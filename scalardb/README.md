@@ -4,7 +4,9 @@ This guide will teach you how to run Jepsen tests for Scalar DB.
 The current tests use [Cassandra test tools in Jepsen](https://github.com/scalar-labs/scalar-jepsen/tree/cassandra).
 
 ## How to test
-1. Install the Cassandra test tool
+1. Start the Docker nodes or multiple machines and log into jepsen-control (as explained [here](https://github.com/scalar-labs/scalar-jepsen/tree/README.md)).
+
+2. Install the Cassandra test tool
 
     ```
     # in jepsen-control
@@ -13,7 +15,7 @@ The current tests use [Cassandra test tools in Jepsen](https://github.com/scalar
     $ lein install
     ```
 
-2. Run a test of Scalar DB
+3. Run a test of Scalar DB
 
     ```
     # in jepsen-control

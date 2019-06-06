@@ -1,7 +1,7 @@
 
 # Run tests with Jepsen Docker
 1. Clone [Jepsen repository](https://github.com/jepsen-io/jepsen)
-2. Configure to mount `scalar-jepsen` directory by editing `${JEPSEN}/docker/docker-compose.dev.yml` like the following
+2. Configure to mount `scalar-jepsen` directory by editing `${JEPSEN_ROOT}/docker/docker-compose.dev.yml` like the following
 
 ```yaml
    control:
@@ -13,7 +13,7 @@
 3. Start docker with `--dev` option
 
 ```sh
-$ cd ${JEPSEN}/docker
+$ cd ${JEPSEN_ROOT}/docker
 $ ./up.sh --dev
 ```
 
@@ -40,8 +40,8 @@ sudo apt install openjdk-8-jre
 ```
 
 3. Install Leiningen (https://leiningen.org/) on the control machine
-4. Make a SSH key pair on the control machine
-5. Add the public key to login nodes as root on each node
+4. Make an SSH key pair for Jepsen to login nodes from the control machine
+5. Register the public key as root on each node
 
 ```sh
 $ sudo echo ssh-rsa ... >> /root/.ssh/authorized_keys

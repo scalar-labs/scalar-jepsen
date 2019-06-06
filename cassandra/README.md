@@ -14,6 +14,9 @@ This is based on [riptano's jepsen](https://github.com/riptano/jepsen/tree/cassa
 You will probably need to increase the amount of memory that you make available to Docker in order to run these tests with Docker. We have had success using 8GB of memory and 2GB of swap. More, if you can spare it, is probably better.
 
 ### Run a test
+1. Start the Docker nodes or multiple machines and log into jepsen-control (as explained [here](https://github.com/scalar-labs/scalar-jepsen/tree/README.md)).
+
+2. Run a test
 
 ```
 # in jepsen-control
