@@ -1,0 +1,6 @@
+pom.xml
+*/target/**
+*/checkouts/**
+*/store/**
+*/report/**
+
