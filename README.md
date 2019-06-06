@@ -3,10 +3,11 @@
 1. Clone [Jepsen repository](https://github.com/jepsen-io/jepsen)
 2. Configure to mount `scalar-jepsen` directory by editing `${JEPSEN}/docker/docker-compose.dev.yml` like the following
 
-```yml
-:volumes
-  - ${JEPSEN_ROOT}:/jepsen
-  - ${SCALAR-JEPSEN_DIR}:/scalar-jepsen
+```yaml
+   control:
+     volumes:
+       - ${JEPSEN_ROOT}:/jepsen # Mounts $JEPSEN_ROOT on host to /jepsen control container
+       - ${SCALAR_JEPSEN}:/scalar-jepsen
 ```
 
 3. Start docker with `--dev` option
@@ -30,7 +31,7 @@ $ ./up.sh --dev
   - Check README in each test for more detail
 
 # Run tests without Docker
-1. Launch debian machines as a control machine and nodes
+1. Launch debian machines as a control machine and Cassandra nodes
   - We recommend 1 control machine and 5 node's machines
     - You can decrease the number of nodes. If it's decreased, you need to specify the nodes when a test starts.
 2. Install Java8 on each machine
@@ -58,7 +59,7 @@ $ sudo sh -c "cat << EOF >> /etc/hosts
 EOF"
 ```
 
-7. Run a test
+7. Run a test on the control machine
 
 ```sh
 $ cd ${SCALAR_JEPSEN}/cassandra
