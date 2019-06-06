@@ -32,8 +32,8 @@ $ ./up.sh --dev
 
 # Run tests without Docker
 1. Launch debian machines as a control machine and Cassandra nodes
-  - We recommend 1 control machine and 5 node's machines
-    - You can decrease the number of nodes. If it's decreased, you need to specify the nodes when a test starts.
+  - We recommend 1 control machine and 5 node machines
+    - You can decrease the number of nodes. If you do so then you will need to specify the nodes when starting a test.
 2. Install Java8 on each machine
 ```sh
 sudo apt install openjdk-8-jre
