@@ -7,7 +7,7 @@
    control:
      volumes:
        - ${JEPSEN_ROOT}:/jepsen # Mounts $JEPSEN_ROOT on host to /jepsen control container
-       - ${SCALAR_JEPSEN}:/scalar-jepsen
+       - ${SCALAR_JEPSEN_ROOT}:/scalar-jepsen # $SCALAR_JEPSEN_ROOT is the path of this repository on host
 ```
 
 3. Start docker with `--dev` option
