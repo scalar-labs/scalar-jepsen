@@ -6,7 +6,6 @@
              [client :as client]
              [checker :as checker]
              [generator :as gen]]
-            [knossos.op :as op]
             [scalardb.core :as scalar])
   (:import (com.scalar.database.api Put
                                     Scan
@@ -72,44 +71,38 @@
   (let [tx (scalar/start-transaction test)]
     (try
       (dotimes [i n]
-        (->>
-         (prepare-put i 1 balance)
-         (.put tx)))
+        (.put tx (prepare-put i 1 balance)))
       (.commit tx)
       (catch Exception e
         (throw (RuntimeException. (.getMessage e)))))))
 
-(defn- get-balance-from-result
-  "Get the balance from a result"
+(defn- get-balance
   [^Result result]
   (-> result (.getValue BALANCE) .get .get))
 
-(defn- get-age-from-result
-  "Get the age from a result"
+(defn- get-age
   [^Result result]
   (-> result (.getValue AGE) .get .get))
 
 (defn- get-balances
   [results]
-  (mapv #(get-balance-from-result (first %)) results))
+  (mapv #(get-balance (first %)) results))
 
 (defn- get-ages
   [results]
-  (mapv #(get-age-from-result (first %)) results))
+  (mapv #(get-age (first %)) results))
 
 (defn- get-nums
   [results]
   (mapv count results))
 
 (defn- calc-new-balance
-  "Calculate the new value from the result of transaction.get()"
   [^Result r amount]
-  (-> r get-balance-from-result (+ amount)))
+  (-> r get-balance (+ amount)))
 
 (defn- calc-new-age
-  "Calculate the new value from the result of transaction.get()"
   [^Result r]
-  (-> r get-age-from-result inc))
+  (-> r get-age inc))
 
 (defn- tx-transfer
   [tx from to amount]
@@ -146,7 +139,6 @@
         (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
                                                 :table TABLE
                                                 :schema SCHEMA}])
-        (scalar/prepare-storage-service! test)
         (scalar/prepare-transaction-service! test)
         (populate-accounts test n initial-balance))))
 
@@ -182,7 +174,7 @@
 
 (defn- transfer
   [test _]
-  (let [n (-> test :model :num)]
+  (let [n (-> test :client :n)]
     {:type  :invoke
      :f     :transfer
      :value {:from   (rand-int n)
@@ -198,7 +190,7 @@
   [test _]
   {:type :invoke
    :f    :get-all
-   :num  (-> test :model :num)})
+   :num  (-> test :client :n)})
 
 (defn- check-tx
   [test _]
@@ -210,7 +202,6 @@
   (reify checker/Checker
     (check [this test history opts]
       (let [read-result (->> history
-                             (r/filter op/ok?)
                              (r/filter #(= :get-all (:f %)))
                              (into [])
                              last
@@ -246,7 +237,6 @@
   [opts]
   (merge (scalar/scalardb-test (str "transfer-append-" (:suffix opts))
                                {:client     (TransferClient. (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
-                                :model      {:num NUM_ACCOUNTS}
                                 :unknown-tx (atom #{})
                                 :failures   (atom 0)
                                 :generator  (gen/phases

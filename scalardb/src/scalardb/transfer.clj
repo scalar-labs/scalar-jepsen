@@ -9,10 +9,7 @@
             [knossos.op :as op]
             [scalardb.core :as scalar])
   (:import (com.scalar.database.api Consistency
-                                    DistributedStorage
-                                    DistributedTransaction
                                     Get
-                                    Isolation
                                     Put
                                     Result)
            (com.scalar.database.io IntValue
@@ -55,12 +52,12 @@
       (.withConsistency Consistency/LINEARIZABLE)))
 
 (defn- prepare-put
-  [id v]
+  [id balance]
   (-> (Key. [(IntValue. ACCOUNT_ID id)])
       (Put.)
       (.forNamespace KEYSPACE)
       (.forTable TABLE)
-      (.withValue v)
+      (.withValue (IntValue. BALANCE balance))
       (.withConsistency Consistency/LINEARIZABLE)))
 
 (defn- populate-accounts
@@ -70,20 +67,16 @@
   (let [tx (scalar/start-transaction test)]
     (try
       (dotimes [i n]
-        (->>
-         (prepare-put i (IntValue. BALANCE balance))
-         (.put tx)))
+        (.put tx (prepare-put i balance)))
       (.commit tx)
       (catch Exception e
         (throw (RuntimeException. (.getMessage e)))))))
 
 (defn- get-balance
-  "Get a balance from a result"
   [^Result r]
   (-> r .get (.getValue BALANCE) .get .get))
 
 (defn- get-version
-  "Get a version from a result"
   [^Result r]
   (-> r .get (.getValue scalar/VERSION) .get .get))
 
@@ -95,19 +88,18 @@
   [results]
   (mapv get-version results))
 
-(defn- calc-new-val
-  "Calculate the new value from the result of transaction.get()"
+(defn- calc-new-balance
   [^Result r ^long amount]
-  (IntValue. BALANCE (-> r get-balance (+ amount))))
+  (-> r get-balance (+ amount)))
 
 (defn- tx-transfer
   [tx {:keys [from to amount]}]
   (let [fromResult (.get tx (prepare-get from))
         toResult (.get tx (prepare-get to))]
-    (->> (calc-new-val fromResult (- amount))
+    (->> (calc-new-balance fromResult (- amount))
          (prepare-put from)
          (.put tx))
-    (->> (calc-new-val toResult amount)
+    (->> (calc-new-balance toResult amount)
          (prepare-put to)
          (.put tx))
     (.commit tx)))
@@ -138,7 +130,6 @@
         (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
                                                 :table TABLE
                                                 :schema SCHEMA}])
-        (scalar/prepare-storage-service! test)
         (scalar/prepare-transaction-service! test)
         (populate-accounts test n initial-balance))))
 
@@ -173,7 +164,7 @@
 
 (defn- transfer
   [test _]
-  (let [n (-> test :model :num)]
+  (let [n (-> test :client :n)]
     {:type  :invoke
      :f     :transfer
      :value {:from   (rand-int n)
@@ -189,7 +180,7 @@
   [test _]
   {:type :invoke
    :f    :get-all
-   :num  (-> test :model :num)})
+   :num  (-> test :client :n)})
 
 (defn- check-tx
   [test _]
@@ -201,7 +192,6 @@
   (reify checker/Checker
     (check [this test history opts]
       (let [read-result (->> history
-                             (r/filter op/ok?)
                              (r/filter #(= :get-all (:f %)))
                              (r/filter identity)
                              (into [])
@@ -230,8 +220,8 @@
                           count
                           (+ checked-committed))
             expected-version (-> total-ok
-                                 (* 2)                       ; update 2 records per a transfer
-                                 (+ (-> test :model :num)))  ; initial insertions
+                                 (* 2)                      ; update 2 records per a transfer
+                                 (+ (-> test :client :n)))  ; initial insertions
             bad-version (if-not (= actual-version expected-version)
                           {:type     :wrong-version
                            :expected expected-version
@@ -248,7 +238,6 @@
                                {:client     (TransferClient. (atom false)
                                                              NUM_ACCOUNTS
                                                              INITIAL_BALANCE)
-                                :model      {:num NUM_ACCOUNTS}
                                 :unknown-tx (atom #{})
                                 :failures   (atom 0)
                                 :generator  (gen/phases
