@@ -67,7 +67,7 @@
 (defn- create-properties
   [nodes]
   (doto (Properties.)
-    (.setProperty "scalar.database.contact_points" (reduce #(str %1 "," %2) nodes))
+    (.setProperty "scalar.database.contact_points" (clojure.string/join "," nodes))
     (.setProperty "scalar.database.username" "cassandra")
     (.setProperty "scalar.database.password" "cassandra")))
 
