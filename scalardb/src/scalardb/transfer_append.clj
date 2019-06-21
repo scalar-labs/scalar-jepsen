@@ -105,7 +105,7 @@
   (-> r get-age inc))
 
 (defn- tx-transfer
-  [tx from to amount]
+  [tx {:keys [from to amount]}]
   (let [^Result fromResult (scan-for-latest tx (prepare-scan-for-latest from))
         ^Result toResult (scan-for-latest tx (prepare-scan-for-latest to))]
     (->> (prepare-put from (calc-new-age fromResult) (calc-new-balance fromResult (- amount)))
@@ -146,7 +146,7 @@
     (case (:f op)
       :transfer (if-let [tx (scalar/start-transaction test)]
                   (try
-                    (tx-transfer tx (-> op :value :from) (-> op :value :to) (-> op :value :amount))
+                    (tx-transfer tx (:value op))
                     (assoc op :type :ok)
                     (catch UnknownTransactionStatusException e
                       (swap! (:unknown-tx test) conj (.getId tx))
