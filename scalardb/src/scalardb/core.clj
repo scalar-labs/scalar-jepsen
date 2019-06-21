@@ -66,17 +66,10 @@
 
 (defn- create-properties
   [nodes]
-  (let [props (Properties.)]
-    (if (= (count nodes) 1)
-      (.setProperty props
-                    "scalar.database.contact_points"
-                    (first nodes))
-      (.setProperty props
-                    "scalar.database.contact_points"
-                    (reduce #(str %1 "," %2) nodes)))
-    (.setProperty props "scalar.database.username" "cassandra")
-    (.setProperty props "scalar.database.password" "cassandra")
-    props))
+  (doto (Properties.)
+    (.setProperty "scalar.database.contact_points" (reduce #(str %1 "," %2) nodes))
+    (.setProperty "scalar.database.username" "cassandra")
+    (.setProperty "scalar.database.password" "cassandra")))
 
 (defn- close-storage!
   [test]
@@ -173,7 +166,7 @@
      (when (zero? (mod tries# RETRIES_FOR_RECONNECTION))
        (~connect-fn ~test))
      (let [results# ~@body]
-       (if-not (nil? results#)
+       (if results#
          results#
          (if (pos? tries#)
            (recur (dec tries#))
