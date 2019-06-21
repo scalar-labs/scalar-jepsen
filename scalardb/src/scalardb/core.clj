@@ -165,13 +165,12 @@
        (exponential-backoff (- RETRIES tries#)))
      (when (zero? (mod tries# RETRIES_FOR_RECONNECTION))
        (~connect-fn ~test))
-     (let [results# ~@body]
-       (if results#
-         results#
-         (if (pos? tries#)
-           (recur (dec tries#))
-           (throw (ex-info "Failed to read records"
-                           {:cause "Failed to read records"})))))))
+     (if-let [results# ~@body]
+       results#
+       (if (pos? tries#)
+         (recur (dec tries#))
+         (throw (ex-info "Failed to read records"
+                         {:cause "Failed to read records"}))))))
 
 (defn- is-committed-state?
   "Return true if the status is COMMITTED. Return nil if the read fails."
