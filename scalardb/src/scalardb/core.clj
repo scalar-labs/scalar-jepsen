@@ -82,7 +82,7 @@
   [test]
   (let [storage (:storage test)]
     (locking storage
-      (when-not (nil? @storage)
+      (when @storage
         (.close @storage)
         (reset! storage nil)
         (info "The current storage service closed")))))
@@ -91,7 +91,7 @@
   [test]
   (let [transaction (:transaction test)]
     (locking transaction
-      (when-not (nil? @transaction)
+      (when @transaction
         (.close @transaction)
         (reset! transaction nil)
         (info "The current transaction service closed")))))
@@ -122,7 +122,7 @@
                (reset! (:storage test)))
           (catch Exception e
             (warn (.getMessage e))))
-        (when-not (nil? (:storage test))
+        (when-not @(:storage test)
           (recur (dec tries)))))))
 
 (defn prepare-transaction-service!
@@ -132,7 +132,7 @@
   (loop [tries RETRIES]
     (when (< tries RETRIES)
       (exponential-backoff (- RETRIES tries)))
-    (if-not (pos? tries)
+    (if (zero? tries)
       (warn "Failed to connect to the cluster")
       (if-let [injector (some->> (c/live-nodes test)
                                  not-empty
@@ -146,7 +146,7 @@
                (reset! (:transaction test)))
           (catch Exception e
             (warn (.getMessage e))))
-        (when-not (nil? (:transaction test))
+        (when-not @(:transaction test)
           (recur (dec tries)))))))
 
 (defn check-connection!
