@@ -7,23 +7,22 @@
   (:import (javax.json Json)
            (java.io StringReader)))
 
-(defn cass-node?
-  [test node]
-  (if (some #(= % node) (:cass-nodes test)) true false))
+(def ^:private ^:const STATUS_CODE_SUCCESS 200)
+(def ^:private ^:const STATUS_CODE_UNKNOWN 501)
 
 (defn server?
-  [test node]
+  [node test]
   (if (some #(= % node) (:servers test)) true false))
 
 (defn spinup-cassandra!
-  [test node]
+  [node test]
   (when (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
     (cassandra/wipe! node))
   (doto node
     (cassandra/install! test)
     (cassandra/configure! test)
     (cassandra/wait-turn test)
-    (cassandra/start! test)))
+    (cassandra/guarded-start! test)))
 
 (defn teardown-cassandra!
   [node]
@@ -32,16 +31,16 @@
 
 (defn success?
   [response]
-  (= (.getStatus response) 200))
+  (= (.getStatus response) STATUS_CODE_SUCCESS))
 
 (defn response->obj
   "Returns the value from a ContractExecutionResponse if it exists, and nil otherwise."
   [response]
-  (if (= (.getStatus response) 200)
+  (if (success? response)
     (-> response .getResult StringReader. (Json/createReader) .readObject)
-    (if (= (.getStatus response) 501)
+    (if (= (.getStatus response) STATUS_CODE_UNKNOWN)
       (warn "The result of the request was unknown")
-      (warn "Failed to get the object from the response"))))
+      (warn "The contract execution failed"))))
 
 (defn create-tables
   [{:keys [cass-nodes rf]}]

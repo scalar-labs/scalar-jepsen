@@ -1,6 +1,6 @@
 (defproject scalardl "0.1.0-SNAPSHOT"
   :description "Jepsen testing for Scalar DL"
-  :url "https://github.com/scalar-labs/scalar"
+  :url "https://github.com/scalar-labs/scalar-jepsen"
   :license {:name ""
             :url ""}
   :dependencies [[org.clojure/clojure "1.10.0"]

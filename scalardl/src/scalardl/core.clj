@@ -14,6 +14,7 @@
            (java.util Properties)))
 
 (def ^:private ^:const RETRIES 5)
+(def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 
 (def ^:private ^:const LOCAL_DIR "/scalar-jepsen/scalardl")
 (def ^:private ^:const LEDGER_INSTALL_DIR "/root/ledger")
@@ -54,11 +55,18 @@
       (throw (ex-info "Failed to prepare ClientService"
                       {:cause "Failed to prepare ClientService"})))))
 
-(defn- start-server!
-  [test node]
-  (info node "waiting for starting C* cluster")
-  (Thread/sleep (* 1000 60 (count (:cass-nodes test))))
+(defn try-switch-server!
+  [client-service test]
+  (if (= (swap! (:failures test) inc) NUM_FAILURES_FOR_RECONNECTION)
+    (do
+      (info "Switch the server to another")
+      (.close client-service)
+      (reset! (:failures test) 0)
+      (prepare-client-service test))
+    client-service))
 
+(defn- install-server!
+  [node test]
   (info node "installing DL server")
   (c/su (c/exec :rm :-rf LEDGER_INSTALL_DIR))
   (c/su (debian/install [:openjdk-8-jre]))
@@ -70,34 +78,41 @@
   (c/exec :echo "scalar.database.username=cassandra"
           :>> LEDGER_PROPERTIES)
   (c/exec :echo "scalar.database.password=cassandra"
-          :>> LEDGER_PROPERTIES)
+          :>> LEDGER_PROPERTIES))
+
+(defn start-server!
+  [node test]
   (info node "starting DL server")
   (cu/start-daemon! {:logfile LEDGER_LOG :pidfile LEDGER_PID :chdir LEDGER_INSTALL_DIR}
                     LEDGER_EXE
                     :-config LEDGER_PROPERTIES))
 
-(defn- stop-server!
+(defn stop-server!
   [node]
   (info node "tearing down DL server")
-  (cu/stop-daemon! LEDGER_EXE LEDGER_PID)
+  (cu/stop-daemon! LEDGER_PID)
   (c/su (c/exec :rm :-rf LEDGER_INSTALL_DIR)))
 
 (defn db
   []
   (reify db/DB
     (setup! [_ test node]
-      (if (util/server? test node)
-        (start-server! test node)
-        (util/spinup-cassandra! test node)))
+      (if (util/server? node test)
+        (do
+          (install-server! node test)
+          (info node "waiting for starting C* cluster")
+          (Thread/sleep (* 1000 60 (count (:cass-nodes test))))
+          (start-server! node test))
+        (util/spinup-cassandra! node test)))
 
     (teardown! [_ test node]
-      (if (util/server? test node)
+      (if (util/server? node test)
         (stop-server! node)
         (util/teardown-cassandra! node)))
 
     db/LogFiles
     (log-files [_ test node]
-      (if (util/server? test node)
+      (if (util/server? node test)
         [LEDGER_LOG]
         ["/root/cassandra/logs/system.log"])))) ;; TODO: to const in cassandra
 

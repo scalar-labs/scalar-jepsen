@@ -2,25 +2,30 @@
   (:gen-class)
   (:require [cassandra
              [core :as cassandra]
-             [runner :as car]
-             [nemesis :as can]]
+             [nemesis :as can]
+             [runner :as car]]
             [jepsen
              [core :as jepsen]
              [cli :as cli]]
-            [scalardl.simple]
-            [scalardl.transfer]))
+            [scalardl
+             [nemesis :as nemesis]
+             [simple]
+             [transfer]]))
 
 (def tests
   "A map of test names to test constructors."
   {"simple"   scalardl.simple/simple-test
    "transfer" scalardl.transfer/transfer-test})
 
+(def nemeses
+  {"crash" `(nemesis/crash)})
+
 (def opt-spec
   [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)
 
    (cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
                      [`(can/none)]
-                     car/nemeses) ;; TODO: add nemesis for DL server
+                     (merge car/nemeses nemeses))
 
    (cli/repeated-opt nil "--join NAME" "Which node joinings to use"
                      [{:name "" :bootstrap false :decommission false}]
