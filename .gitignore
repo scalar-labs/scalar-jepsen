@@ -3,5 +3,4 @@ pom.xml
 */checkouts/**
 */store/**
 */report/**
-*/resources/**
-
+*/resources/ledger*
