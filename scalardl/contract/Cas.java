@@ -32,7 +32,7 @@ public class Cas extends Contract {
     }
 
     int next = argument.getInt("new_value");
-    ledger.put(key, Json.createObjectBuilder().add("value", value).build());
+    ledger.put(key, Json.createObjectBuilder().add("value", next).build());
 
     return null;
   }

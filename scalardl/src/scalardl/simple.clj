@@ -57,37 +57,38 @@
           (.registerContract client-service (:name c) (:class c) (:path c) (Optional/empty))))))
 
   (invoke! [_ test op]
-    (let [[k v] (:value op)]
-      (case (:f op)
-        ;; TODO: unknown failure
-        :read (let [resp (->> (create-argument k)
-                              (.executeContract client-service "read"))]
-                (if (util/success? resp)
-                  (assoc op :type :ok :value (->> resp
-                                                  util/response->obj
-                                                  (.getInt ASSET_VALUE)))
-                  (assoc op :type :fail :error (.getMessage resp))))
+    (case (:f op)
+      ;; TODO: unknown failure
+      :read (let [resp (->> (create-argument 1)
+                            (.executeContract client-service "read"))]
+              (if (util/success? resp)
+                (assoc op :type :ok :value (-> resp
+                                               util/response->obj
+                                               (.getInt ASSET_VALUE)))
+                (assoc op :type :fail :error (.getMessage resp))))
 
-        :write (let [resp (->> (create-argument k v)
-                               (.executeContract client-service "write"))]
-                 (if (util/success? resp)
-                   (assoc op :type :ok)
-                   (assoc op :type :fail :error (.getMessage resp))))
-
-        :cas (let [resp (->> (create-argument k (:cur v) (:next v))
-                             (.executeContract client-service "cas"))]
+      :write (let [v (:value op)
+                   resp (->> (create-argument 1 v)
+                             (.executeContract client-service "write"))]
                (if (util/success? resp)
                  (assoc op :type :ok)
-                 (assoc op :type :fail :error (.getMessage resp)))))))
+                 (assoc op :type :fail :error (.getMessage resp))))
+
+      :cas (let [[cur next] (:value op)
+                 resp (->> (create-argument 1 cur next)
+                           (.executeContract client-service "cas"))]
+             (if (util/success? resp)
+               (assoc op :type :ok)
+               (assoc op :type :fail :error (.getMessage resp))))))
 
   (close! [_ _]
     (.close client-service))
 
   (teardown! [_ test]))
 
-(defn r [_ _] {:type :invoke :f :read :value [1 nil] })
-(defn w [_ _] {:type :invoke :f :write :value [1 (rand-int 5)]})
-(defn cas [_ _] {:type :invoke :f :cas :value [1 {:cur (rand-int 5) :next (rand-int 5)}]})
+(def r {:type :invoke, :f :read})
+(defn w [_ _] {:type :invoke, :f :write, :value (rand-int 5)})
+(defn cas [_ _] {:type :invoke, :f :cas, :value [(rand-int 5) (rand-int 5)]})
 
 (defn simple-test
   [opts]
@@ -95,7 +96,7 @@
                            {:client     (SimpleClient. (atom false) nil)
                             :failures   (atom 0)
                             :generator  (gen/phases
-                                         (conductors/std-gen opts [r w cas cas])
+                                         (conductors/std-gen opts [r w cas cas cas])
                                          (conductors/terminate-nemesis opts))
                             :checker   (checker/linearizable {:model (model/cas-register)
                                                               :algorithm :linear})})
