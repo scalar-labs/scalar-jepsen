@@ -6,8 +6,10 @@
             [clojure.tools.logging :refer [debug info warn]]
             [cassandra.conductors :as conductors]
             [knossos.model :as model]
-            [scalardl.core :as dl]
-            [scalardl.util :as util])
+            [scalardl
+             [cassandra :as cassandra]
+             [core :as dl]
+             [util :as util]])
   (:import (javax.json Json)
            (java.util Optional)))
 
@@ -50,8 +52,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (util/create-tables test)
-        (info "creating tables")
+        (cassandra/create-tables test)
         (Thread/sleep 10000)  ;; Wait for the table creation
         (info "prepare certificate and contracts")
         (.registerCertificate @client-service)

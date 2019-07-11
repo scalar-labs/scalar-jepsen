@@ -6,7 +6,9 @@
              [tests :as tests]]
             [jepsen.control.util :as cu]
             [jepsen.os.debian :as debian]
-            [scalardl.util :as util])
+            [scalardl
+             [cassandra :as cassandra]
+             [util :as util]])
   (:import (com.scalar.client.service ClientService)
            (com.scalar.client.config ClientConfig)
            (com.scalar.client.service ClientModule)
@@ -103,12 +105,12 @@
           (info node "waiting for starting C* cluster")
           (Thread/sleep (* 1000 60 (count (:cass-nodes test))))
           (start-server! node test))
-        (util/spinup-cassandra! node test)))
+        (cassandra/spinup-cassandra! node test)))
 
     (teardown! [_ test node]
       (if (util/server? node test)
         (stop-server! node)
-        (util/teardown-cassandra! node)))
+        (cassandra/teardown-cassandra! node)))
 
     db/LogFiles
     (log-files [_ test node]
