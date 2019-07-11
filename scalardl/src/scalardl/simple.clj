@@ -54,50 +54,52 @@
       (when (compare-and-set! initialized? false true)
         (cassandra/create-tables test)
         (Thread/sleep 10000)  ;; Wait for the table creation
-        (info "prepare certificate and contracts")
+        (info "register a certificate and contracts")
         (.registerCertificate @client-service)
         (doseq [c CONTRACTS]
           (.registerContract @client-service (:name c) (:class c) (:path c) (Optional/empty))))))
 
   (invoke! [_ test op]
-    (case (:f op)
-      ;; TODO: unknown failure
-      :read (let [resp (->> (create-argument 1)
-                            (.executeContract @client-service "read"))]
-              (if (util/success? resp)
-                (assoc op :type :ok :value (-> resp
-                                               util/response->obj
-                                               (.getInt ASSET_VALUE)))
-                (do
-                  (reset! client-service (dl/try-switch-server! @client-service test))
-                  (assoc op :type :fail :error (.getMessage resp)))))
+    (let [txid (str (java.util.UUID/randomUUID))]
+      (case (:f op)
+        :read (let [resp (->> (create-argument 1)
+                              (.executeContract @client-service "read"))]
+                (if (util/success? resp)
+                  (assoc op :type :ok :value (-> resp
+                                                 util/response->obj
+                                                 (.getInt ASSET_VALUE)))
+                  (do
+                    (reset! client-service (dl/try-switch-server! @client-service test))
+                    (assoc op :type :fail :error (.getMessage resp)))))
 
-      :write (let [v (:value op)
-                   resp (->> (create-argument 1 v)
-                             (.executeContract @client-service "write"))]
-               (if (util/success? resp)
+        :write (let [v (:value op)
+                     resp (->> (create-argument 1 v)
+                               (.executeContract @client-service "write"))]
+                 (if (or (util/success? resp)
+                         (and (util/unknown? resp) (dl/check-tx-committed txid test)))
+                   (assoc op :type :ok)
+                   (do
+                     (reset! client-service (dl/try-switch-server! @client-service test))
+                     (assoc op :type :fail :error (.getMessage resp)))))
+
+        :cas (let [[cur next] (:value op)
+                   resp (->> (create-argument 1 cur next)
+                             (.executeContract @client-service "cas"))]
+               (if (or (util/success? resp)
+                       (and (util/unknown? resp) (dl/check-tx-committed txid test)))
                  (assoc op :type :ok)
                  (do
                    (reset! client-service (dl/try-switch-server! @client-service test))
-                   (assoc op :type :fail :error (.getMessage resp)))))
-
-      :cas (let [[cur next] (:value op)
-                 resp (->> (create-argument 1 cur next)
-                           (.executeContract @client-service "cas"))]
-             (if (util/success? resp)
-               (assoc op :type :ok)
-               (do
-                 (reset! client-service (dl/try-switch-server! @client-service test))
-                 (assoc op :type :fail :error (.getMessage resp)))))))
+                   (assoc op :type :fail :error (.getMessage resp))))))))
 
   (close! [_ _]
     (.close @client-service))
 
   (teardown! [_ _]))
 
-(def r {:type :invoke, :f :read})
-(defn w [_ _] {:type :invoke, :f :write, :value (rand-int 5)})
-(defn cas [_ _] {:type :invoke, :f :cas, :value [(rand-int 5) (rand-int 5)]})
+(def r {:type :invoke :f :read})
+(defn w [_ _] {:type :invoke :f :write :value (rand-int 5)})
+(defn cas [_ _] {:type :invoke :f :cas :value [(rand-int 5) (rand-int 5)]})
 
 (defn simple-test
   [opts]

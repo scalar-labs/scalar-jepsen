@@ -15,7 +15,7 @@
            (com.google.inject Guice)
            (java.util Properties)))
 
-(def ^:private ^:const RETRIES 5)
+(def ^:private ^:const RETRIES 8)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 
 (def ^:private ^:const LOCAL_DIR "/scalar-jepsen/scalardl")
@@ -66,6 +66,18 @@
       (reset! (:failures test) 0)
       (prepare-client-service test))
     client-service))
+
+(defn check-tx-committed
+  [txid test]
+  (loop [tries RETRIES]
+    (when (< tries RETRIES)
+      (exponential-backoff (- RETRIES tries)))
+    (let [committed (cassandra/check-tx-state txid test)]
+      (if committed
+        committed
+        (if (pos? tries)
+          (recur (dec tries))
+          (warn "Failed to check the TX state" txid))))))
 
 (defn- install-server!
   [node test]

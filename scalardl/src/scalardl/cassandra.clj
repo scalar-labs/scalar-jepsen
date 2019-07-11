@@ -5,6 +5,23 @@
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all]))
 
+(def ^:private ^:const TX_COMMITTED 3)
+(def ^:private ^:const TX_ABORTED 4)
+
+(defn check-tx-state
+  "Return true/false when the transaction has been committed or aborted.
+  Return nil when it can't read the state from the coordinator table"
+  [txid {:keys [cass-nodes]}]
+  (let [cluster (alia/cluster {:contact-points cass-nodes})
+        state (some-> (try (alia/execute (alia/connect cluster)
+                                         (select :coordinator.state (where {:tx_id txid}))
+                                         {:consistency :serial})
+                           (catch Exception _
+                             (warn "Failed to read the coordinator table"))
+                           (finally (alia/shutdown cluster)))
+                      first :tx_state)]
+    (if state (= state TX_COMMITTED) nil)))
+
 (defn spinup-cassandra!
   [node test]
   (when (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
@@ -104,4 +121,5 @@
                                         (column-definitions {:tx_id         :text
                                                              :tx_state      :int
                                                              :tx_created_at :bigint
-                                                             :primary-key   [:tx_id]})))))
+                                                             :primary-key   [:tx_id]})))
+    (alia/shutdown session)))
