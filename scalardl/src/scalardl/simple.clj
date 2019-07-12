@@ -60,7 +60,6 @@
           (.registerContract @client-service (:name c) (:class c) (:path c) (Optional/empty))))))
 
   (invoke! [_ test op]
-    (let [txid (str (java.util.UUID/randomUUID))]
       (case (:f op)
         :read (let [resp (->> (create-argument 1)
                               (.executeContract @client-service "read"))]
@@ -76,7 +75,8 @@
                      resp (->> (create-argument 1 v)
                                (.executeContract @client-service "write"))]
                  (if (or (util/success? resp)
-                         (and (util/unknown? resp) (dl/check-tx-committed txid test)))
+                         (and (util/unknown? resp)
+                              (dl/check-tx-committed (util/response->txid resp) test)))
                    (assoc op :type :ok)
                    (do
                      (reset! client-service (dl/try-switch-server! @client-service test))
@@ -86,11 +86,12 @@
                    resp (->> (create-argument 1 cur next)
                              (.executeContract @client-service "cas"))]
                (if (or (util/success? resp)
-                       (and (util/unknown? resp) (dl/check-tx-committed txid test)))
+                       (and (util/unknown? resp)
+                            (dl/check-tx-committed (util/response->txid resp) test)))
                  (assoc op :type :ok)
                  (do
                    (reset! client-service (dl/try-switch-server! @client-service test))
-                   (assoc op :type :fail :error (.getMessage resp))))))))
+                   (assoc op :type :fail :error (.getMessage resp)))))))
 
   (close! [_ _]
     (.close @client-service))

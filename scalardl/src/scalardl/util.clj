@@ -24,3 +24,8 @@
   (if (success? response)
     (-> response .getResult StringReader. (Json/createReader) .readObject)
     (warn "The contract execution failed")))
+
+(defn response->txid
+  [response]
+  (when (success? response)
+    (-> response .getProofs first .getNonce)))

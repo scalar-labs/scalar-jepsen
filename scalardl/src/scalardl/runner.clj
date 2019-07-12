@@ -42,8 +42,10 @@
 
    [nil "--cert CERTIFICATE" "a certificate file for DL"
     :default "resources/client.pem"]
-   [nil "--client-key CLIENT_KEY" "a private key for DL"
+   [nil "--client-key CLIENT_KEY" "a private key for DL client"
     :default "resources/client-key.pem"]
+   [nil "--server-key SERVER_KEY" "a private key for DL server"
+    :default "resources/server-key.pem"]
    [nil "--ledger-tarball LEDGER_TARBALL" "DL server bin files"
     :default "resources/ledger.tar"]
 

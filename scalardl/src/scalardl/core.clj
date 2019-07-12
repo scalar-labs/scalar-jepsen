@@ -22,6 +22,7 @@
 (def ^:private ^:const LEDGER_INSTALL_DIR "/root/ledger")
 (def ^:private ^:const LEDGER_EXE "bin/scalar-ledger")
 (def ^:private ^:const LEDGER_PROPERTIES (str LEDGER_INSTALL_DIR "/ledger.properties"))
+(def ^:private ^:const LEDGER_KEY (str LEDGER_INSTALL_DIR "/server-key.pem"))
 (def ^:private ^:const LEDGER_LOG (str LEDGER_INSTALL_DIR "/scalardl.log"))
 (def ^:private ^:const LEDGER_PID (str LEDGER_INSTALL_DIR "/scalardl.pid"))
 
@@ -61,7 +62,7 @@
   [client-service test]
   (if (= (swap! (:failures test) inc) NUM_FAILURES_FOR_RECONNECTION)
     (do
-      (info "Switch the server to another")
+      (info "switching the server to another")
       (.close client-service)
       (reset! (:failures test) 0)
       (prepare-client-service test))
@@ -69,6 +70,7 @@
 
 (defn check-tx-committed
   [txid test]
+  (info "checking a TX state" txid)
   (loop [tries RETRIES]
     (when (< tries RETRIES)
       (exponential-backoff (- RETRIES tries)))
@@ -79,6 +81,16 @@
           (recur (dec tries))
           (warn "Failed to check the TX state" txid))))))
 
+(defn- create-server-properties
+  [test]
+  (c/exec :echo (str "scalar.ledger.proof.enabled=true\n"
+                     "scalar.ledger.proof.private_key_path=server-key.pem\n"
+                     "scalar.database.contact_points="
+                     (clojure.string/join "," (:cass-nodes test)) "\n"
+                     "scalar.database.username=cassandra\n"
+                     "scalar.database.password=cassandra")
+          :> LEDGER_PROPERTIES))
+
 (defn- install-server!
   [node test]
   (info node "installing DL server")
@@ -86,13 +98,8 @@
   (c/su (debian/install [:openjdk-8-jre]))
   (c/upload (:ledger-tarball test) "/tmp/ledger.tar")
   (cu/install-archive! "file:///tmp/ledger.tar" LEDGER_INSTALL_DIR)
-  (c/exec :echo (str "scalar.database.contact_points="
-                     (clojure.string/join "," (:cass-nodes test)))
-          :> LEDGER_PROPERTIES)
-  (c/exec :echo "scalar.database.username=cassandra"
-          :>> LEDGER_PROPERTIES)
-  (c/exec :echo "scalar.database.password=cassandra"
-          :>> LEDGER_PROPERTIES))
+  (c/upload (:server-key test) LEDGER_KEY)
+  (create-server-properties test))
 
 (defn start-server!
   [node test]
