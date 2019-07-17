@@ -1,10 +1,8 @@
 (ns scalardl.util
   (:require [clojure.tools.logging :refer [debug info warn]])
-  (:import (javax.json Json)
+  (:import (com.scalar.client.service StatusCode)
+           (javax.json Json)
            (java.io StringReader)))
-
-(def ^:private ^:const STATUS_CODE_SUCCESS 200)
-(def ^:private ^:const STATUS_CODE_UNKNOWN 501)
 
 (defn server?
   [node test]
@@ -12,11 +10,11 @@
 
 (defn success?
   [response]
-  (= (.getStatus response) STATUS_CODE_SUCCESS))
+  (= (.getStatus response) (.get StatusCode/OK)))
 
 (defn unknown?
   [response]
-  (= (.getStatus response) STATUS_CODE_UNKNOWN))
+  (= (.getStatus response) (.get StatusCode/UNKNOWN_TRANSACTION_STATUS)))
 
 (defn response->obj
   "Returns the value from a ContractExecutionResponse if it exists, and nil otherwise."
