@@ -23,6 +23,7 @@
                                    :class "com.scalar.jepsen.scalardl.Cas"
                                    :path "target/classes/com/scalar/jepsen/scalardl/Cas.class"}])
 
+(def ^:private ^:const NONCE "nonce")
 (def ^:private ^:const ASSET_KEY "key")
 (def ^:private ^:const ASSET_VALUE "value")
 (def ^:private ^:const ASSET_VALUE_NEW "new_value")
@@ -31,17 +32,20 @@
   ([key]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
+       (.add NONCE (str (java.util.UUID/randomUUID)))
        (.build)))
   ([key value]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add ASSET_VALUE value)
+       (.add NONCE (str (java.util.UUID/randomUUID)))
        (.build)))
   ([key cur next]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add ASSET_VALUE cur)
        (.add ASSET_VALUE_NEW next)
+       (.add NONCE (str (java.util.UUID/randomUUID)))
        (.build))))
 
 (defrecord SimpleClient [initialized? client-service]
@@ -60,38 +64,43 @@
           (.registerContract @client-service (:name c) (:class c) (:path c) (Optional/empty))))))
 
   (invoke! [_ test op]
-      (case (:f op)
-        :read (let [resp (->> (create-argument 1)
-                              (.executeContract @client-service "read"))]
-                (if (util/success? resp)
-                  (assoc op :type :ok :value (-> resp
-                                                 util/response->obj
-                                                 (.getInt ASSET_VALUE)))
-                  (do
-                    (reset! client-service (dl/try-switch-server! @client-service test))
-                    (assoc op :type :fail :error (.getMessage resp)))))
+    (case (:f op)
+      :read (let [argument (create-argument 1)
+                  resp (.executeContract @client-service "read" argument)]
+              (if (util/success? resp)
+                (assoc op :type :ok :value (-> resp
+                                               util/response->obj
+                                               (.getInt ASSET_VALUE)))
+                (do
+                  (reset! client-service
+                          (dl/try-switch-server! @client-service test))
+                  (assoc op :type :fail :error (.getMessage resp)))))
 
-        :write (let [v (:value op)
-                     resp (->> (create-argument 1 v)
-                               (.executeContract @client-service "write"))]
-                 (if (or (util/success? resp)
-                         (and (util/unknown? resp)
-                              (dl/check-tx-committed (util/response->txid resp) test)))
-                   (assoc op :type :ok)
-                   (do
-                     (reset! client-service (dl/try-switch-server! @client-service test))
-                     (assoc op :type :fail :error (.getMessage resp)))))
-
-        :cas (let [[cur next] (:value op)
-                   resp (->> (create-argument 1 cur next)
-                             (.executeContract @client-service "cas"))]
+      :write (let [v (:value op)
+                   argument (create-argument 1 v)
+                   resp (.executeContract @client-service "write" argument)]
                (if (or (util/success? resp)
                        (and (util/unknown? resp)
-                            (dl/check-tx-committed (util/response->txid resp) test)))
+                            (dl/check-tx-committed (.getString argument NONCE)
+                                                   test)))
                  (assoc op :type :ok)
                  (do
-                   (reset! client-service (dl/try-switch-server! @client-service test))
-                   (assoc op :type :fail :error (.getMessage resp)))))))
+                   (reset! client-service
+                           (dl/try-switch-server! @client-service test))
+                   (assoc op :type :fail :error (.getMessage resp)))))
+
+      :cas (let [[cur next] (:value op)
+                 argument (create-argument 1 cur next)
+                 resp (.executeContract @client-service "cas" argument)]
+             (if (or (util/success? resp)
+                     (and (util/unknown? resp)
+                          (dl/check-tx-committed (.getString argument NONCE)
+                                                 test)))
+               (assoc op :type :ok)
+               (do
+                 (reset! client-service
+                         (dl/try-switch-server! @client-service test))
+                 (assoc op :type :fail :error (.getMessage resp)))))))
 
   (close! [_ _]
     (.close @client-service))
