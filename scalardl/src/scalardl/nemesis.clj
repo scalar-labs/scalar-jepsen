@@ -14,7 +14,9 @@
   []
   (cn/test-aware-node-start-stopper
    cn/safe-mostly-small-nonempty-subset
-   (fn start [test node] (meh (c/su (c/exec :killall :-9 :java))) [:killed node])
+   (fn start [test node]
+     (when-not (util/server? node test)
+       (meh (c/su (c/exec :killall :-9 :java))) [:killed node]))
    (fn stop  [test node]
      (if (util/server? node test)
        (do

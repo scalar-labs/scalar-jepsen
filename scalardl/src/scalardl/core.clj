@@ -92,7 +92,8 @@
           (if committed
             (assoc op :type :ok)
             (assoc op :type :fail :error (.getMessage resp)))))
-      (assoc op :type :fail :error (.getMessage resp)))))
+      (assoc op :type :fail :error (str "status code:" (.getStatus resp)
+                                        " error message:" (.getMessage resp))))))
 
 (defn- create-server-properties
   [test]
