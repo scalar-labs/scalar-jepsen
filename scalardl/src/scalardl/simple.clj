@@ -78,29 +78,27 @@
 
       :write (let [v (:value op)
                    argument (create-argument 1 v)
-                   resp (.executeContract @client-service "write" argument)]
-               (if (or (util/success? resp)
-                       (and (util/unknown? resp)
-                            (dl/check-tx-committed (.getString argument NONCE)
-                                                   test)))
-                 (assoc op :type :ok)
-                 (do
-                   (reset! client-service
-                           (dl/try-switch-server! @client-service test))
-                   (assoc op :type :fail :error (.getMessage resp)))))
+                   resp (.executeContract @client-service "write" argument)
+                   result (dl/response->result resp
+                                               op
+                                               (.getString argument NONCE)
+                                               test)]
+               (when (= (:type result) :fail)
+                 (reset! client-service
+                         (dl/try-switch-server! @client-service test)))
+               result)
 
       :cas (let [[cur next] (:value op)
                  argument (create-argument 1 cur next)
-                 resp (.executeContract @client-service "cas" argument)]
-             (if (or (util/success? resp)
-                     (and (util/unknown? resp)
-                          (dl/check-tx-committed (.getString argument NONCE)
-                                                 test)))
-               (assoc op :type :ok)
-               (do
-                 (reset! client-service
-                         (dl/try-switch-server! @client-service test))
-                 (assoc op :type :fail :error (.getMessage resp)))))))
+                 resp (.executeContract @client-service "cas" argument)
+                 result (dl/response->result resp
+                                             op
+                                             (.getString argument NONCE)
+                                             test)]
+             (when (= (:type result) :fail)
+               (reset! client-service
+                       (dl/try-switch-server! @client-service test)))
+             result)))
 
   (close! [_ _]
     (.close @client-service))

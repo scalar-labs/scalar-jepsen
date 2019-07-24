@@ -68,7 +68,7 @@
       (prepare-client-service test))
     client-service))
 
-(defn check-tx-committed
+(defn- check-tx-committed
   [txid test]
   (info "checking a TX state" txid)
   (loop [tries RETRIES]
@@ -80,6 +80,19 @@
         (if (pos? tries)
           (recur (dec tries))
           (warn "Failed to check the TX state" txid))))))
+
+(defn response->result
+  [resp op txid test]
+  (if (util/success? resp)
+    (assoc op :type :ok)
+    (if (util/unknown? resp)
+      (let [committed (check-tx-committed txid test)]
+        (if (nil? committed)
+          (assoc op :type :info :error (.getMessage resp)) ;; unknown
+          (if committed
+            (assoc op :type :ok)
+            (assoc op :type :fail :error (.getMessage resp)))))
+      (assoc op :type :fail :error (.getMessage resp)))))
 
 (defn- create-server-properties
   [test]
