@@ -9,12 +9,12 @@
              [cli :as cli]]
             [scalardl
              [nemesis :as nemesis]
-             [simple]
+             [cas]
              [transfer]]))
 
 (def tests
   "A map of test names to test constructors."
-  {"simple"   scalardl.simple/simple-test
+  {"cas"   scalardl.cas/cas-test
    "transfer" scalardl.transfer/transfer-test})
 
 (def nemeses

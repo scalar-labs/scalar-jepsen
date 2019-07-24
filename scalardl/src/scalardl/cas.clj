@@ -1,4 +1,4 @@
-(ns scalardl.simple
+(ns scalardl.cas
   (:require [jepsen
              [checker :as checker]
              [client :as client]
@@ -48,10 +48,10 @@
        (.add NONCE (str (java.util.UUID/randomUUID)))
        (.build))))
 
-(defrecord SimpleClient [initialized? client-service]
+(defrecord CasRegisterClient [initialized? client-service]
   client/Client
   (open! [_ test _]
-    (SimpleClient. initialized? (atom (dl/prepare-client-service test))))
+    (->CasRegisterClient initialized? (atom (dl/prepare-client-service test))))
 
   (setup! [_ test]
     (locking initialized?
@@ -109,10 +109,10 @@
 (defn w [_ _] {:type :invoke :f :write :value (rand-int 5)})
 (defn cas [_ _] {:type :invoke :f :cas :value [(rand-int 5) (rand-int 5)]})
 
-(defn simple-test
+(defn cas-test
   [opts]
-  (merge (dl/scalardl-test (str "simple-" (:suffix opts))
-                           {:client     (SimpleClient. (atom false) (atom nil))
+  (merge (dl/scalardl-test (str "cas-" (:suffix opts))
+                           {:client     (->CasRegisterClient (atom false) (atom nil))
                             :failures   (atom 0)
                             :generator  (gen/phases
                                          (conductors/std-gen opts [r w cas cas cas])
