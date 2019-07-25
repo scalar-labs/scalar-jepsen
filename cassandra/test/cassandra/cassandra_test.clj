@@ -12,6 +12,10 @@
              [nemesis :as can]
              [runner  :as runner]]))
 
+;; Skip these tests for unit testing.
+;; They take a long time and needs Cassandra cluster
+(comment
+
 (def nodes ["n1" "n2" "n3" "n4" "n5"])
 
 (defn check
@@ -67,3 +71,4 @@
 (def-tests set/set-test)
 (def-tests counter/cnt-inc-test)
 (def-tests lwt/lwt-test)
+)

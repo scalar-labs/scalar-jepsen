@@ -36,38 +36,7 @@
                                               RetryPolicy$RetryDecision)
            (java.net InetAddress)))
 
-(defn scaled
-  "Applies a scaling factor to a number - used for durations
-  throughout testing to easily scale the run time of the whole
-  test suite. Accepts doubles."
-  [v]
-  (let [factor (or (some-> (System/getenv "JEPSEN_SCALE") (Double/parseDouble))
-                   1)]
-    (Math/ceil (* v factor))))
-
-(defn compaction-strategy
-  "Returns the compaction strategy to use"
-  []
-  (SchemaBuilder/sizedTieredStategy))
-
-(defn compressed-commitlog?
-  "Returns whether to use commitlog compression"
-  []
-  (= (some-> (System/getenv "JEPSEN_COMMITLOG_COMPRESSION") (clojure.string/lower-case))
-     "true"))
-
-(defn coordinator-batchlog-disabled?
-  "Returns whether to disable the coordinator batchlog for MV"
-  []
-  (boolean (System/getenv "JEPSEN_DISABLE_COORDINATOR_BATCHLOG")))
-
-(defn phi-level
-  "Returns the value to use for phi in the failure detector"
-  []
-  (or (System/getenv "JEPSEN_PHI_VALUE")
-      8))
-
-(defn disable-hints?
+(defn- disable-hints?
   "Returns true if Jepsen tests should run without hints"
   []
   (not (System/getenv "JEPSEN_DISABLE_HINTS")))
@@ -125,7 +94,7 @@
   [test]
   (set (mapcat (fn [node]
                  (try
-                   (jmx/with-connection {:host (name node) :port 7199}
+                   (jmx/with-connection {:host node :port 7199}
                                         (jmx/read "org.apache.cassandra.db:type=StorageService"
                                                   :JoiningNodes))
                    (catch Exception e
@@ -208,17 +177,12 @@
                        (str "\"s/# commitlog_sync_batch_window_in_ms: .*/"
                             "commitlog_sync_batch_window_in_ms: 1.0/g\"")
                        "\"s/commitlog_sync_period_in_ms: .*/#/g\""
-                       (str "\"s/# phi_convict_threshold: .*/phi_convict_threshold: " (phi-level)
-                            "/g\"")
-                       "\"/auto_bootstrap: .*/d\""]
-                      (when (compressed-commitlog?)
-                        ["\"s/#commitlog_compression.*/commitlog_compression:/g\""
-                         (str "\"s/#   - class_name: LZ4Compressor/"
-                              "    - class_name: LZ4Compressor/g\"")]))]
+                       "\"/auto_bootstrap: .*/d\""
+                       "\"s/# commitlog_compression.*/commitlog_compression:/g\""
+                       "\"s/#hints_compression.*/hints_compression:/g\""
+                       (str "\"s/#   - class_name: LZ4Compressor/"
+                            "    - class_name: LZ4Compressor/g\"")])]
       (c/exec :sed :-i (lit rep) "/root/cassandra/conf/cassandra.yaml"))
-    (c/exec :echo (str "JVM_OPTS=\"$JVM_OPTS -Dcassandra.mv_disable_coordinator_batchlog="
-                       (coordinator-batchlog-disabled?) "\"")
-            :>> "/root/cassandra/conf/cassandra-env.sh")
     (c/exec :sed :-i (lit "\"s/INFO/DEBUG/g\"") "/root/cassandra/conf/logback.xml")))
 
 (defn start!
