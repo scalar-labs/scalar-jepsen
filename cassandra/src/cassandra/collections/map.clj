@@ -6,7 +6,6 @@
              [generator :as gen]]
             [knossos.model :as model]
             [qbits.alia :as alia]
-            [qbits.hayt]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all]
             [qbits.hayt.utils :refer [map-type]]
@@ -21,9 +20,9 @@
 (defrecord CQLMapClient [tbl-created? conn writec]
   client/Client
   (open! [this test _]
-    (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
+    (let [cluster (alia/cluster {:contact-points (:nodes test)})
           conn (alia/connect cluster)]
-      (CQLMapClient. tbl-created? conn writec)))
+      (->CQLMapClient tbl-created? conn writec)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -42,7 +41,7 @@
         (alia/execute conn (insert :maps (values [[:id 0]
                                                   [:elements {}]]))))))
 
-  (invoke! [this test op]
+  (invoke! [this _ op]
     (alia/execute conn (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
@@ -82,8 +81,8 @@
 
 (defn cql-map-client
   "A set implemented using CQL maps"
-  ([] (CQLMapClient. (atom false) nil :one))
-  ([writec] (CQLMapClient. (atom false) nil writec)))
+  ([] (->CQLMapClient (atom false) nil :quorum))
+  ([writec] (->CQLMapClient (atom false) nil writec)))
 
 (defn map-test
   [opts]
@@ -93,6 +92,7 @@
                           :generator (gen/phases
                                        (->> [(adds)]
                                             (conductors/std-gen opts))
+                                       (conductors/terminate-nemesis opts)
                                        (read-once))
                           :checker   (checker/set)})
          opts))
