@@ -24,7 +24,7 @@ jobs:
           key: scalar-jepsen-{{ checksum "cassandra/project.clj" }}-{{ checksum "scalardb/project.clj" }}-{{ checksum "scalardl/project.clj" }}
 
       - run:
-        - name: Run tests for cassandra
-        - command: |
-          cd cassandra
-          lein test
+          name: Run tests for cassandra
+          command: |
+            cd cassandra
+            lein test
