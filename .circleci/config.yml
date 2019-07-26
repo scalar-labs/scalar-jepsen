@@ -36,6 +36,12 @@ jobs:
           key: scalar-jepsen-{{ checksum "scalardb/project.clj" }}
 
       - run:
+          name: Install Cassandra test for following tests
+          command: |
+            cd cassandra
+            lein install
+
+      - run:
           command: |
             cd scalardb
             lein deps
@@ -53,6 +59,12 @@ jobs:
 
       - restore_cache:
           key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
+
+      - run:
+          name: Install Cassandra test for following tests
+          command: |
+            cd cassandra
+            lein install
 
       - run:
           command: |
