@@ -5,9 +5,7 @@
              [client :as client]
              [checker :as checker]
              [generator :as gen]]
-            [knossos.model :as model]
             [qbits.alia :as alia]
-            [qbits.hayt]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all]
             [qbits.hayt.utils :refer [set-type]]
@@ -22,24 +20,19 @@
 (defrecord CQLSetClient [tbl-created? conn writec]
   client/Client
   (open! [this test _]
-    (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
+    (let [cluster (alia/cluster {:contact-points (:nodes test)})
           conn (alia/connect cluster)]
-      (CQLSetClient. tbl-created? conn writec)))
+      (->CQLSetClient tbl-created? conn writec)))
 
   (setup! [this test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (alia/execute conn (create-keyspace :jepsen_keyspace
-                                            (if-exists false)
-                                            (with {:replication {"class"              "SimpleStrategy"
-                                                                 "replication_factor" (:rf test)}})))
-        (alia/execute conn (use-keyspace :jepsen_keyspace))
-        (alia/execute conn (create-table :sets
-                                         (if-exists false)
-                                         (column-definitions {:id          :int
-                                                              :elements    (set-type :int)
-                                                              :primary-key [:id]})))
-        (alia/execute conn (alter-table :sets (with {:compaction {:class :SizeTieredCompactionStrategy}})))
+        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
+        (create-my-table conn test {:keyspace "jepsen_keyspace"
+                                    :table "sets"
+                                    :schema {:id          :int
+                                             :elements    (set-type :int)
+                                             :primary-key [:id]}})
         (alia/execute conn (insert :sets
                                    (values [[:id 0]
                                             [:elements #{}]])
@@ -53,17 +46,16 @@
                                (update :sets
                                        (set-columns {:elements [+ #{(:value op)}]})
                                        (where [[= :id 0]]))
-                               {:consistency-level writec})
+                               {:consistency writec})
                  (assoc op :type :ok))
-        :read (do (wait-for-recovery 30 conn)
-                  (let [value (->> (alia/execute conn
-                                                 (select :sets (where [[= :id 0]]))
-                                                 {:consistency  :all
-                                                  :retry-policy aggressive-read})
-                                   first
-                                   :elements
-                                   (into (sorted-set)))]
-                    (assoc op :type :ok, :value value))))
+        :read (let [value (->> (alia/execute conn
+                                             (select :sets (where [[= :id 0]]))
+                                             {:consistency  :all
+                                              :retry-policy aggressive-read})
+                               first
+                               :elements
+                               (into (sorted-set)))]
+                (assoc op :type :ok, :value value)))
 
       (catch ExceptionInfo e
         (let [e (class (:exception (ex-data e)))]
@@ -84,17 +76,17 @@
 
 (defn cql-set-client
   "A set implemented using CQL sets"
-  ([] (CQLSetClient. (atom false) nil :one))
-  ([writec] (CQLSetClient. (atom false) nil writec)))
+  ([] (->CQLSetClient (atom false) nil :quorum))
+  ([writec] (->CQLSetClient (atom false) nil writec)))
 
 (defn set-test
   [opts]
   (merge (cassandra-test (str "set-" (:suffix opts))
                          {:client    (cql-set-client)
-                          :model     (model/set)
                           :generator (gen/phases
-                                       (->> [(adds)]
-                                            (conductors/std-gen opts))
-                                       (read-once))
+                                      (->> [(adds)]
+                                           (conductors/std-gen opts))
+                                      (conductors/terminate-nemesis opts)
+                                      (read-once))
                           :checker   (checker/set)})
          opts))

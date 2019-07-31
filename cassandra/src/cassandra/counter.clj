@@ -26,17 +26,12 @@
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (alia/execute conn (create-keyspace :jepsen_keyspace
-                                            (if-exists false)
-                                            (with {:replication {"class"              "SimpleStrategy"
-                                                                 "replication_factor" (:rf test)}})))
-        (alia/execute conn (use-keyspace :jepsen_keyspace))
-        (alia/execute conn (create-table :counters
-                                         (if-exists false)
-                                         (column-definitions {:id          :int
-                                                              :count       :counter
-                                                              :primary-key [:id]})))
-        (alia/execute conn (alter-table :counters (with {:compaction {:class :SizeTieredCompactionStrategy}})))
+        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
+        (create-my-table conn test {:keyspace "jepsen_keyspace"
+                                    :table "counters"
+                                    :schema {:id          :int
+                                             :count       :counter
+                                             :primary-key [:id]}})
         (alia/execute conn (update :counters
                                    (set-columns :count [+ 0])
                                    (where [[= :id 0]]))))))

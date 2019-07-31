@@ -100,5 +100,5 @@
   (->> gen
        gen/mix
        (gen/nemesis
-         (mix-failure-seq opts))
+        (mix-failure-seq opts))
        (gen/time-limit (:time-limit opts))))

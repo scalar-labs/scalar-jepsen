@@ -149,7 +149,7 @@
     (log-files [_ test node]
       (if (util/server? node test)
         [LEDGER_LOG]
-        ["/root/cassandra/logs/system.log"])))) ;; TODO: to const in cassandra
+        [cassandra/CASSANDRA_LOG]))))
 
 (defn scalardl-test
   [name opts]

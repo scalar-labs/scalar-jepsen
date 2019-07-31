@@ -8,7 +8,6 @@
              [generator :as gen]]
             [knossos.model :as model]
             [qbits.alia :as alia]
-            [qbits.hayt]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
   (:import (clojure.lang ExceptionInfo)
@@ -31,17 +30,12 @@
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (alia/execute conn (create-keyspace :jepsen_keyspace
-                                            (if-exists false)
-                                            (with {:replication {"class"              "SimpleStrategy"
-                                                                 "replication_factor" (:rf test)}})))
-        (alia/execute conn (use-keyspace :jepsen_keyspace))
-        (alia/execute conn (create-table :lwt
-                                         (if-exists false)
-                                         (column-definitions {:id          :int
-                                                              :value       :int
-                                                              :primary-key [:id]})))
-        (alia/execute conn (alter-table :lwt (with {:compaction {:class :SizeTieredCompactionStrategy}}))))))
+        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
+        (create-my-table conn test {:keyspace "jepsen_keyspace"
+                                    :table "lwt"
+                                    :schema {:id          :int
+                                             :value       :int
+                                             :primary-key [:id]}}))))
 
   (invoke! [this test op]
     (alia/execute conn (use-keyspace :jepsen_keyspace))
@@ -75,8 +69,8 @@
         :read (let [v (->> (alia/execute conn
                                          (select :lwt (where [[= :id 0]]))
                                          {:consistency :serial})
-                               first
-                               :value)]
+                           first
+                           :value)]
                 (assoc op :type :ok, :value v)))
 
       (catch ExceptionInfo e
@@ -103,6 +97,6 @@
                           :checker   (checker/linearizable {:model     (model/cas-register)
                                                             :algorithm :linear})
                           :generator (gen/phases
-                                       (->> [r w cas cas cas]
-                                            (conductors/std-gen opts)))})
+                                      (->> [r w cas cas cas]
+                                           (conductors/std-gen opts)))})
          opts))

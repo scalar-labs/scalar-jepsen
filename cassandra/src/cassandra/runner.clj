@@ -81,33 +81,33 @@
                (atom #{})))
       (assoc :nemesis
              (jn/compose
-               (conj {#{:start :stop} (:nemesis (eval nemesis))}
-                     (when (:decommission joining)
-                       {#{:decommission} (conductors/decommissioner)})
-                     (when (:bootstrap joining)
-                       {#{:bootstrap} (conductors/bootstrapper)})
-                     (when (or (:bump clock) (:strobe clock))
-                       {#{:reset :bump :strobe} (nt/clock-nemesis)}))))))
+              (conj {#{:start :stop} (:nemesis (eval nemesis))}
+                    (when (:decommission joining)
+                      {#{:decommission} (conductors/decommissioner)})
+                    (when (:bootstrap joining)
+                      {#{:bootstrap} (conductors/bootstrapper)})
+                    (when (or (:bump clock) (:strobe clock))
+                      {#{:reset :bump :strobe} (nt/clock-nemesis)}))))))
 
 (defn test-cmd
-   []
-   {"test" {:opt-spec (into cli/test-opt-spec opt-spec)
-            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
-            :usage (cli/test-usage)
-            :run (fn [{:keys [options]}]
-                   (doseq [i        (range (:test-count options))
-                           test-fn  (:test options)
-                           nemesis  (:nemesis options)
-                           joining  (:join options)
-                           clock    (:clock options)]
-                     (let [test (-> options
-                                    (combine-nemesis nemesis joining clock)
-                                    (assoc :db (cassandra/db (:cassandra options)))
-                                    (dissoc :test)
-                                    test-fn
-                                    jepsen/run!)]
-                       (when-not (:valid? (:results test))
-                         (System/exit 1)))))}})
+  []
+  {"test" {:opt-spec (into cli/test-opt-spec opt-spec)
+           :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
+           :usage (cli/test-usage)
+           :run (fn [{:keys [options]}]
+                  (doseq [i        (range (:test-count options))
+                          test-fn  (:test options)
+                          nemesis  (:nemesis options)
+                          joining  (:join options)
+                          clock    (:clock options)]
+                    (let [test (-> options
+                                   (combine-nemesis nemesis joining clock)
+                                   (assoc :db (cassandra/db (:cassandra options)))
+                                   (dissoc :test)
+                                   test-fn
+                                   jepsen/run!)]
+                      (when-not (:valid? (:results test))
+                        (System/exit 1)))))}})
 
 (defn -main
   [& args]
