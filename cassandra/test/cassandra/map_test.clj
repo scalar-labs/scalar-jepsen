@@ -12,7 +12,7 @@
 
 (deftest map-client-init-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client-quorum (map/cql-map-client)
           client (client/open! client-quorum {:nodes ["n1" "n2" "n3"]} nil)]
@@ -27,16 +27,16 @@
 
 (deftest map-client-add-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client-quorum (map/cql-map-client)
           client (client/open! client-quorum {:nodes ["n1" "n2" "n3"]} nil)]
       (client/invoke! client {} {:type :invoke :f :add :value 1})
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:use-keyspace :jepsen_keyspace}))
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:update :maps
                              :set-columns {:elements [+ {1 1}]}
                              :where [[= :id 0]]}
@@ -44,7 +44,7 @@
 
 (deftest map-client-read-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:id 0 :elements {1 1 3 3 2 2}}])))]
@@ -52,10 +52,10 @@
           client (client/open! client-quorum {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:use-keyspace :jepsen_keyspace}))
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:select :maps
                              :columns :*
                              :where [[= :id 0]]}
@@ -66,7 +66,7 @@
 
 (deftest map-client-read-timeout-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
@@ -81,7 +81,7 @@
 
 (deftest map-client-write-timeout-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
@@ -97,7 +97,7 @@
 
 (deftest map-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
@@ -112,7 +112,7 @@
 
 (deftest map-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)

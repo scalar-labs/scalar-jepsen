@@ -17,38 +17,38 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord CQLSetClient [tbl-created? conn writec]
+(defrecord CQLSetClient [tbl-created? session writec]
   client/Client
   (open! [this test _]
     (let [cluster (alia/cluster {:contact-points (:nodes test)})
-          conn (alia/connect cluster)]
-      (->CQLSetClient tbl-created? conn writec)))
+          session (alia/connect cluster)]
+      (->CQLSetClient tbl-created? session writec)))
 
   (setup! [this test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
-        (create-my-table conn test {:keyspace "jepsen_keyspace"
-                                    :table "sets"
-                                    :schema {:id          :int
-                                             :elements    (set-type :int)
-                                             :primary-key [:id]}})
-        (alia/execute conn (insert :sets
-                                   (values [[:id 0]
-                                            [:elements #{}]])
-                                   (if-exists false))))))
+        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (create-my-table session test {:keyspace "jepsen_keyspace"
+                                       :table "sets"
+                                       :schema {:id          :int
+                                                :elements    (set-type :int)
+                                                :primary-key [:id]}})
+        (alia/execute session (insert :sets
+                                      (values [[:id 0]
+                                               [:elements #{}]])
+                                      (if-exists false))))))
 
   (invoke! [this test op]
-    (alia/execute conn (use-keyspace :jepsen_keyspace))
+    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
-        :add (do (alia/execute conn
+        :add (do (alia/execute session
                                (update :sets
                                        (set-columns {:elements [+ #{(:value op)}]})
                                        (where [[= :id 0]]))
                                {:consistency writec})
                  (assoc op :type :ok))
-        :read (let [value (->> (alia/execute conn
+        :read (let [value (->> (alia/execute session
                                              (select :sets (where [[= :id 0]]))
                                              {:consistency  :all
                                               :retry-policy aggressive-read})
@@ -69,8 +69,7 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (info "Closing client with conn" conn)
-    (alia/shutdown conn))
+    (alia/shutdown session))
 
   (teardown! [_ _]))
 

@@ -20,29 +20,29 @@
                                 ; it isn't really a valid keyword from reader's
                                 ; perspective
 
-(defrecord CasRegisterClient [tbl-created? conn]
+(defrecord CasRegisterClient [tbl-created? session]
   client/Client
   (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
-          conn (alia/connect cluster)]
-      (CasRegisterClient. tbl-created? conn)))
+          session (alia/connect cluster)]
+      (CasRegisterClient. tbl-created? session)))
 
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
-        (create-my-table conn test {:keyspace "jepsen_keyspace"
-                                    :table "lwt"
-                                    :schema {:id          :int
-                                             :value       :int
-                                             :primary-key [:id]}}))))
+        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (create-my-table session test {:keyspace "jepsen_keyspace"
+                                       :table "lwt"
+                                       :schema {:id          :int
+                                                :value       :int
+                                                :primary-key [:id]}}))))
 
   (invoke! [this test op]
-    (alia/execute conn (use-keyspace :jepsen_keyspace))
+    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
         :cas (let [[old new] (:value op)
-                   result (alia/execute conn
+                   result (alia/execute session
                                         (update :lwt
                                                 (set-columns {:value new})
                                                 (where [[:id 0]])
@@ -52,21 +52,21 @@
                                  :fail)))
 
         :write (let [v (:value op)
-                     result (alia/execute conn (update :lwt
-                                                       (set-columns {:value v})
-                                                       (only-if [[:in :value (range 5)]])
-                                                       (where [[= :id 0]])))]
+                     result (alia/execute session (update :lwt
+                                                          (set-columns {:value v})
+                                                          (only-if [[:in :value (range 5)]])
+                                                          (where [[= :id 0]])))]
                  (if (-> result first ak)
                    (assoc op :type :ok)
-                   (let [result' (alia/execute conn (insert :lwt
-                                                            (values [[:id 0]
-                                                                     [:value v]])
-                                                            (if-exists false)))]
+                   (let [result' (alia/execute session (insert :lwt
+                                                               (values [[:id 0]
+                                                                        [:value v]])
+                                                               (if-exists false)))]
                      (if (-> result' first ak)
                        (assoc op :type :ok)
                        (assoc op :type :fail)))))
 
-        :read (let [v (->> (alia/execute conn
+        :read (let [v (->> (alia/execute session
                                          (select :lwt (where [[= :id 0]]))
                                          {:consistency :serial})
                            first
@@ -85,8 +85,7 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (info "Closing client with conn" conn)
-    (alia/shutdown conn))
+    (alia/shutdown session))
 
   (teardown! [_ _]))
 

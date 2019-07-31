@@ -15,30 +15,30 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord BatchSetClient [tbl-created? conn]
+(defrecord BatchSetClient [tbl-created? session]
   client/Client
   (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
-          conn (alia/connect cluster)]
-      (->BatchSetClient tbl-created? conn)))
+          session (alia/connect cluster)]
+      (->BatchSetClient tbl-created? session)))
 
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
-        (create-my-table conn test {:keyspace "jepsen_keyspace"
-                                    :table "bat"
-                                    :schema {:pid         :int
-                                             :cid         :int
-                                             :value       :int
-                                             :primary-key [:pid :cid]}}))))
+        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (create-my-table session test {:keyspace "jepsen_keyspace"
+                                       :table "bat"
+                                       :schema {:pid         :int
+                                                :cid         :int
+                                                :value       :int
+                                                :primary-key [:pid :cid]}}))))
 
   (invoke! [this test op]
-    (alia/execute conn (use-keyspace :jepsen_keyspace))
+    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
         :add (let [value (:value op)]
-               (alia/execute conn
+               (alia/execute session
                              (str "BEGIN BATCH "
                                   "INSERT INTO bat (pid, cid, value) VALUES ("
                                   value ",0," value "); "
@@ -47,7 +47,7 @@
                                   "APPLY BATCH;")
                              {:consistency :quorum})
                (assoc op :type :ok))
-        :read (let [results (alia/execute conn
+        :read (let [results (alia/execute session
                                           (select :bat)
                                           {:consistency :all
                                            :retry-policy      aggressive-read})
@@ -75,8 +75,7 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (info "Closing client conn" conn)
-    (alia/shutdown conn))
+    (alia/shutdown session))
 
   (teardown! [_ _]))
 

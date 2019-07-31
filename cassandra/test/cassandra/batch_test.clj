@@ -11,7 +11,7 @@
                                                 UnavailableException)))
 (deftest batch-client-init-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)]
@@ -25,16 +25,16 @@
 
 (deftest batch-client-add-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/invoke! client {} {:type :invoke :f :add :value 1})
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:use-keyspace :jepsen_keyspace}))
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             (str "BEGIN BATCH "
                                  "INSERT INTO bat (pid, cid, value) VALUES (1,0,1); "
                                  "INSERT INTO bat (pid, cid, value) VALUES (1,1,1); "
@@ -43,7 +43,7 @@
 
 (deftest batch-client-read-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:pid 0 :cid 0 :value 0}
@@ -56,10 +56,10 @@
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:use-keyspace :jepsen_keyspace}))
       (is (spy/called-with? alia/execute
-                            "test-conn"
+                            "session"
                             {:select :bat
                              :columns :*}
                             {:consistency :all
@@ -69,7 +69,7 @@
 
 (deftest batch-client-read-fail-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:pid 0 :cid 0 :value 0}
@@ -85,7 +85,7 @@
 
 (deftest batch-client-write-timeout-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (and (string? cql) (re-find #"BATCH" cql))
@@ -101,7 +101,7 @@
 
 (deftest batch-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
@@ -116,7 +116,7 @@
 
 (deftest batch-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "test-conn")
+                alia/connect (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)

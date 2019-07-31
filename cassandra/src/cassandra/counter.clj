@@ -16,38 +16,38 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord CQLCounterClient [tbl-created? conn writec]
+(defrecord CQLCounterClient [tbl-created? session writec]
   client/Client
   (open! [this test _]
     (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
-          conn (alia/connect cluster)]
-      (CQLCounterClient. tbl-created? conn writec)))
+          session (alia/connect cluster)]
+      (CQLCounterClient. tbl-created? session writec)))
 
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace conn test {:keyspace "jepsen_keyspace"})
-        (create-my-table conn test {:keyspace "jepsen_keyspace"
-                                    :table "counters"
-                                    :schema {:id          :int
-                                             :count       :counter
-                                             :primary-key [:id]}})
-        (alia/execute conn (update :counters
-                                   (set-columns :count [+ 0])
-                                   (where [[= :id 0]]))))))
+        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (create-my-table session test {:keyspace "jepsen_keyspace"
+                                       :table "counters"
+                                       :schema {:id          :int
+                                                :count       :counter
+                                                :primary-key [:id]}})
+        (alia/execute session (update :counters
+                                      (set-columns :count [+ 0])
+                                      (where [[= :id 0]]))))))
 
   (invoke! [this test op]
     (try
-      (alia/execute conn (use-keyspace :jepsen_keyspace))
+      (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
-        :add (do (alia/execute conn
+        :add (do (alia/execute session
                                (update :counters
                                        (set-columns :count [+ (:value op)])
                                        (where [[= :id 0]]))
                                {:consistency  writec
                                 :retry-policy FallthroughRetryPolicy/INSTANCE})
                  (assoc op :type :ok))
-        :read (let [value (->> (alia/execute conn
+        :read (let [value (->> (alia/execute session
                                              (select :counters (where [[= :id 0]]))
                                              {:consistency  :all
                                               :retry-policy FallthroughRetryPolicy/INSTANCE})
@@ -67,8 +67,7 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (info "Closing client with conn" conn)
-    (alia/shutdown conn))
+    (alia/shutdown session))
 
   (teardown! [_ _]))
 
