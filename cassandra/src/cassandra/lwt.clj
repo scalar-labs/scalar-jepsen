@@ -23,9 +23,9 @@
 (defrecord CasRegisterClient [tbl-created? session]
   client/Client
   (open! [_ test _]
-    (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
+    (let [cluster (alia/cluster {:contact-points (:nodes test)})
           session (alia/connect cluster)]
-      (CasRegisterClient. tbl-created? session)))
+      (->CasRegisterClient tbl-created? session)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -37,7 +37,7 @@
                                                 :value       :int
                                                 :primary-key [:id]}}))))
 
-  (invoke! [this test op]
+  (invoke! [_ _ op]
     (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
@@ -45,7 +45,7 @@
                    result (alia/execute session
                                         (update :lwt
                                                 (set-columns {:value new})
-                                                (where [[:id 0]])
+                                                (where [[= :id 0]])
                                                 (only-if [[:value old]])))]
                (assoc op :type (if (-> result first ak)
                                  :ok
@@ -92,7 +92,7 @@
 (defn lwt-test
   [opts]
   (merge (cassandra-test (str "lwt-" (:suffix opts))
-                         {:client    (CasRegisterClient. (atom false) nil)
+                         {:client    (->CasRegisterClient (atom false) nil)
                           :checker   (checker/linearizable {:model     (model/cas-register)
                                                             :algorithm :linear})
                           :generator (gen/phases

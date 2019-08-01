@@ -28,8 +28,8 @@
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client (client/open! (->BatchSetClient (atom false) nil)
-                               {:nodes ["n1" "n2" "n3"]} nil)]
-      (client/invoke! client {} {:type :invoke :f :add :value 1})
+                               {:nodes ["n1" "n2" "n3"]} nil)
+          result (client/invoke! client {} {:type :invoke :f :add :value 1})]
       (is (spy/called-with? alia/execute
                             "session"
                             {:use-keyspace :jepsen_keyspace}))
@@ -39,7 +39,8 @@
                                  "INSERT INTO bat (pid, cid, value) VALUES (1,0,1); "
                                  "INSERT INTO bat (pid, cid, value) VALUES (1,1,1); "
                                  "APPLY BATCH;")
-                            {:consistency :quorum})))))
+                            {:consistency :quorum}))
+      (is (= :ok (:type result))))))
 
 (deftest batch-client-read-test
   (with-redefs [alia/cluster (spy/spy)
