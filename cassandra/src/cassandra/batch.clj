@@ -33,7 +33,7 @@
                                                 :value       :int
                                                 :primary-key [:pid :cid]}}))))
 
-  (invoke! [this test op]
+  (invoke! [_ _ op]
     (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)

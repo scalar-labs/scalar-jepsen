@@ -19,12 +19,12 @@
 
 (defrecord CQLSetClient [tbl-created? session writec]
   client/Client
-  (open! [this test _]
+  (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (:nodes test)})
           session (alia/connect cluster)]
       (->CQLSetClient tbl-created? session writec)))
 
-  (setup! [this test]
+  (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
         (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
@@ -38,7 +38,7 @@
                                                [:elements #{}]])
                                       (if-exists false))))))
 
-  (invoke! [this test op]
+  (invoke! [_ _ op]
     (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
@@ -73,15 +73,10 @@
 
   (teardown! [_ _]))
 
-(defn cql-set-client
-  "A set implemented using CQL sets"
-  ([] (->CQLSetClient (atom false) nil :quorum))
-  ([writec] (->CQLSetClient (atom false) nil writec)))
-
 (defn set-test
   [opts]
   (merge (cassandra-test (str "set-" (:suffix opts))
-                         {:client    (cql-set-client)
+                         {:client    (->CQLSetClient (atom false) nil :quorum)
                           :generator (gen/phases
                                       (->> [(adds)]
                                            (conductors/std-gen opts))

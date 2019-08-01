@@ -18,7 +18,7 @@
 
 (defrecord CQLMapClient [tbl-created? session writec]
   client/Client
-  (open! [this test _]
+  (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (:nodes test)})
           session (alia/connect cluster)]
       (->CQLMapClient tbl-created? session writec)))
@@ -35,7 +35,7 @@
         (alia/execute session (insert :maps (values [[:id 0]
                                                      [:elements {}]]))))))
 
-  (invoke! [this _ op]
+  (invoke! [_ _ op]
     (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
@@ -71,15 +71,10 @@
 
   (teardown! [_ _]))
 
-(defn cql-map-client
-  "A set implemented using CQL maps"
-  ([] (->CQLMapClient (atom false) nil :quorum))
-  ([writec] (->CQLMapClient (atom false) nil writec)))
-
 (defn map-test
   [opts]
   (merge (cassandra-test (str "map-" (:suffix opts))
-                         {:client    (cql-map-client)
+                         {:client    (->CQLMapClient (atom false) nil :quorum)
                           :generator (gen/phases
                                       (->> [(adds)]
                                            (conductors/std-gen opts))
