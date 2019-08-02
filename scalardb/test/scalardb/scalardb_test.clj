@@ -8,6 +8,10 @@
             [scalardb.transfer :as transfer]
             [jepsen [core :as jepsen]]))
 
+;; Skip these tests for unit testing.
+;; They take a long time and needs Cassandra cluster
+(comment
+
 (def nodes ["n1" "n2" "n3" "n4" "n5"])
 
 (defn check
@@ -58,3 +62,4 @@
        (add-joining name# "-clock-drift"  ~test-fn {:name "-clock-drift"  :bump true  :strobe true}))))
 
 (def-tests transfer/transfer-test)
+)

@@ -1,3 +1,4 @@
+[![CircleCI](https://circleci.com/gh/scalar-labs/scalar-jepsen/tree/master.svg?style=svg)](https://circleci.com/gh/scalar-labs/scalar-jepsen/tree/master)
 
 # Run tests with Jepsen Docker
 1. Clone [Jepsen repository](https://github.com/jepsen-io/jepsen)

@@ -4,58 +4,54 @@
             [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [client :as client]
-             [checker :as checker]]
+             [checker :as checker]
+             [generator :as gen]]
             [qbits.alia :as alia]
             [qbits.hayt]
             [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all])
+            [qbits.hayt.dsl.statement :refer :all]
+            [qbits.alia.policy.retry :as retry])
   (:import (clojure.lang ExceptionInfo)
-           (com.datastax.driver.core.policies FallthroughRetryPolicy)
            (com.datastax.driver.core.exceptions NoHostAvailableException
                                                 ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord CQLCounterClient [tbl-created? conn writec]
+(defrecord CQLCounterClient [tbl-created? session writec]
   client/Client
-  (open! [this test _]
-    (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
-          conn (alia/connect cluster)]
-      (CQLCounterClient. tbl-created? conn writec)))
+  (open! [_ test _]
+    (let [cluster (alia/cluster {:contact-points (:nodes test)})
+          session (alia/connect cluster)]
+      (->CQLCounterClient tbl-created? session writec)))
 
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (alia/execute conn (create-keyspace :jepsen_keyspace
-                                            (if-exists false)
-                                            (with {:replication {"class"              "SimpleStrategy"
-                                                                 "replication_factor" (:rf test)}})))
-        (alia/execute conn (use-keyspace :jepsen_keyspace))
-        (alia/execute conn (create-table :counters
-                                         (if-exists false)
-                                         (column-definitions {:id          :int
-                                                              :count       :counter
-                                                              :primary-key [:id]})))
-        (alia/execute conn (alter-table :counters (with {:compaction {:class :SizeTieredCompactionStrategy}})))
-        (alia/execute conn (update :counters
-                                   (set-columns :count [+ 0])
-                                   (where [[= :id 0]]))))))
+        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (create-my-table session test {:keyspace "jepsen_keyspace"
+                                       :table "counters"
+                                       :schema {:id          :int
+                                                :count       :counter
+                                                :primary-key [:id]}})
+        (alia/execute session (update :counters
+                                      (set-columns :count [+ 0])
+                                      (where [[= :id 0]]))))))
 
-  (invoke! [this test op]
+  (invoke! [_ _ op]
     (try
-      (alia/execute conn (use-keyspace :jepsen_keyspace))
+      (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
-        :add (do (alia/execute conn
+        :add (do (alia/execute session
                                (update :counters
-                                       (set-columns :count [+ (:value op)])
+                                       (set-columns {:count [+ (:value op)]})
                                        (where [[= :id 0]]))
                                {:consistency  writec
-                                :retry-policy FallthroughRetryPolicy/INSTANCE})
+                                :retry-policy (retry/fallthrough-retry-policy)})
                  (assoc op :type :ok))
-        :read (let [value (->> (alia/execute conn
+        :read (let [value (->> (alia/execute session
                                              (select :counters (where [[= :id 0]]))
                                              {:consistency  :all
-                                              :retry-policy FallthroughRetryPolicy/INSTANCE})
+                                              :retry-policy (retry/fallthrough-retry-policy)})
                                first
                                :count)]
                 (assoc op :type :ok, :value value)))
@@ -72,22 +68,18 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (info "Closing client with conn" conn)
-    (alia/shutdown conn))
+    (alia/shutdown session))
 
   (teardown! [_ _]))
-
-(defn cql-counter-client
-  "A counter implemented using CQL counters"
-  ([] (CQLCounterClient. (atom false) nil :one))
-  ([writec] (CQLCounterClient. (atom false) nil writec)))
 
 (defn cnt-inc-test
   [opts]
   (merge (cassandra-test (str "counter-inc-" (:suffix opts))
-                         {:client    (cql-counter-client)
+                         {:client    (->CQLCounterClient (atom false) nil :quorum)
                           :checker   (checker/counter)
-                          :generator (->> (repeat 100 add)
-                                          (cons r)
-                                          (conductors/std-gen opts))})
+                          :generator (gen/phases
+                                      (->> [add]
+                                           (conductors/std-gen opts))
+                                      (conductors/terminate-nemesis opts)
+                                      (read-once))})
          opts))

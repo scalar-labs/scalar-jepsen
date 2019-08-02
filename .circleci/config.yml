@@ -1,0 +1,83 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/scalar-jepsen
+
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+
+    environment:
+      JVM_OPTS: -Xmx3200m
+      LEIN_ROOT: nbd
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          key: scalar-jepsen-{{ checksum "cassandra/project.clj" }}
+
+      - run:
+          command: |
+            cd cassandra
+            lein deps
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: scalar-jepsen-{{ checksum "cassandra/project.clj" }}
+
+      - run:
+          name: Run tests for cassandra
+          command: |
+            cd cassandra
+            lein test
+
+      - restore_cache:
+          key: scalar-jepsen-{{ checksum "scalardb/project.clj" }}
+
+      - run:
+          name: Install Cassandra test for following tests
+          command: |
+            cd cassandra
+            lein install
+
+      - run:
+          command: |
+            cd scalardb
+            lein deps
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: scalar-jepsen-{{ checksum "scalardb/project.clj" }}
+
+      - run:
+          name: Run tests for Scalar DB
+          command: |
+            cd scalardb
+            lein test
+
+      - restore_cache:
+          key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
+
+      - run:
+          name: Install Cassandra test for following tests
+          command: |
+            cd cassandra
+            lein install
+
+      - run:
+          command: |
+            cd scalardl
+            lein deps
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
+
+      - run:
+          name: Run tests for Scalar DL
+          command: |
+            cd scalardl
+            lein test

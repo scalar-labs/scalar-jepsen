@@ -4,9 +4,7 @@
              [client :as client]
              [checker :as checker]
              [generator :as gen]]
-            [knossos.model :as model]
             [qbits.alia :as alia]
-            [qbits.hayt]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all]
             [qbits.hayt.utils :refer [map-type]]
@@ -18,50 +16,44 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord CQLMapClient [tbl-created? conn writec]
+(defrecord CQLMapClient [tbl-created? session writec]
   client/Client
-  (open! [this test _]
-    (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
-          conn (alia/connect cluster)]
-      (CQLMapClient. tbl-created? conn writec)))
+  (open! [_ test _]
+    (let [cluster (alia/cluster {:contact-points (:nodes test)})
+          session (alia/connect cluster)]
+      (->CQLMapClient tbl-created? session writec)))
 
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (alia/execute conn (create-keyspace :jepsen_keyspace
-                                            (if-exists false)
-                                            (with {:replication {"class"              "SimpleStrategy"
-                                                                 "replication_factor" (:rf test)}})))
-        (alia/execute conn (use-keyspace :jepsen_keyspace))
-        (alia/execute conn (create-table :maps
-                                         (if-exists false)
-                                         (column-definitions {:id          :int
-                                                              :elements    (map-type :int :int)
-                                                              :primary-key [:id]})))
-        (alia/execute conn (alter-table :maps (with {:compaction {:class :SizeTieredCompactionStrategy}})))
-        (alia/execute conn (insert :maps (values [[:id 0]
-                                                  [:elements {}]]))))))
+        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (create-my-table session test {:keyspace "jepsen_keyspace"
+                                       :table "maps"
+                                       :schema {:id          :int
+                                                :elements    (map-type :int :int)
+                                                :primary-key [:id]}})
+        (alia/execute session (insert :maps (values [[:id 0]
+                                                     [:elements {}]]))))))
 
-  (invoke! [this test op]
-    (alia/execute conn (use-keyspace :jepsen_keyspace))
+  (invoke! [_ _ op]
+    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
       (case (:f op)
-        :add (do (alia/execute conn
+        :add (do (alia/execute session
                                (update :maps
                                        (set-columns {:elements [+ {(:value op) (:value op)}]})
                                        (where [[= :id 0]]))
-                               {:consistency-level writec})
+                               {:consistency writec})
                  (assoc op :type :ok))
-        :read (do (wait-for-recovery 30 conn)
-                  (let [value (->> (alia/execute conn
-                                                 (select :maps (where [[= :id 0]]))
-                                                 {:consistency  :all
-                                                  :retry-policy aggressive-read})
-                                   first
-                                   :elements
-                                   vals
-                                   (into (sorted-set)))]
-                    (assoc op :type :ok, :value value))))
+        :read (let [value (->> (alia/execute session
+                                             (select :maps (where [[= :id 0]]))
+                                             {:consistency  :all
+                                              :retry-policy aggressive-read})
+                               first
+                               :elements
+                               vals
+                               (into (sorted-set)))]
+                (assoc op :type :ok, :value value)))
 
       (catch ExceptionInfo e
         (let [e (class (:exception (ex-data e)))]
@@ -75,24 +67,18 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (info "Closing client with conn" conn)
-    (alia/shutdown conn))
+    (alia/shutdown session))
 
   (teardown! [_ _]))
-
-(defn cql-map-client
-  "A set implemented using CQL maps"
-  ([] (CQLMapClient. (atom false) nil :one))
-  ([writec] (CQLMapClient. (atom false) nil writec)))
 
 (defn map-test
   [opts]
   (merge (cassandra-test (str "map-" (:suffix opts))
-                         {:client    (cql-map-client)
-                          :model     (model/set)
+                         {:client    (->CQLMapClient (atom false) nil :quorum)
                           :generator (gen/phases
-                                       (->> [(adds)]
-                                            (conductors/std-gen opts))
-                                       (read-once))
+                                      (->> [(adds)]
+                                           (conductors/std-gen opts))
+                                      (conductors/terminate-nemesis opts)
+                                      (read-once))
                           :checker   (checker/set)})
          opts))

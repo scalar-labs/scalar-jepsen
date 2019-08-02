@@ -28,40 +28,21 @@
   [r]
   (Thread/sleep (reduce * 1000 (repeat r 2))))
 
-(defn create-transfer-table
-  [test session {:keys [keyspace table schema]}]
-  (alia/execute session (create-keyspace keyspace
-                                         (if-exists false)
-                                         (with {:replication {"class"              "SimpleStrategy"
-                                                              "replication_factor" (:rf test)}})))
-  (alia/execute session (use-keyspace keyspace))
-  (alia/execute session (create-table table
-                                      (if-exists false)
-                                      (column-definitions schema)))
-  (alia/execute session (alter-table table
-                                     (with {:compaction {:class :SizeTieredCompactionStrategy}}))))
-
-(defn create-coordinator-table
-  [test session]
-  (alia/execute session (create-keyspace COORDINATOR
-                                         (if-exists false)
-                                         (with {:replication {"class"              "SimpleStrategy"
-                                                              "replication_factor" (:rf test)}})))
-  (alia/execute session (use-keyspace COORDINATOR))
-  (alia/execute session (create-table STATE_TABLE
-                                      (if-exists false)
-                                      (column-definitions {:tx_id         :text
-                                                           :tx_state      :int
-                                                           :tx_created_at :bigint
-                                                           :primary-key   [:tx_id]}))))
-
 (defn setup-transaction-tables
   [test schemata]
   (let [session (alia/connect
-                 (alia/cluster {:contact-points (->> test :nodes (map name))}))]
+                 (alia/cluster {:contact-points (:nodes test)}))]
     (doseq [schema schemata]
-      (create-transfer-table test session schema))
-    (create-coordinator-table test session)
+      (c/create-my-keyspace session test schema)
+      (c/create-my-table session test schema))
+
+    (c/create-my-keyspace session test {:keyspace COORDINATOR})
+    (c/create-my-table session test {:keyspace COORDINATOR
+                                     :table STATE_TABLE
+                                     :schema {:tx_id         :text
+                                              :tx_state      :int
+                                              :tx_created_at :bigint
+                                              :primary-key   [:tx_id]}})
     (alia/shutdown session)))
 
 (defn- create-properties
