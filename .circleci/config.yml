@@ -37,7 +37,7 @@ jobs:
           command: |
             # save the test result because `lein install` removes the result
             mkdir -p /tmp/cloverage_reports
-            cp -a cassandra/target/coverage /tmp/cloverage_reports/cassandra; done
+            cp -a cassandra/target/coverage /tmp/cloverage_reports/cassandra
           when: always
 
       - restore_cache:
