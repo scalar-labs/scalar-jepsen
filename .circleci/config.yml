@@ -82,13 +82,13 @@ jobs:
             cd scalardl
             lein cloverage
 
-     - run:
-         name: Save cloverage reports
-         command: |
-           mkdir -p /tmp/cloverage_test_reports
-           for x in */target/coverage; do cp -a $x /tmp/cloverage_reports/${x%%/*}; done
-         when: always
+      - run:
+          name: Save cloverage reports
+          command: |
+            mkdir -p /tmp/cloverage_test_reports
+            for x in */target/coverage; do cp -a $x /tmp/cloverage_reports/${x%%/*}; done
+          when: always
 
-     - store_artifacts:
-         path: /tmp/cloverage_reports
-         destination: cloverage_reports
+      - store_artifacts:
+          path: /tmp/cloverage_reports
+          destination: cloverage_reports
