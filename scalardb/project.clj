@@ -9,5 +9,8 @@
                  [cc.qbits/alia "4.3.1"]
                  [cc.qbits/hayt "4.1.0"]
                  [com.scalar-labs/scalardb "1.0.0" :exclusions [org.slf4j/slf4j-log4j12]]]
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.0"]
+                                  [tortue/spy "2.0.0"]]
+                   :plugins [[lein-cloverage "1.1.1"]]}}
   :main scalardb.runner
   :aot [scalardb.runner])
