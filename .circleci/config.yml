@@ -32,6 +32,14 @@ jobs:
             cd cassandra
             lein cloverage
 
+      - run:
+          name: Save cloverage reports
+          command: |
+            # save the test result because `lein install` removes the result
+            mkdir -p /tmp/cloverage_reports
+            cp -a cassandra/target/coverage /tmp/cloverage_reports/cassandra; done
+          when: always
+
       - restore_cache:
           key: scalar-jepsen-{{ checksum "scalardb/project.clj" }}
 
