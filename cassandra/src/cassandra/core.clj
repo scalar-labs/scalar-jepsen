@@ -45,7 +45,7 @@
 (defn dns-resolve
   "Gets the address of a hostname"
   [hostname]
-  (.getHostAddress (InetAddress/getByName (name hostname))))
+  (.getHostAddress (InetAddress/getByName hostname)))
 
 (defn dns-hostnames
   "Gets the list of hostnames"
@@ -57,38 +57,33 @@
                      (get names)))
               addrs))))
 
+(defn- get-shuffled-nodes
+  [test]
+  (-> test :nodes set (set/difference @(:decommissioned test)) shuffle))
+
+(defn- get-jmx-status
+  [node attr]
+  (try
+    (jmx/with-connection {:host node :port 7199}
+      (jmx/read "org.apache.cassandra.db:type=StorageService"
+                attr))
+    (catch Exception e
+      (info "Couldn't get status from node" node))))
+
 (defn live-nodes
   "Get the list of live nodes from a random node in the cluster"
   [test]
-  (->> (some (fn [node]
-               (try
-                 (jmx/with-connection {:host (name node) :port 7199}
-                   (jmx/read "org.apache.cassandra.db:type=StorageService"
-                             :LiveNodes))
-                 (catch Exception e
-                   (info "Couldn't get status from node" node))))
-             (-> test
-                 :nodes
-                 set
-                 (set/difference @(:decommissioned test))
-                 shuffle))
+  (->> test get-shuffled-nodes
+       (some #(get-jmx-status % :LiveNodes))
        (dns-hostnames test)))
 
 (defn joining-nodes
   "Get the list of joining nodes from a random node in the cluster"
   [test]
-  (set (mapcat (fn [node]
-                 (try
-                   (jmx/with-connection {:host node :port 7199}
-                     (jmx/read "org.apache.cassandra.db:type=StorageService"
-                               :JoiningNodes))
-                   (catch Exception e
-                     (info "Couldn't get status from node" node))))
-               (-> test
-                   :nodes
-                   set
-                   (set/difference @(:decommissioned test))
-                   shuffle))))
+  (->> test
+       get-shuffled-nodes
+       (mapcat #(get-jmx-status % :JoiningNodes))
+       set))
 
 (defn seed-nodes
   "Get a list of seed nodes"

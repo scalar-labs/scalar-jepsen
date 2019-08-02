@@ -30,7 +30,7 @@ jobs:
           name: Run tests for cassandra
           command: |
             cd cassandra
-            lein test
+            lein cloverage
 
       - restore_cache:
           key: scalar-jepsen-{{ checksum "scalardb/project.clj" }}
@@ -55,7 +55,7 @@ jobs:
           name: Run tests for Scalar DB
           command: |
             cd scalardb
-            lein test
+            lein coloverage
 
       - restore_cache:
           key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
@@ -80,4 +80,15 @@ jobs:
           name: Run tests for Scalar DL
           command: |
             cd scalardl
-            lein test
+            lein cloverage
+
+     - run:
+         name: Save cloverage reports
+         command: |
+           mkdir -p /tmp/cloverage_test_reports
+           for x in */target/coverage; do cp -a $x /tmp/cloverage_reports/${x%%/*}; done
+         when: always
+
+     - store_artifacts:
+         path: /tmp/cloverage_reports
+         destination: cloverage_reports
