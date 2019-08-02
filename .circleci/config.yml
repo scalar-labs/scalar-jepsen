@@ -93,7 +93,6 @@ jobs:
       - run:
           name: Save cloverage reports
           command: |
-            mkdir -p /tmp/cloverage_reports
             for x in */target/coverage; do cp -a $x /tmp/cloverage_reports/${x%%/*}; done
           when: always
 
