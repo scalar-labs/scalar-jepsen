@@ -55,7 +55,7 @@ jobs:
           name: Run tests for Scalar DB
           command: |
             cd scalardb
-            lein coloverage
+            lein cloverage
 
       - restore_cache:
           key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
