@@ -31,11 +31,11 @@
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
         (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session test {:keyspace "jepsen_keyspace"
-                                       :table "lwt"
-                                       :schema {:id          :int
-                                                :value       :int
-                                                :primary-key [:id]}}))))
+        (create-my-table session {:keyspace "jepsen_keyspace"
+                                  :table "lwt"
+                                  :schema {:id          :int
+                                           :value       :int
+                                           :primary-key [:id]}}))))
 
   (invoke! [_ _ op]
     (alia/execute session (use-keyspace :jepsen_keyspace))

@@ -28,11 +28,11 @@
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
         (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session test {:keyspace "jepsen_keyspace"
-                                       :table "sets"
-                                       :schema {:id          :int
-                                                :elements    (set-type :int)
-                                                :primary-key [:id]}})
+        (create-my-table session {:keyspace "jepsen_keyspace"
+                                  :table "sets"
+                                  :schema {:id          :int
+                                           :elements    (set-type :int)
+                                           :primary-key [:id]}})
         (alia/execute session (insert :sets
                                       (values [[:id 0]
                                                [:elements #{}]])
@@ -50,8 +50,7 @@
                  (assoc op :type :ok))
         :read (let [value (->> (alia/execute session
                                              (select :sets (where [[= :id 0]]))
-                                             {:consistency  :all
-                                              :retry-policy aggressive-read})
+                                             {:consistency :all})
                                first
                                :elements
                                (into (sorted-set)))]

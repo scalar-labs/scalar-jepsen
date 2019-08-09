@@ -143,13 +143,13 @@
     (teardown! [_ test node]
       (if (util/server? node test)
         (stop-server! node)
-        (cassandra/teardown-cassandra! node)))
+        (cassandra/teardown-cassandra! test node)))
 
     db/LogFiles
     (log-files [_ test node]
       (if (util/server? node test)
         [LEDGER_LOG]
-        [cassandra/CASSANDRA_LOG]))))
+        [(cassandra/cassandra-log test)]))))
 
 (defn scalardl-test
   [name opts]

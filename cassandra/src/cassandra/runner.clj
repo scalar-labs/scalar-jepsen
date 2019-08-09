@@ -66,6 +66,9 @@
     :parse-fn #(Long/parseLong %)
     :validate [pos? "Must be positive"]]
 
+   [nil "--cassandra-dir CASSANDRA_DIRECTORY" "Cassandra directory on DB node"
+    :default "/root/cassandra"]
+
    (cli/tarball-opt link-to-tarball)])
 
 (defn combine-nemesis
@@ -102,7 +105,7 @@
                           clock    (:clock options)]
                     (let [test (-> options
                                    (combine-nemesis nemesis joining clock)
-                                   (assoc :db (cassandra/db (:cassandra options)))
+                                   (assoc :db (cassandra/db))
                                    (dissoc :test)
                                    test-fn
                                    jepsen/run!)]

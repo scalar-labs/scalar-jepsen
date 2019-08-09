@@ -34,10 +34,10 @@
                  (alia/cluster {:contact-points (:nodes test)}))]
     (doseq [schema schemata]
       (c/create-my-keyspace session test schema)
-      (c/create-my-table session test schema))
+      (c/create-my-table sessiont schema))
 
     (c/create-my-keyspace session test {:keyspace COORDINATOR})
-    (c/create-my-table session test {:keyspace COORDINATOR
+    (c/create-my-table session {:keyspace COORDINATOR
                                      :table STATE_TABLE
                                      :schema {:tx_id         :text
                                               :tx_state      :int

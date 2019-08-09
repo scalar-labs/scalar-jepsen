@@ -19,11 +19,11 @@
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
-      (is (spy/called-n-times? alia/execute 4)) ;; for table creation
+      (is (spy/called-n-times? alia/execute 3)) ;; for table creation
 
       ;; tables have been already created
       (client/setup! client {:rf 3})
-      (is (spy/called-n-times? alia/execute 4)))))
+      (is (spy/called-n-times? alia/execute 3)))))
 
 (deftest lwt-client-cas-test
   (with-redefs [alia/cluster (spy/spy)

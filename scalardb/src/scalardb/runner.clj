@@ -50,7 +50,7 @@
                                 clock (:clock options)]
                           (let [test (-> options
                                          (car/combine-nemesis nemesis joining clock)
-                                         (assoc :db (cassandra/db (:cassandra options)))
+                                         (assoc :db (cassandra/db))
                                          (dissoc :test)
                                          test-fn
                                          jepsen/run!)]

@@ -39,7 +39,7 @@
           (do (info node "decommissioning")
               (info @decommissioned "already decommissioned")
               (swap! decommissioned conj node)
-              (cassandra/nodetool node "decommission")
+              (cassandra/nodetool test node "decommission")
               (assoc op :value (str node " decommissioned")))
           (assoc op :value "no nodes eligible for decommission"))))
     (teardown! [this _] this)))
@@ -52,8 +52,8 @@
     (invoke! [this test op]
       (case (:f op)
         :start (do (doseq [node (:nodes test)]
-                     (cassandra/nodetool node "flush")
-                     (cassandra/nodetool node "compact"))
+                     (cassandra/nodetool test node "flush")
+                     (cassandra/nodetool test node "compact"))
                    (assoc op :value (str (:nodes test)
                                          " nodes flushed and compacted")))
         :stop (assoc op :value "stop is a no-op with this nemesis")))

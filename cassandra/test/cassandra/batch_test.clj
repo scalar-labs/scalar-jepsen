@@ -17,11 +17,11 @@
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
-      (is (spy/called-n-times? alia/execute 4)) ;; for table creation
+      (is (spy/called-n-times? alia/execute 3)) ;; for table creation
 
       ;; tables have been already created
       (client/setup! client {:rf 3})
-      (is (spy/called-n-times? alia/execute 4)))))
+      (is (spy/called-n-times? alia/execute 3)))))
 
 (deftest batch-client-add-test
   (with-redefs [alia/cluster (spy/spy)
@@ -63,8 +63,7 @@
                             "session"
                             {:select :bat
                              :columns :*}
-                            {:consistency :all
-                             :retry-policy cassandra/aggressive-read}))
+                            {:consistency :all}))
       (is (= :ok (:type result)))
       (is (= #{0 1 2} (:value result))))))
 
