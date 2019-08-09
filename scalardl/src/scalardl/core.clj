@@ -143,7 +143,7 @@
     (teardown! [_ test node]
       (if (util/server? node test)
         (stop-server! node)
-        (cassandra/teardown-cassandra! test node)))
+        (cassandra/teardown-cassandra! node test)))
 
     db/LogFiles
     (log-files [_ test node]

@@ -8,7 +8,7 @@
 (def ^:private ^:const TX_COMMITTED 3)
 (def ^:private ^:const TX_ABORTED 4)
 
-(defn cassandra/cassandra-log
+(defn cassandra-log
   [test]
   (cassandra/cassandra-log test))
 
@@ -37,7 +37,7 @@
     (cassandra/guarded-start! test)))
 
 (defn teardown-cassandra!
-  [node]
+  [node test]
   (when-not (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
     (cassandra/wipe! test node)))
 
