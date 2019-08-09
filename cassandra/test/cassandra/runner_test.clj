@@ -1,12 +1,15 @@
 (ns cassandra.runner-test
   (:require [clojure.test :refer :all]
-            [jepsen.control :as c]
-            [jepsen.client :as client]
-            [jepsen.nemesis :as jn]
+            [jepsen
+             [control :as c]
+             [client :as client]
+             [nemesis :as jn]]
             [jepsen.nemesis.time :as nt]
-            [cassandra.core :as cass]
-            [cassandra.runner :as runner]
-            [cassandra.conductors :as conductors]
+            [cassandra
+             [core :as cass]
+             [runner :as runner]
+             [conductors :as conductors]
+             [nemesis :as nemesis]]
             [spy.core :as spy]))
 
 (deftest combine-nemesis-test
@@ -23,7 +26,8 @@
                 cass/live-nodes (spy/stub #{"n2" "n1" "n3" "n4"})
                 cass/joining-nodes (spy/stub #{})
                 cass/nodetool (spy/spy)
-                cass/start! (spy/spy)]
+                cass/start! (spy/spy)
+                nemesis/safe-mostly-small-nonempty-subset (spy/stub #{"n1"})]
     (let [base-opts {:nodes ["n1" "n2" "n3" "n4" "n5"] :rf 3}
           nemesis (runner/nemeses "crash")
           joining (runner/joinings "rejoin")

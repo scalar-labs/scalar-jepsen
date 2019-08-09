@@ -38,11 +38,11 @@
 
     (c/create-my-keyspace session test {:keyspace COORDINATOR})
     (c/create-my-table session {:keyspace COORDINATOR
-                                     :table STATE_TABLE
-                                     :schema {:tx_id         :text
-                                              :tx_state      :int
-                                              :tx_created_at :bigint
-                                              :primary-key   [:tx_id]}})
+                                :table STATE_TABLE
+                                :schema {:tx_id         :text
+                                         :tx_state      :int
+                                         :tx_created_at :bigint
+                                         :primary-key   [:tx_id]}})
     (alia/shutdown session)))
 
 (defn- create-properties
