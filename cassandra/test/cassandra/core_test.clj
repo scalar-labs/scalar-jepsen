@@ -142,10 +142,7 @@
       (cass/wipe! test "n1")
       (is (spy/called-with? c/exec :killall :java))
       (is (spy/called-with? c/exec :rm :-r "/root/cassandra/logs"))
-      (is (spy/called-with? c/exec :rm :-r "/root/cassandra/data/data"))
-      (is (spy/called-with? c/exec :rm :-r "/root/cassandra/data/hints"))
-      (is (spy/called-with? c/exec :rm :-r "/root/cassandra/data/commitlog"))
-      (is (spy/called-with? c/exec :rm :-r "/root/cassandra/data/saved_caches")))))
+      (is (spy/called-with? c/exec :rm :-r "/root/cassandra/data")))))
 
 (deftest db-setup-test
   (with-redefs [cass/wipe! (spy/spy)
