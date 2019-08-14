@@ -178,10 +178,7 @@
   (info node "deleting data files")
   (c/su
    (meh (c/exec :rm :-r (str (:cassandra-dir test) "/logs")))
-   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data/data")))
-   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data/hints")))
-   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data/commitlog")))
-   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data/saved_caches")))))
+   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data")))))
 
 (defn wait-turn
   "A node has to wait because Cassandra node can't start when another node is bootstrapping"
