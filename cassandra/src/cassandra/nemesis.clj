@@ -48,7 +48,7 @@
   [targeter start! stop!]
   (let [nodes (atom nil)]
     (reify nemesis/Nemesis
-      (setup! [this test] this)
+      (setup! [this _] this)
 
       (invoke! [this test op]
         (locking nodes
@@ -56,7 +56,7 @@
                  (case (:f op)
                    :start (if-let [ns (-> test :nodes (targeter test) util/coll)]
                             (if (compare-and-set! nodes nil ns)
-                              (c/on-many ns (start! test (keyword c/*host*)))
+                              (vals (c/on-many ns (start! test c/*host*)))
                               (str "nemesis already disrupting " @nodes))
                             :no-target)
                    :stop (if-let [ns @nodes]

@@ -9,6 +9,7 @@
                  [cc.qbits/alia "4.3.1"]
                  [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.9.0"]
-                                  [tortue/spy "2.0.0"]]}}
+                                  [tortue/spy "2.0.0"]]
+                   :plugins [[lein-cloverage "1.1.1"]]}}
   :main cassandra.runner
   :aot [cassandra.runner])

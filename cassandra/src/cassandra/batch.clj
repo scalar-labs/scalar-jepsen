@@ -26,12 +26,12 @@
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
         (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session test {:keyspace "jepsen_keyspace"
-                                       :table "bat"
-                                       :schema {:pid         :int
-                                                :cid         :int
-                                                :value       :int
-                                                :primary-key [:pid :cid]}}))))
+        (create-my-table session {:keyspace "jepsen_keyspace"
+                                  :table "bat"
+                                  :schema {:pid         :int
+                                           :cid         :int
+                                           :value       :int
+                                           :primary-key [:pid :cid]}}))))
 
   (invoke! [_ _ op]
     (alia/execute session (use-keyspace :jepsen_keyspace))
@@ -49,8 +49,7 @@
                (assoc op :type :ok))
         :read (let [results (alia/execute session
                                           (select :bat)
-                                          {:consistency :all
-                                           :retry-policy      aggressive-read})
+                                          {:consistency :all})
                     value-a (->> results
                                  (filter (fn [ret] (= (:cid ret) 0)))
                                  (map :value)

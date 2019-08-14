@@ -49,6 +49,9 @@
    [nil "--ledger-tarball LEDGER_TARBALL" "DL server bin files"
     :default "resources/ledger.tar"]
 
+   [nil "--cassandra-dir CASSANDRA_DIRECTORY" "Cassandra directory on DB node"
+    :default "/root/cassandra"]
+
    [nil "--rf REPLICATION_FACTOR" "Replication factor"
     :default 3
     :parse-fn #(Long/parseLong %)

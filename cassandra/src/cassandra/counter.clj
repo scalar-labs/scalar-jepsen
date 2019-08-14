@@ -28,11 +28,11 @@
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
         (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session test {:keyspace "jepsen_keyspace"
-                                       :table "counters"
-                                       :schema {:id          :int
-                                                :count       :counter
-                                                :primary-key [:id]}})
+        (create-my-table session {:keyspace "jepsen_keyspace"
+                                  :table "counters"
+                                  :schema {:id          :int
+                                           :count       :counter
+                                           :primary-key [:id]}})
         (alia/execute session (update :counters
                                       (set-columns :count [+ 0])
                                       (where [[= :id 0]]))))))

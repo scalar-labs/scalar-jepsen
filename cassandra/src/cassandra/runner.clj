@@ -46,10 +46,11 @@
    "strobe" {:name "-clock-strobe" :bump false :strobe true}
    "drift"  {:name "-clock-drift"  :bump true  :strobe true}})
 
-(def opt-spec
-  [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)
+(def test-opt-spec
+  [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)])
 
-   (cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
+(def cassandra-opt-spec
+  [(cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
                      [`(can/none)]
                      nemeses)
 
@@ -65,6 +66,9 @@
     :default 3
     :parse-fn #(Long/parseLong %)
     :validate [pos? "Must be positive"]]
+
+   [nil "--cassandra-dir CASSANDRA_DIRECTORY" "Cassandra directory on DB node"
+    :default "/root/cassandra"]
 
    (cli/tarball-opt link-to-tarball)])
 
@@ -91,7 +95,9 @@
 
 (defn test-cmd
   []
-  {"test" {:opt-spec (into cli/test-opt-spec opt-spec)
+  {"test" {:opt-spec (->> test-opt-spec
+                          (into cassandra-opt-spec)
+                          (into cli/test-opt-spec))
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
@@ -102,7 +108,7 @@
                           clock    (:clock options)]
                     (let [test (-> options
                                    (combine-nemesis nemesis joining clock)
-                                   (assoc :db (cassandra/db (:cassandra options)))
+                                   (assoc :db (cassandra/db))
                                    (dissoc :test)
                                    test-fn
                                    jepsen/run!)]

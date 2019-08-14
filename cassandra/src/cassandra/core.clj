@@ -35,7 +35,9 @@
                                               RetryPolicy$RetryDecision)
            (java.net InetAddress)))
 
-(def ^:const CASSANDRA_LOG "/root/cassandra/logs/system.log")
+(defn cassandra-log
+  [test]
+  (str (:cassandra-dir test) "/logs/system.log"))
 
 (defn- disable-hints?
   "Returns true if Jepsen tests should run without hints"
@@ -45,7 +47,7 @@
 (defn dns-resolve
   "Gets the address of a hostname"
   [hostname]
-  (.getHostAddress (InetAddress/getByName (name hostname))))
+  (.getHostAddress (InetAddress/getByName hostname)))
 
 (defn dns-hostnames
   "Gets the list of hostnames"
@@ -57,38 +59,33 @@
                      (get names)))
               addrs))))
 
+(defn- get-shuffled-nodes
+  [test]
+  (-> test :nodes set (set/difference @(:decommissioned test)) shuffle))
+
+(defn- get-jmx-status
+  [node attr]
+  (try
+    (jmx/with-connection {:host node :port 7199}
+      (jmx/read "org.apache.cassandra.db:type=StorageService"
+                attr))
+    (catch Exception e
+      (info "Couldn't get status from node" node))))
+
 (defn live-nodes
   "Get the list of live nodes from a random node in the cluster"
   [test]
-  (->> (some (fn [node]
-               (try
-                 (jmx/with-connection {:host (name node) :port 7199}
-                   (jmx/read "org.apache.cassandra.db:type=StorageService"
-                             :LiveNodes))
-                 (catch Exception e
-                   (info "Couldn't get status from node" node))))
-             (-> test
-                 :nodes
-                 set
-                 (set/difference @(:decommissioned test))
-                 shuffle))
+  (->> test get-shuffled-nodes
+       (some #(get-jmx-status % :LiveNodes))
        (dns-hostnames test)))
 
 (defn joining-nodes
   "Get the list of joining nodes from a random node in the cluster"
   [test]
-  (set (mapcat (fn [node]
-                 (try
-                   (jmx/with-connection {:host node :port 7199}
-                     (jmx/read "org.apache.cassandra.db:type=StorageService"
-                               :JoiningNodes))
-                   (catch Exception e
-                     (info "Couldn't get status from node" node))))
-               (-> test
-                   :nodes
-                   set
-                   (set/difference @(:decommissioned test))
-                   shuffle))))
+  (->> test
+       get-shuffled-nodes
+       (mapcat #(get-jmx-status % :JoiningNodes))
+       set))
 
 (defn seed-nodes
   "Get a list of seed nodes"
@@ -99,30 +96,8 @@
 
 (defn nodetool
   "Run a nodetool command"
-  [node & args]
-  (c/on node (apply c/exec (lit "/root/cassandra/bin/nodetool") args)))
-
-; This policy should only be used for final reads! It tries to
-; aggressively get an answer from an unstable cluster after
-; stabilization
-(def aggressive-read
-  (proxy [RetryPolicy] []
-    (onReadTimeout [statement cl requiredResponses
-                    receivedResponses dataRetrieved nbRetry]
-      (if (> nbRetry 100)
-        (RetryPolicy$RetryDecision/rethrow)
-        (RetryPolicy$RetryDecision/retry cl)))
-    (onWriteTimeout [statement cl writeType requiredAcks
-                     receivedAcks nbRetry]
-      (RetryPolicy$RetryDecision/rethrow))
-    (onUnavailable [statement cl requiredReplica aliveReplica nbRetry]
-      (info "Caught UnavailableException in driver - sleeping 2s")
-      (Thread/sleep 2000)
-      (if (> nbRetry 100)
-        (RetryPolicy$RetryDecision/rethrow)
-        (RetryPolicy$RetryDecision/retry cl)))))
-
-(def setup-lock (Object.))
+  [test node & args]
+  (c/on node (apply c/exec (lit (str (:cassandra-dir test) "/bin/nodetool")) args)))
 
 (defn install!
   "Installs Cassandra on the given node."
@@ -134,7 +109,7 @@
     (info node "installing Cassandra from" url)
     (do (when local-file
           (c/upload local-file "/tmp/cassandra.tar.gz"))
-        (cu/install-archive! tpath "/root/cassandra"))))
+        (cu/install-archive! tpath (:cassandra-dir test)))))
 
 (defn configure!
   "Uploads configuration files to the given node."
@@ -151,7 +126,7 @@
                      ".authenticate=true\"/JVM_OPTS=\"$JVM_OPTS -Dcom.sun.management"
                      ".jmxremote.authenticate=false\"/g'")
                 "'/JVM_OPTS=\"$JVM_OPTS -Dcassandra.mv_disable_coordinator_batchlog=.*\"/d'"]]
-     (c/exec :sed :-i (lit rep) "/root/cassandra/conf/cassandra-env.sh"))
+     (c/exec :sed :-i (lit rep) (str (:cassandra-dir test) "/conf/cassandra-env.sh")))
    (doseq [rep (into ["\"s/cluster_name: .*/cluster_name: 'jepsen'/g\""
                       (str "\"s/seeds: .*/seeds: '"
                            (clojure.string/join "," (seed-nodes test)) "'/g\"")
@@ -167,15 +142,15 @@
                       "\"s/#hints_compression.*/hints_compression:/g\""
                       (str "\"s/#   - class_name: LZ4Compressor/"
                            "    - class_name: LZ4Compressor/g\"")])]
-     (c/exec :sed :-i (lit rep) "/root/cassandra/conf/cassandra.yaml"))
-   (c/exec :sed :-i (lit "\"s/INFO/DEBUG/g\"") "/root/cassandra/conf/logback.xml")))
+     (c/exec :sed :-i (lit rep) (str (:cassandra-dir test) "/conf/cassandra.yaml")))
+   (c/exec :sed :-i (lit "\"s/INFO/DEBUG/g\"") (str (:cassandra-dir test) "/conf/logback.xml"))))
 
 (defn start!
   "Starts Cassandra."
   [node test]
   (info node "starting Cassandra")
   (c/su
-   (c/exec (lit "/root/cassandra/bin/cassandra -R"))))
+   (c/exec (lit (str (:cassandra-dir test) "/bin/cassandra -R")))))
 
 (defn guarded-start!
   "Guarded start that only starts nodes that have joined the cluster already
@@ -198,15 +173,12 @@
 
 (defn wipe!
   "Shuts down Cassandra and wipes data."
-  [node]
+  [test node]
   (stop! node)
   (info node "deleting data files")
   (c/su
-   (meh (c/exec :rm :-r "/root/cassandra/logs"))
-   (meh (c/exec :rm :-r "/root/cassandra/data/data"))
-   (meh (c/exec :rm :-r "/root/cassandra/data/hints"))
-   (meh (c/exec :rm :-r "/root/cassandra/data/commitlog"))
-   (meh (c/exec :rm :-r "/root/cassandra/data/saved_caches"))))
+   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/logs")))
+   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data")))))
 
 (defn wait-turn
   "A node has to wait because Cassandra node can't start when another node is bootstrapping"
@@ -217,12 +189,12 @@
       (Thread/sleep (* 1000 60 idx)))))
 
 (defn db
-  "Cassandra for a particular version."
-  [version]
+  "Setup Cassandra."
+  []
   (reify db/DB
     (setup! [_ test node]
       (when (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
-        (wipe! node))
+        (wipe! test node))
       (doto node
         (install! test)
         (configure! test)
@@ -231,10 +203,10 @@
 
     (teardown! [_ test node]
       (when-not (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
-        (wipe! node)))
+        (wipe! test node)))
 
     db/LogFiles
-    (log-files [db test node]
+    (log-files [_ _ _]
       [])))
 
 (def add {:type :invoke, :f :add, :value 1})
@@ -248,15 +220,6 @@
   []
   (->> (range)
        (map (fn [x] {:type :invoke, :f :add, :value x}))
-       gen/seq))
-
-(defn assocs
-  "Generator that emits :assoc operations for sequential integers,
-  mapping x to (f x)"
-  [f]
-  (->> (range)
-       (map (fn [x] {:type :invoke :f :assoc :value {:k x
-                                                     :v (f x)}}))
        gen/seq))
 
 (defn read-once
@@ -273,16 +236,14 @@
                                                               "replication_factor" (:rf test)}}))))
 
 (defn create-my-table
-  [session test {:keys [keyspace table schema compaction-strategy]
-                 :or {compaction-strategy :SizeTieredCompactionStrategy}}]
+  [session {:keys [keyspace table schema compaction-strategy]
+            :or {compaction-strategy :SizeTieredCompactionStrategy}}]
   (alia/execute session (use-keyspace (keyword keyspace)))
   (alia/execute session (create-table (keyword table)
                                       (if-exists false)
-                                      (column-definitions schema)))
-  (alia/execute session
-                (alter-table (keyword table)
-                             (with {:compaction
-                                    {:class compaction-strategy}}))))
+                                      (column-definitions schema)
+                                      (with {:compaction
+                                             {:class compaction-strategy}}))))
 
 (defn cassandra-test
   [name opts]

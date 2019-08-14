@@ -19,11 +19,11 @@
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
       (is (= :quorum (.writec client)))
-      (is (spy/called-n-times? alia/execute 5)) ;; for table creation
+      (is (spy/called-n-times? alia/execute 4)) ;; for table creation
 
       ;; tables have been already created
       (client/setup! client {:rf 3})
-      (is (spy/called-n-times? alia/execute 5)))))
+      (is (spy/called-n-times? alia/execute 4)))))
 
 (deftest map-client-add-test
   (with-redefs [alia/cluster (spy/spy)
@@ -60,8 +60,7 @@
                             {:select :maps
                              :columns :*
                              :where [[= :id 0]]}
-                            {:consistency :all
-                             :retry-policy cassandra/aggressive-read}))
+                            {:consistency :all}))
       (is (= :ok (:type result)))
       (is (= #{1 2 3} (:value result))))))
 
