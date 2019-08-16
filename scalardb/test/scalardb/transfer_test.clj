@@ -69,13 +69,6 @@
     (^void put [this ^Put p] (mock-put p))
     (^void commit [this] (throw (UnknownTransactionStatusException. "unknown state")))))
 
-(def mock-transaction-throws-exception
-  (reify
-    DistributedTransaction
-    (^Optional get [this ^Get get] (throw (CrudException. "get failed")))
-    (^void put [this ^Put put] (throw (CrudException. "put failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))))
-
 (deftest transfer-client-init-test
   (binding [test-records (atom {0 0 1 0 2 0 3 0 4 0})
             put-count (atom 0)
