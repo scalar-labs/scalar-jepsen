@@ -13,7 +13,7 @@
 (def tests
   "A map of test names to test constructors."
   {"transfer"        scalardb.transfer/transfer-test
-   "transfer-append" scalardb.transfer_append/transfer-append-test})
+   "transfer-append" scalardb.transfer-append/transfer-append-test})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)])
