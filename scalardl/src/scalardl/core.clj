@@ -26,10 +26,6 @@
 (def ^:private ^:const LEDGER_LOG (str LEDGER_INSTALL_DIR "/scalardl.log"))
 (def ^:private ^:const LEDGER_PID (str LEDGER_INSTALL_DIR "/scalardl.pid"))
 
-(defn exponential-backoff
-  [r]
-  (Thread/sleep (reduce * 1000 (repeat r 2))))
-
 (defn create-client-properties
   [test]
   (doto (Properties.)
@@ -42,7 +38,7 @@
   [test]
   (loop [tries RETRIES]
     (when (< tries RETRIES)
-      (exponential-backoff (- RETRIES tries)))
+      (cassandra/exponential-backoff (- RETRIES tries)))
     (if (pos? tries)
       (if-let [injector (some->> test
                                  create-client-properties
@@ -73,7 +69,7 @@
   (info "checking a TX state" txid)
   (loop [tries RETRIES]
     (when (< tries RETRIES)
-      (exponential-backoff (- RETRIES tries)))
+      (cassandra/exponential-backoff (- RETRIES tries)))
     (let [committed (cassandra/check-tx-state txid test)]
       (if committed
         committed

@@ -35,6 +35,10 @@
                                               RetryPolicy$RetryDecision)
            (java.net InetAddress)))
 
+(defn exponential-backoff
+  [r]
+  (Thread/sleep (reduce * 1000 (repeat r 2))))
+
 (defn cassandra-log
   [test]
   (str (:cassandra-dir test) "/logs/system.log"))
@@ -99,13 +103,24 @@
   [test node & args]
   (c/on node (apply c/exec (lit (str (:cassandra-dir test) "/bin/nodetool")) args)))
 
+(defn- install-jdk-with-retry
+  [node tries]
+  (when (pos? tries)
+    (exponential-backoff tries))
+  (try
+    (c/su (debian/install [:openjdk-8-jre]))
+    (catch clojure.lang.ExceptionInfo e
+      (if (= tries 5)
+        (throw e)
+        (install-jdk-with-retry node (inc tries))))))
+
 (defn install!
   "Installs Cassandra on the given node."
   [node test]
   (let [url (:tarball test)
         local-file (second (re-find #"file://(.+)" url))
         tpath (if local-file "file:///tmp/cassandra.tar.gz" url)]
-    (c/su (debian/install [:openjdk-8-jre]))
+    (install-jdk-with-retry node 0)
     (info node "installing Cassandra from" url)
     (do (when local-file
           (c/upload local-file "/tmp/cassandra.tar.gz"))

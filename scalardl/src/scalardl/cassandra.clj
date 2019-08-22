@@ -8,6 +8,10 @@
 (def ^:private ^:const TX_COMMITTED 3)
 (def ^:private ^:const TX_ABORTED 4)
 
+(defn exponential-backoff
+  [r]
+  (cassandra/exponential-backoff r))
+
 (defn cassandra-log
   [test]
   (cassandra/cassandra-log test))

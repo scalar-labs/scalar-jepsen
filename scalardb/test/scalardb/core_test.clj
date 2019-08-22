@@ -102,11 +102,11 @@
 
 (deftest prepare-service-fail-test
   (with-redefs [c/live-nodes (spy/stub ["n1" "n2" "n3"])
-                scalar/exponential-backoff (spy/spy)
+                c/exponential-backoff (spy/spy)
                 scalar/create-service-instance (spy/stub nil)]
     (let [test {:storage (atom nil)}]
       (scalar/prepare-storage-service! test)
-      (is (spy/called-n-times? scalar/exponential-backoff 8))
+      (is (spy/called-n-times? c/exponential-backoff 8))
       (is (nil? @(:storage test))))))
 
 (deftest check-connection-test
@@ -148,10 +148,10 @@
       (is (= 1 (scalar/check-transaction-states test #{"3" "4"}))))))
 
 (deftest check-transaction-states-fail-test
-  (with-redefs [scalar/exponential-backoff (spy/spy)
+  (with-redefs [c/exponential-backoff (spy/spy)
                 scalar/prepare-storage-service! (spy/spy)]
     (let [test {:storage (atom mock-storage)}]
       (is (thrown? clojure.lang.ExceptionInfo
                    (scalar/check-transaction-states test #{"tx"})))
-      (is (spy/called-n-times? scalar/exponential-backoff 8))
+      (is (spy/called-n-times? c/exponential-backoff 8))
       (is (spy/called-n-times? scalar/prepare-storage-service! 3)))))
