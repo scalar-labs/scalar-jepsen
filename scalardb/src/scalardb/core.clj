@@ -75,57 +75,50 @@
   (close-storage! test)
   (close-transaction! test))
 
-(defn prepare-storage-service!
-  [test]
-  (close-storage! test)
+(defn- create-service-instance
+  [test mode]
+  (when-let [config (some->> (c/live-nodes test)
+                             not-empty
+                             create-properties
+                             DatabaseConfig.)]
+    (let [[module service] (condp = mode
+                             :storage [(StorageModule. config)
+                                       StorageService]
+                             :transaction [(TransactionModule. config)
+                                           TransactionService])
+          injector (Guice/createInjector (vector module))]
+      (try
+        (.getInstance injector service)
+        (catch Exception e
+          (warn (.getMessage e)))))))
+
+(defn- prepare-service!
+  [test mode]
+  (if (= mode :storage)
+    (close-storage! test)
+    (close-transaction! test))
   (info "reconnecting to the cluster")
   (loop [tries RETRIES]
     (when (< tries RETRIES)
       (exponential-backoff (- RETRIES tries)))
     (if-not (pos? tries)
       (warn "Failed to connect to the cluster")
-      (if-let [injector (some->> (c/live-nodes test)
-                                 not-empty
-                                 create-properties
-                                 DatabaseConfig.
-                                 StorageModule.
-                                 vector
-                                 Guice/createInjector)]
-        (try
-          (->> (.getInstance injector StorageService)
-               (reset! (:storage test)))
-          (catch Exception e
-            (warn (.getMessage e))))
-        (when-not @(:storage test)
+      (if-let [instance (create-service-instance test mode)]
+        (reset! (mode test) instance)
+        (when-not @(mode test)
           (recur (dec tries)))))))
+
+(defn prepare-storage-service!
+  [test]
+  (prepare-service! test :storage))
 
 (defn prepare-transaction-service!
   [test]
-  (close-transaction! test)
-  (info "reconnecting to the cluster")
-  (loop [tries RETRIES]
-    (when (< tries RETRIES)
-      (exponential-backoff (- RETRIES tries)))
-    (if (zero? tries)
-      (warn "Failed to connect to the cluster")
-      (if-let [injector (some->> (c/live-nodes test)
-                                 not-empty
-                                 create-properties
-                                 DatabaseConfig.
-                                 TransactionModule.
-                                 vector
-                                 Guice/createInjector)]
-        (try
-          (->> (.getInstance injector TransactionService)
-               (reset! (:transaction test)))
-          (catch Exception e
-            (warn (.getMessage e))))
-        (when-not @(:transaction test)
-          (recur (dec tries)))))))
+  (prepare-service! test :transaction))
 
 (defn check-connection!
   [test]
-  (when (nil? @(:transaction test))
+  (when-not @(:transaction test)
     (prepare-transaction-service! test)))
 
 (defn try-reconnection!
