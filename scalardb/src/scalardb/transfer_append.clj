@@ -1,4 +1,4 @@
-(ns scalardb.transfer_append
+(ns scalardb.transfer-append
   (:require [cassandra.conductors :as conductors]
             [clojure.tools.logging :refer [debug info warn]]
             [clojure.core.reducers :as r]
@@ -106,11 +106,15 @@
 
 (defn- tx-transfer
   [tx {:keys [from to amount]}]
-  (let [^Result fromResult (scan-for-latest tx (prepare-scan-for-latest from))
-        ^Result toResult (scan-for-latest tx (prepare-scan-for-latest to))]
-    (->> (prepare-put from (calc-new-age fromResult) (calc-new-balance fromResult (- amount)))
+  (let [^Result from-result (scan-for-latest tx (prepare-scan-for-latest from))
+        ^Result to-result (scan-for-latest tx (prepare-scan-for-latest to))]
+    (->> (prepare-put from
+                      (calc-new-age from-result)
+                      (calc-new-balance from-result (- amount)))
          (.put tx))
-    (->> (prepare-put to (calc-new-age toResult) (calc-new-balance toResult amount))
+    (->> (prepare-put to
+                      (calc-new-age to-result)
+                      (calc-new-balance to-result amount))
          (.put tx))
     (.commit tx)))
 
