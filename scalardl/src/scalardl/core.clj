@@ -15,7 +15,7 @@
            (com.google.inject Guice)
            (java.util Properties)))
 
-(def ^:private ^:const RETRIES 8)
+(def ^:const RETRIES 8)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 
 (def ^:private ^:const LOCAL_DIR "/scalar-jepsen/scalardl")
@@ -68,7 +68,7 @@
       (prepare-client-service test))
     client-service))
 
-(defn- check-tx-committed
+(defn check-tx-committed
   [txid test]
   (info "checking a TX state" txid)
   (loop [tries RETRIES]
