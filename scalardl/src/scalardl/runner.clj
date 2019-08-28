@@ -1,7 +1,6 @@
 (ns scalardl.runner
   (:gen-class)
   (:require [cassandra
-             [core :as cassandra]
              [nemesis :as can]
              [runner :as car]]
             [jepsen

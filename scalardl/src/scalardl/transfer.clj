@@ -152,19 +152,19 @@
               transfer))
 
 (defn- get-all
-  [test _]
+  [_ _]
   {:type :invoke
    :f    :get-all})
 
 (defn- check-tx
-  [test _]
+  [_ _]
   {:type :invoke
    :f    :check-tx})
 
 (defn- asset-checker
   []
   (reify checker/Checker
-    (check [this test history opts]
+    (check [_ test history opts]
       (let [read-results (->> history
                               (r/filter #(= :get-all (:f %)))
                               (r/filter identity)

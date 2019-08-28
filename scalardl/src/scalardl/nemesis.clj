@@ -5,9 +5,7 @@
             [cassandra
              [core :as cass]
              [nemesis :as cn]]
-            [scalardl
-             [core :as dl]
-             [util :as util]]))
+            [scalardl.util :as util]))
 
 (defn- crash-nemesis
   "A nemesis that crashes a random subset of nodes."
