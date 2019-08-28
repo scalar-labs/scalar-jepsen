@@ -104,15 +104,17 @@
   (c/on node (apply c/exec (lit (str (:cassandra-dir test) "/bin/nodetool")) args)))
 
 (defn- install-jdk-with-retry
-  [node tries]
-  (when (pos? tries)
-    (exponential-backoff tries))
-  (try
-    (c/su (debian/install [:openjdk-8-jre]))
-    (catch clojure.lang.ExceptionInfo e
-      (if (= tries 5)
-        (throw e)
-        (install-jdk-with-retry node (inc tries))))))
+  []
+  (letfn [(step [tries]
+            (when (pos? tries)
+              (exponential-backoff tries))
+            (try
+              (c/su (debian/install [:openjdk-8-jre]))
+              (catch clojure.lang.ExceptionInfo e
+                (if (= tries 5)
+                  (throw e)
+                  (step (inc tries))))))]
+    (step 0)))
 
 (defn install!
   "Installs Cassandra on the given node."
@@ -120,7 +122,7 @@
   (let [url (:tarball test)
         local-file (second (re-find #"file://(.+)" url))
         tpath (if local-file "file:///tmp/cassandra.tar.gz" url)]
-    (install-jdk-with-retry node 0)
+    (install-jdk-with-retry)
     (info node "installing Cassandra from" url)
     (do (when local-file
           (c/upload local-file "/tmp/cassandra.tar.gz"))
