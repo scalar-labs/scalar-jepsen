@@ -105,6 +105,20 @@
                             "file:///tmp/cassandra.tar.gz"
                             (:cassandra-dir test))))))
 
+(deftest install-jdk-fail-test
+  (let [test {:tarball "http://some.where/tarball-file"
+              :cassandra-dir "/root/cassandra"}]
+    (with-redefs [cass/exponential-backoff (spy/spy)
+                  debian/install (spy/mock (fn [a]
+                                             (throw (ex-info
+                                                     "install failed!" {}))))
+                  c/upload (spy/spy)
+                  cu/install-archive! (spy/spy)]
+      (is (thrown? clojure.lang.ExceptionInfo (cass/install! "n1" test)))
+      (is (spy/called-n-times? cass/exponential-backoff 5))
+      (is (spy/not-called? c/upload))
+      (is (spy/not-called? cu/install-archive!)))))
+
 (deftest start-test
   (let [test {:cassandra-dir "/root/cassandra"}]
     (with-redefs [c/exec (spy/spy)]

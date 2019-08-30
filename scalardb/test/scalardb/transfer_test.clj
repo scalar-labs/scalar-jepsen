@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [jepsen.client :as client]
             [jepsen.checker :as checker]
+            [cassandra.core :as cass]
             [scalardb.core :as scalar]
             [scalardb.transfer :as transfer]
             [spy.core :as spy])
@@ -180,7 +181,7 @@
 
 (deftest transfer-client-get-all-fail-test
   (with-redefs [scalar/check-connection! (spy/spy)
-                scalar/exponential-backoff (spy/spy)
+                cass/exponential-backoff (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
@@ -189,7 +190,7 @@
                    (client/invoke! client {}
                                    (#'transfer/get-all {:client client}
                                                        nil))))
-      (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
+      (is (spy/called-n-times? cass/exponential-backoff scalar/RETRIES))
       (is (spy/called-n-times? scalar/prepare-transaction-service! scalar/RETRIES_FOR_RECONNECTION)))))
 
 (deftest transfer-client-check-tx-test

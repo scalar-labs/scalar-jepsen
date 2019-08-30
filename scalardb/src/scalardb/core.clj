@@ -24,10 +24,6 @@
 (def ^:private ^:const STATE_TABLE "state")
 (def ^:const VERSION "tx_version")
 
-(defn exponential-backoff
-  [r]
-  (Thread/sleep (reduce * 1000 (repeat r 2))))
-
 (defn setup-transaction-tables
   [test schemata]
   (let [session (alia/connect
@@ -100,7 +96,7 @@
   (info "reconnecting to the cluster")
   (loop [tries RETRIES]
     (when (< tries RETRIES)
-      (exponential-backoff (- RETRIES tries)))
+      (c/exponential-backoff (- RETRIES tries)))
     (if-not (pos? tries)
       (warn "Failed to connect to the cluster")
       (if-let [instance (create-service-instance test mode)]
@@ -136,7 +132,7 @@
   "If the result of the body is nil, it retries it"
   `(loop [tries# RETRIES]
      (when (< tries# RETRIES)
-       (exponential-backoff (- RETRIES tries#)))
+       (c/exponential-backoff (- RETRIES tries#)))
      (when (zero? (mod tries# RETRIES_FOR_RECONNECTION))
        (~connect-fn ~test))
      (if-let [results# ~@body]
