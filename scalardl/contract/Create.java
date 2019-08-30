@@ -12,7 +12,7 @@ public class Create extends Contract {
   @Override
   public JsonObject invoke(Ledger ledger, JsonObject argument, Optional<JsonObject> property) {
     if (!(argument.containsKey("id") && argument.containsKey("balance"))) {
-      throw new ContractContextException("required key 'id' and 'balance' is missing");
+      throw new ContractContextException("required key 'id' or 'balance' is missing");
     }
 
     String id = String.valueOf(argument.getInt("id"));

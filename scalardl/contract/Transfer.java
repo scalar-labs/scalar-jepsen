@@ -14,7 +14,7 @@ public class Transfer extends Contract {
     if (!(argument.containsKey("from")
         && argument.containsKey("to")
         && argument.containsKey("amount"))) {
-      throw new ContractContextException("required keys 'from', 'to' and 'amount' is missing");
+      throw new ContractContextException("required key 'from', 'to' or 'amount' is missing");
     }
 
     String from = String.valueOf(argument.getInt("from"));
