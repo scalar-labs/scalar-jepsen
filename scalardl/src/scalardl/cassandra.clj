@@ -17,14 +17,14 @@
   Return nil when it can't read the state from the coordinator table"
   [txid {:keys [cass-nodes]}]
   (let [cluster (alia/cluster {:contact-points cass-nodes})
-        state (some-> (try (alia/execute (alia/connect cluster)
-                                         (select :coordinator.state (where {:tx_id txid}))
-                                         {:consistency :serial})
-                           (catch Exception _
-                             (warn "Failed to read the coordinator table"))
-                           (finally (alia/shutdown cluster)))
-                      first :tx_state)]
-    (if state (= state TX_COMMITTED) nil)))
+        rows (try (alia/execute (alia/connect cluster)
+                                (select :coordinator.state
+                                        (where {:tx_id txid}))
+                                {:consistency :serial})
+                  (catch Exception _
+                    (warn "Failed to read the coordinator table"))
+                  (finally (alia/shutdown cluster)))]
+    (if rows (= (-> rows first :tx_state) TX_COMMITTED) nil)))
 
 (defn spinup-cassandra!
   [node test]

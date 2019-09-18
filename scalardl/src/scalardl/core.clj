@@ -30,7 +30,7 @@
   [r]
   (Thread/sleep (reduce * 1000 (repeat r 2))))
 
-(defn create-client-properties
+(defn- create-client-properties
   [test]
   (doto (Properties.)
     (.setProperty "scalar.ledger.client.server_host" (rand-nth (:servers test)))
@@ -44,12 +44,12 @@
     (when (< tries RETRIES)
       (exponential-backoff (- RETRIES tries)))
     (if (pos? tries)
-      (if-let [injector (some->> test
-                                 create-client-properties
-                                 ClientConfig.
-                                 ClientModule.
-                                 vector
-                                 Guice/createInjector)]
+      (if-let [injector (some-> test
+                                create-client-properties
+                                ClientConfig.
+                                ClientModule.
+                                vector
+                                Guice/createInjector)]
         (try
           (.getInstance injector ClientService)
           (catch Exception e
@@ -75,7 +75,7 @@
     (when (< tries RETRIES)
       (exponential-backoff (- RETRIES tries)))
     (let [committed (cassandra/check-tx-state txid test)]
-      (if committed
+      (if-not (nil? committed)
         committed
         (if (pos? tries)
           (recur (dec tries))
@@ -97,8 +97,7 @@
 
 (defn- create-server-properties
   [test]
-  (c/exec :echo (str "scalar.ledger.proof.enabled=true\n"
-                     "scalar.ledger.proof.private_key_path=server-key.pem\n"
+  (c/exec :echo (str "scalar.ledger.nonce_txid.enabled=true\n"
                      "scalar.database.contact_points="
                      (clojure.string/join "," (:cass-nodes test)) "\n"
                      "scalar.database.username=cassandra\n"

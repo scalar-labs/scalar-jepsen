@@ -34,6 +34,7 @@
 (def ^:private ^:const ASSET_AMOUNT "amount")
 (def ^:private ^:const ASSET_BALANCE "balance")
 (def ^:private ^:const ASSET_AGE "age")
+(def ^:private ^:const NONCE "nonce")
 
 (defn- create-argument
   ([id]
@@ -45,8 +46,9 @@
        (.add ASSET_ID id)
        (.add ASSET_BALANCE initial-balance)
        (.build)))
-  ([from to amount]
+  ([txid from to amount]
    (-> (Json/createObjectBuilder)
+       (.add NONCE txid)
        (.add ASSET_ID_FROM from)
        (.add ASSET_ID_TO to)
        (.add ASSET_AMOUNT amount)
@@ -111,7 +113,7 @@
     (let [txid (str (java.util.UUID/randomUUID))]
       (case (:f op)
         :transfer (let [{:keys [from to amount]} (:value op)
-                        resp (->> (create-argument from to amount)
+                        resp (->> (create-argument txid from to amount)
                                   (.executeContract @client-service
                                                     "transfer"))]
                     (if (util/success? resp)
