@@ -5,9 +5,7 @@
             [cassandra
              [core :as cass]
              [nemesis :as cn]]
-            [scalardl
-             [core :as dl]
-             [util :as util]]))
+            [scalardl.util :as util]))
 
 (defn- crash-nemesis
   "A nemesis that crashes a random subset of nodes."
@@ -18,14 +16,10 @@
      (when-not (util/server? node test)
        (meh (c/su (c/exec :killall :-9 :java))) [:killed node]))
    (fn stop  [test node]
-     (if (util/server? node test)
-       (do
-         (dl/start-server! node test)
-         [:server-restarted node])
-       (do
-         (meh (cass/guarded-start! node test))
-         (Thread/sleep (* 1000 60))
-         [:cassandra-restarted node])))))
+     (when-not (util/server? node test)
+       (meh (cass/guarded-start! node test))
+       (Thread/sleep (* 1000 60))
+       [:cassandra-restarted node]))))
 
 (defn crash
   []
