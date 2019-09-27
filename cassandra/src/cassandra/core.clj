@@ -111,7 +111,7 @@
             (try
               (c/su (debian/install [:openjdk-8-jre]))
               (catch clojure.lang.ExceptionInfo e
-                (if (= tries 5)
+                (if (= tries 7)
                   (throw e)
                   (step (inc tries))))))]
     (step 0)))
