@@ -115,7 +115,7 @@
                   c/upload (spy/spy)
                   cu/install-archive! (spy/spy)]
       (is (thrown? clojure.lang.ExceptionInfo (cass/install! "n1" test)))
-      (is (spy/called-n-times? cass/exponential-backoff 5))
+      (is (spy/called-n-times? cass/exponential-backoff 7))
       (is (spy/not-called? c/upload))
       (is (spy/not-called? cu/install-archive!)))))
 
