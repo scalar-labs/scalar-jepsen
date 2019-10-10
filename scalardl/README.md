@@ -28,7 +28,7 @@ The Scalar DL Jepsen tests make use of the [Cassandra Jepsen tests](https://gith
     # in jepsen-control
 
     $ cd /scalar-jepsen/scalardl
-    $ lein run test --test simple
+    $ lein run test --test cas
     ```
 
     Use `lein run test --help` to see a list of the options.
