@@ -1,6 +1,7 @@
 (ns scalardl.runner
   (:gen-class)
-  (:require [cassandra
+  (:require [clojure.string :as cstr]
+            [cassandra
              [nemesis :as can]
              [runner :as car]]
             [jepsen
@@ -34,10 +35,14 @@
                      [{:name "" :bump false :strobe false}]
                      car/clocks)
 
-   [nil "--cass-nodes CASSANDRA_NODES" "Array of Cassandra nodes"
-    :default ["n1" "n2" "n3"]]
-   [nil "--servers DL_SERVERS" "Array of DL servers"
-    :default ["n4" "n5"]]
+   [nil "--cass-nodes CASSANDRA_NODES"
+    "Comma-separated list of cassandra hostnames."
+    :default ["n1" "n2" "n3"]
+    :parse-fn #(cstr/split % #",\s*")]
+   [nil "--servers DL_SERVERS"
+    "Comma-separated list of server hostnames."
+    :default ["n4" "n5"]
+    :parse-fn #(cstr/split % #",\s*")]
 
    [nil "--cert CERTIFICATE" "a certificate file for DL"
     :default "resources/client.pem"]
@@ -67,6 +72,15 @@
                                (dissoc :node :nodes-file)
                                (assoc :nodes all-nodes)))))
 
+(defn- modify-decommissioned-node
+  "Avoid starting Cassandra on a DL server"
+  [opts joining]
+  (let [rf (:rf opts)
+        cass-nodes (:cass-nodes opts)
+        bootstrap? (and (:bootstrap joining) (< rf (count cass-nodes)))
+        decommissioned (if bootstrap? #{(last cass-nodes)} #{})]
+    (assoc opts :decommissioned (atom decommissioned))))
+
 (defn test-cmd
   []
   {"test" {:opt-spec (into cli/test-opt-spec opt-spec)
@@ -80,6 +94,7 @@
                                clock (:clock options)]
                          (let [test (-> options
                                         (car/combine-nemesis nemesis joining clock)
+                                        (modify-decommissioned-node joining)
                                         (dissoc :test)
                                         test-fn
                                         jepsen/run!)]
