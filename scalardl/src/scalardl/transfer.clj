@@ -11,8 +11,7 @@
              [core :as dl]
              [cassandra :as cassandra]
              [util :as util]])
-  (:import (javax.json Json)
-           (java.util Optional)))
+  (:import (javax.json Json)))
 
 (def ^:private ^:const INITIAL_BALANCE 10000)
 (def ^:private ^:const NUM_ACCOUNTS 10)
@@ -101,11 +100,8 @@
         (cassandra/create-tables test)
         (Thread/sleep 10000)  ;; Wait for the table creation
         (info "register a certificate and contracts")
-        (.registerCertificate @client-service)
-        (doseq [c CONTRACTS]
-          (.registerContract @client-service
-                             (:name c) (:class c) (:path c)
-                             (Optional/empty)))
+        (dl/register-certificate @client-service)
+        (dl/register-contracts @client-service CONTRACTS)
         (doseq [id (range 0 n)]
           (create-asset @client-service id)))))
 

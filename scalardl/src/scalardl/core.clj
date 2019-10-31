@@ -13,6 +13,7 @@
            (com.scalar.client.config ClientConfig)
            (com.scalar.client.service ClientModule)
            (com.google.inject Guice)
+           (java.util Optional)
            (java.util Properties)))
 
 (def ^:const RETRIES 8)
@@ -67,6 +68,26 @@
       (reset! (:failures test) 0)
       (prepare-client-service test))
     client-service))
+
+(defn register-certificate
+  [client-service]
+  (let [resp (.registerCertificate client-service)]
+    (when-not (util/success? resp)
+      (throw (ex-info "Failed to register a certificate"
+                      {:cause "Failed to register a certificate"})))))
+
+(defn register-contracts
+  "Register contracts which have
+  {:name contract-name, :class class-name, :path contract-path}"
+  [client-service contracts]
+  (doseq [c contracts]
+    (let [resp (.registerContract client-service
+                                  (:name c) (:class c) (:path c)
+                                  (Optional/empty))]
+      (when-not (util/success? resp)
+        (throw (ex-info "Failed to register a contract"
+                        {:cause "Failed to register a contract"
+                         :contract c}))))))
 
 (defn check-tx-committed
   [txid test]
