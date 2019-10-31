@@ -10,8 +10,7 @@
              [cassandra :as cassandra]
              [core :as dl]
              [util :as util]])
-  (:import (javax.json Json)
-           (java.util Optional)))
+  (:import (javax.json Json)))
 
 (def ^:private ^:const CONTRACTS [{:name "read"
                                    :class "com.scalar.jepsen.scalardl.Read"
@@ -59,9 +58,8 @@
         (cassandra/create-tables test)
         (Thread/sleep 10000)  ;; Wait for the table creation
         (info "register a certificate and contracts")
-        (.registerCertificate @client-service)
-        (doseq [c CONTRACTS]
-          (.registerContract @client-service (:name c) (:class c) (:path c) (Optional/empty))))))
+        (dl/register-certificate @client-service)
+        (dl/register-contracts @client-service CONTRACTS))))
 
   (invoke! [_ test op]
     (case (:f op)
