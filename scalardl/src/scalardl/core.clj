@@ -86,7 +86,8 @@
                                   (Optional/empty))]
       (when-not (util/success? resp)
         (throw (ex-info "Failed to register a contract"
-                        {:cause "Failed to register a contract"}))))))
+                        {:cause "Failed to register a contract"
+                         :contract c}))))))
 
 (defn check-tx-committed
   [txid test]
