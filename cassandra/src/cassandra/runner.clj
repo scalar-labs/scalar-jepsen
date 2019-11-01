@@ -15,8 +15,7 @@
              [nemesis :as jn]]
             [jepsen.nemesis.time :as nt]))
 
-(def link-to-tarball "http://ftp.meisei-u.ac.jp/mirror/apache/dist/cassandra/3.11.5/apache-cassandra-3.11.5-bin.tar.gz")
-;(def link-to-tarball "http://www.us.apache.org/dist/cassandra/3.11.5/apache-cassandra-3.11.5-bin.tar.gz")
+(def link-to-tarball "https://archive.apache.org/dist/cassandra/3.11.5/apache-cassandra-3.11.5-bin.tar.gz")
 
 (def tests
   "A map of test names to test constructors."
