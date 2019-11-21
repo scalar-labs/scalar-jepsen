@@ -26,8 +26,8 @@
 
 (defn setup-transaction-tables
   [test schemata]
-  (let [session (alia/connect
-                 (alia/cluster {:contact-points (:nodes test)}))]
+  (let [cluster (alia/cluster {:contact-points (:nodes test)})
+        session (alia/connect cluster)]
     (doseq [schema schemata]
       (c/create-my-keyspace session test schema)
       (c/create-my-table session schema))
@@ -39,7 +39,7 @@
                                          :tx_state      :int
                                          :tx_created_at :bigint
                                          :primary-key   [:tx_id]}})
-    (alia/shutdown session)))
+    (c/close-cassandra cluster session)))
 
 (defn- create-properties
   [nodes]

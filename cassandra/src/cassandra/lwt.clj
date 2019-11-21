@@ -20,12 +20,12 @@
                                 ; it isn't really a valid keyword from reader's
                                 ; perspective
 
-(defrecord CasRegisterClient [tbl-created? session]
+(defrecord CasRegisterClient [tbl-created? cluster session]
   client/Client
   (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (:nodes test)})
           session (alia/connect cluster)]
-      (->CasRegisterClient tbl-created? session)))
+      (->CasRegisterClient tbl-created? cluster session)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -85,14 +85,14 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (alia/shutdown session))
+    (close-cassandra cluster session))
 
   (teardown! [_ _]))
 
 (defn lwt-test
   [opts]
   (merge (cassandra-test (str "lwt-" (:suffix opts))
-                         {:client    (->CasRegisterClient (atom false) nil)
+                         {:client    (->CasRegisterClient (atom false) nil nil)
                           :checker   (checker/linearizable {:model     (model/cas-register)
                                                             :algorithm :linear})
                           :generator (gen/phases
