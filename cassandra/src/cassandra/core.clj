@@ -265,8 +265,8 @@
 
 (defn close-cassandra
   [cluster session]
-  (-> (alia/shutdown session) (.get 10 TimeUnit/SECONDS))
-  (-> (alia/shutdown cluster) (.get 10 TimeUnit/SECONDS)))
+  (some-> session alia/shutdown (.get 10 TimeUnit/SECONDS))
+  (some-> cluster alia/shutdown (.get 10 TimeUnit/SECONDS)))
 
 (defn cassandra-test
   [name opts]

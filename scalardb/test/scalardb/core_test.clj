@@ -17,7 +17,7 @@
            (java.util Optional)))
 
 (deftest setup-transaction-tables-test
-  (with-redefs [alia/cluster (spy/spy)
+  (with-redefs [alia/cluster (spy/stub "cluster")
                 alia/connect (spy/stub "session")
                 alia/shutdown (spy/spy)
                 c/create-my-keyspace (spy/spy)
@@ -35,7 +35,7 @@
                                                 :val2 :int
                                                 :primary-key [:id]}}])
     (is (spy/called-once? alia/connect))
-    (is (spy/called-once? alia/shutdown))
+    (is (spy/called-n-times? alia/shutdown 2))
     (is (spy/called-n-times? c/create-my-keyspace 3))
     (is (spy/called-n-times? c/create-my-table 3))))
 
