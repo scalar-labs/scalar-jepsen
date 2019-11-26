@@ -111,6 +111,7 @@
             (try
               (c/su (debian/install [:openjdk-8-jre]))
               (catch clojure.lang.ExceptionInfo e
+                (debian/update!)
                 (if (= tries 7)
                   (throw e)
                   (step (inc tries))))))]
@@ -265,6 +266,5 @@
 (defn cassandra-test
   [name opts]
   (merge tests/noop-test
-         {:name (str "cassandra-" name)
-          :os   debian/os}
+         {:name (str "cassandra-" name)}
          opts))

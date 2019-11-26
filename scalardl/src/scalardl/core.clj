@@ -175,6 +175,5 @@
   [name opts]
   (merge tests/noop-test
          {:name (str "scalardl-" name)
-          :os debian/os
           :db (db)}
          opts))

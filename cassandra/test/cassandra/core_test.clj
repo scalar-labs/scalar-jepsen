@@ -112,6 +112,7 @@
                   debian/install (spy/mock (fn [a]
                                              (throw (ex-info
                                                      "install failed!" {}))))
+                  debian/update! (spy/spy)
                   c/upload (spy/spy)
                   cu/install-archive! (spy/spy)]
       (is (thrown? clojure.lang.ExceptionInfo (cass/install! "n1" test)))
