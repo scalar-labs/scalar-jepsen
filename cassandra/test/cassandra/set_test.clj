@@ -14,7 +14,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->CQLSetClient (atom false) nil :quorum)
+    (let [client (client/open! (->CQLSetClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
@@ -29,7 +29,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->CQLSetClient (atom false) nil :quorum)
+    (let [client (client/open! (->CQLSetClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :add :value 1})]
       (is (spy/called-with? alia/execute
@@ -49,7 +49,7 @@
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:id 0 :elements #{1 3 2}}])))]
-    (let [client (client/open! (->CQLSetClient (atom false) nil :quorum)
+    (let [client (client/open! (->CQLSetClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (spy/called-with? alia/execute
@@ -73,7 +73,7 @@
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
                                                    :exception (WriteTimeoutException. nil nil nil 0 0)})))))]
-    (let [client (client/open! (->CQLSetClient (atom false) nil :quorum)
+    (let [client (client/open! (->CQLSetClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
                                      {:type :invoke :f :add :value 1})]
@@ -89,7 +89,7 @@
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
                                                     :exception (UnavailableException. nil nil 0 0)})))))]
-    (let [client (client/open! (->CQLSetClient (atom false) nil :quorum)
+    (let [client (client/open! (->CQLSetClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))
@@ -104,7 +104,7 @@
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
                                                     :exception (NoHostAvailableException. {})})))))]
-    (let [client (client/open! (->CQLSetClient (atom false) nil :quorum)
+    (let [client (client/open! (->CQLSetClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))

@@ -16,12 +16,12 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord CQLMapClient [tbl-created? session writec]
+(defrecord CQLMapClient [tbl-created? cluster session writec]
   client/Client
   (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (:nodes test)})
           session (alia/connect cluster)]
-      (->CQLMapClient tbl-created? session writec)))
+      (->CQLMapClient tbl-created? cluster session writec)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -66,14 +66,15 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (alia/shutdown session))
+    (close-cassandra cluster session))
 
   (teardown! [_ _]))
 
 (defn map-test
   [opts]
   (merge (cassandra-test (str "map-" (:suffix opts))
-                         {:client    (->CQLMapClient (atom false) nil :quorum)
+                         {:client    (->CQLMapClient (atom false)
+                                                     nil nil :quorum)
                           :generator (gen/phases
                                       (->> [(adds)]
                                            (conductors/std-gen opts))

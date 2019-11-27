@@ -33,7 +33,8 @@
            (com.datastax.driver.core.schemabuilder TableOptions)
            (com.datastax.driver.core.policies RetryPolicy
                                               RetryPolicy$RetryDecision)
-           (java.net InetAddress)))
+           (java.net InetAddress)
+           (java.util.concurrent TimeUnit)))
 
 (defn exponential-backoff
   [r]
@@ -261,6 +262,11 @@
                                       (column-definitions schema)
                                       (with {:compaction
                                              {:class compaction-strategy}}))))
+
+(defn close-cassandra
+  [cluster session]
+  (some-> session alia/shutdown (.get 10 TimeUnit/SECONDS))
+  (some-> cluster alia/shutdown (.get 10 TimeUnit/SECONDS)))
 
 (defn cassandra-test
   [name opts]

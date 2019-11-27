@@ -17,12 +17,12 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord CQLCounterClient [tbl-created? session writec]
+(defrecord CQLCounterClient [tbl-created? cluster session writec]
   client/Client
   (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (:nodes test)})
           session (alia/connect cluster)]
-      (->CQLCounterClient tbl-created? session writec)))
+      (->CQLCounterClient tbl-created? cluster session writec)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -68,14 +68,15 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (alia/shutdown session))
+    (close-cassandra cluster session))
 
   (teardown! [_ _]))
 
 (defn cnt-inc-test
   [opts]
   (merge (cassandra-test (str "counter-inc-" (:suffix opts))
-                         {:client    (->CQLCounterClient (atom false) nil :quorum)
+                         {:client    (->CQLCounterClient (atom false)
+                                                         nil nil :quorum)
                           :checker   (checker/counter)
                           :generator (gen/phases
                                       (->> [add]

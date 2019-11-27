@@ -15,12 +15,12 @@
                                                 WriteTimeoutException
                                                 UnavailableException)))
 
-(defrecord BatchSetClient [tbl-created? session]
+(defrecord BatchSetClient [tbl-created? cluster session]
   client/Client
   (open! [_ test _]
     (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
           session (alia/connect cluster)]
-      (->BatchSetClient tbl-created? session)))
+      (->BatchSetClient tbl-created? cluster session)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -74,14 +74,14 @@
                                        (assoc op :type :fail, :error :no-host-available)))))))
 
   (close! [_ _]
-    (alia/shutdown session))
+    (close-cassandra cluster session))
 
   (teardown! [_ _]))
 
 (defn batch-test
   [opts]
   (merge (cassandra-test (str "batch-set-" (:suffix opts))
-                         {:client    (->BatchSetClient (atom false) nil)
+                         {:client    (->BatchSetClient (atom false) nil nil)
                           :checker   (checker/set)
                           :generator (gen/phases
                                       (->> [(adds)]
