@@ -54,19 +54,30 @@
         (locking nodes
           (assoc op :type :info, :value
                  (case (:f op)
-                   :start (if-let [ns (-> test :nodes (targeter test) util/coll)]
+                   :start (if-let [ns (-> test
+                                          :nodes
+                                          (targeter test)
+                                          util/coll)]
                             (if (compare-and-set! nodes nil ns)
                               (vals (c/on-many ns (start! test c/*host*)))
                               (str "nemesis already disrupting " @nodes))
                             :no-target)
                    :stop (if-let [ns @nodes]
                            (let [all-nodes (:nodes test)
-                                 seed (first (cass/seed-nodes test))
+                                 decommissioned @(:decommissioned test)
+                                 seed (-> test
+                                          cass/seed-nodes
+                                          set
+                                          (set/difference decommissioned)
+                                          first)
                                  all-crashed? (= (+ (count ns)
-                                                    (count @(:decommissioned test)))
+                                                    (count decommissioned))
                                                  (count all-nodes))
-                                 reordered (if all-crashed? (conj (remove #(= seed %) ns) seed) ns)
-                                 restarted (for [node reordered] (c/on node (stop! test node)))]
+                                 reordered (if all-crashed?
+                                             (conj (remove #(= seed %) ns) seed)
+                                             ns)
+                                 restarted (for [node reordered]
+                                             (c/on node (stop! test node)))]
                              (reset! nodes nil)
                              restarted)
                            :not-started)))))

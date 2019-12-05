@@ -59,19 +59,19 @@
                 c/disconnect (spy/spy)]
     (let [test {:nodes ["n1" "n2" "n3" "n4" "n5"]
                 :rf 3
-                :decommissioned (atom #{"n4"})}
+                :decommissioned (atom #{"n1" "n4"})}
           nemesis (can/test-aware-node-start-stopper
-                   (fn [_ _] (list "n3" "n5" "n2" "n1")) ;; all nodes crash
+                   (fn [_ _] (list "n5" "n3" "n2")) ;; all nodes crash
                    (fn [_ n] [:killed n])
                    (fn [_ n]  [:restarted n]))
           start-result (n/invoke! nemesis test {:type :invoke :f :start})]
       (is (= :info (:type start-result)))
-      (is (= '([:killed "n3"] [:killed "n5"] [:killed "n2"] [:killed "n1"])
+      (is (= '([:killed "n5"] [:killed "n3"] [:killed "n2"])
              (:value start-result)))
 
       (let [stop-result (n/invoke! nemesis test {:type :invoke :f :stop})]
         (is (= :info (:type stop-result)))
-        (is (= '([:restarted "n1"] [:restarted "n3"] [:restarted "n5"] [:restarted "n2"])
+        (is (= '([:restarted "n2"] [:restarted "n5"] [:restarted "n3"])
                (:value stop-result)))))))
 
 (deftest test-aware-node-start-stopper-no-target-test
