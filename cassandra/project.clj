@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/java.jmx "0.3.1"]
-                 [jepsen "0.1.13"]
+                 [jepsen "0.1.15"]
                  [cc.qbits/alia "4.3.1"]
                  [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]

@@ -4,7 +4,7 @@
   :license {:name ""
             :url ""}
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [jepsen "0.1.13"]
+                 [jepsen "0.1.15"]
                  [cassandra "0.1.0-SNAPSHOT"]
                  [cc.qbits/alia "4.3.1"]
                  [cc.qbits/hayt "4.1.0"]
