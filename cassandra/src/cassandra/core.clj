@@ -3,23 +3,15 @@
             [clojure.set :as set]
             [clojure.tools.logging :refer [debug info warn]]
             [jepsen
-             [core :as jepsen]
              [db :as db]
              [util :as util :refer [meh timeout]]
              [control :as c :refer [| lit]]
-             [client :as client]
-             [checker :as checker]
              [generator :as gen]
-             [nemesis :as nemesis]
-             [store :as store]
-             [report :as report]
              [tests :as tests]]
-            [jepsen.checker.timeline :as timeline]
             [jepsen.control
              [net :as cn]
              [util :as cu]]
             [jepsen.os.debian :as debian]
-            [knossos.core :as knossos]
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
@@ -29,6 +21,12 @@
            (com.datastax.driver.core Cluster)
            (com.datastax.driver.core Metadata)
            (com.datastax.driver.core Host)
+           (com.datastax.driver.core WriteType)
+           (com.datastax.driver.core.exceptions NoHostAvailableException
+                                                ReadTimeoutException
+                                                TransportException
+                                                WriteTimeoutException
+                                                UnavailableException)
            (com.datastax.driver.core.schemabuilder SchemaBuilder)
            (com.datastax.driver.core.schemabuilder TableOptions)
            (com.datastax.driver.core.policies RetryPolicy
@@ -268,6 +266,32 @@
   [cluster session]
   (some-> session alia/shutdown (.get 10 TimeUnit/SECONDS))
   (some-> cluster alia/shutdown (.get 10 TimeUnit/SECONDS)))
+
+(defn handle-exception
+  [op ^ExceptionInfo e]
+  (let [ex (:exception (ex-data e))
+        exception-class (class ex)]
+    (condp = exception-class
+      WriteTimeoutException (if-let [write-type (.getWriteType ex)]
+                              (if (or (= write-type WriteType/CAS)
+                                      (= write-type WriteType/BATCH_LOG))
+                                (assoc op :type :info :value :write-timed-out)
+                                (if (or (= write-type WriteType/SIMPLE)
+                                        (= write-type WriteType/BATCH))
+                                  (assoc op :type :ok)
+                                  (assoc op
+                                         :type :fail
+                                         :error :write-timed-out)))
+                              (assoc op :type :fail :error :write-timed-out))
+      ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
+      TransportException (assoc op :type :fail :error :node-down)
+      UnavailableException (assoc op :type :fail :error :unavailable)
+      NoHostAvailableException (do
+                                 (info "All the servers are down - waiting 2s")
+                                 (Thread/sleep 2000)
+                                 (assoc op
+                                        :type :fail
+                                        :error :no-host-available)))))
 
 (defn cassandra-test
   [name opts]

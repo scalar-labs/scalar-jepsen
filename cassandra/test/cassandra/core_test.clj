@@ -1,18 +1,20 @@
 (ns cassandra.core-test
-  (:require [clojure.java.jmx :as jmx]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [jepsen.control :as c]
             [jepsen.db :as db]
-            [jepsen.control
-             [util :as cu]
-             [net :as cn]]
+            [jepsen.control.util :as cu]
             [jepsen.generator :as gen]
-            [jepsen.nemesis :as n]
             [jepsen.os.debian :as debian]
             [cassandra.core :as cass]
             [qbits.alia :as alia]
             [spy.core :as spy])
-  (:import (java.net UnknownHostException)))
+  (:import (com.datastax.driver.core WriteType)
+           (com.datastax.driver.core.exceptions NoHostAvailableException
+                                                ReadTimeoutException
+                                                TransportException
+                                                WriteTimeoutException
+                                                UnavailableException)
+           (java.net UnknownHostException)))
 
 (deftest dns-resolve-test
   (is (= "127.0.0.1" (cass/dns-resolve "localhost"))))
@@ -109,7 +111,7 @@
   (let [test {:tarball "http://some.where/tarball-file"
               :cassandra-dir "/root/cassandra"}]
     (with-redefs [cass/exponential-backoff (spy/spy)
-                  debian/install (spy/mock (fn [a]
+                  debian/install (spy/mock (fn [_]
                                              (throw (ex-info
                                                      "install failed!" {}))))
                   debian/update! (spy/spy)
@@ -141,7 +143,7 @@
       (is (spy/not-called? c/exec)))))
 
 (deftest stop-test
-  (with-redefs [c/exec (spy/mock (fn [cmd & args]
+  (with-redefs [c/exec (spy/mock (fn [cmd & _]
                                    (case cmd
                                      :killall "kill"
                                      :ps "no cassandra")))]
@@ -150,7 +152,7 @@
 
 (deftest wipe-test
   (let [test {:cassandra-dir "/root/cassandra"}]
-    (with-redefs [c/exec (spy/mock (fn [cmd & args]
+    (with-redefs [c/exec (spy/mock (fn [cmd & _]
                                      (case cmd
                                        :killall "kill"
                                        :ps "no cassandra")))]
@@ -226,3 +228,60 @@
                              :column-definitions (:schema schema)
                              :with {:compaction
                                     {:class :LeveledCompactionStrategy}}})))))
+
+(deftest handle-exception-test
+  (let [op {}
+        cas-timeout (ex-info "Write timed out for CAS"
+                             {:type :execute
+                              :exception
+                              (WriteTimeoutException. nil nil
+                                                      WriteType/CAS
+                                                      0 0)})
+        simple-timeout (ex-info "Write timed out for SIMPLE"
+                                {:type :execute
+                                 :exception
+                                 (WriteTimeoutException. nil nil
+                                                         WriteType/SIMPLE
+                                                         0 0)})
+        batch-log-timeout (ex-info "Write timed out for BATCH_LOG"
+                                   {:type :execute
+                                    :exception
+                                    (WriteTimeoutException. nil nil
+                                                            WriteType/BATCH_LOG
+                                                            0 0)})
+        batch-timeout (ex-info "Write timed out for BATCH"
+                               {:type :execute
+                                :exception
+                                (WriteTimeoutException. nil nil
+                                                        WriteType/BATCH
+                                                        0 0)})
+
+        read-timeout (ex-info "Read timed out"
+                              {:type :execute
+                               :exception (ReadTimeoutException. nil nil
+                                                                 0 0 false)})
+        node-down (ex-info "Transport failed"
+                           {:type :execute
+                            :exception (TransportException. nil nil)})
+        unavailable (ex-info "Unavailable exception"
+                             {:type :execute
+                              :exception (UnavailableException. nil nil 0 0)})
+        no-host (ex-info "No host available"
+                         {:type :execute
+                          :exception (NoHostAvailableException. {})})]
+    (is (= {:type :info :value :write-timed-out}
+           (cass/handle-exception op cas-timeout)))
+    (is (= {:type :ok}
+           (cass/handle-exception op simple-timeout)))
+    (is (= {:type :info :value :write-timed-out}
+           (cass/handle-exception op batch-log-timeout)))
+    (is (= {:type :ok}
+           (cass/handle-exception op batch-timeout)))
+    (is (= {:type :fail :error :read-timed-out}
+           (cass/handle-exception op read-timeout)))
+    (is (= {:type :fail :error :node-down}
+           (cass/handle-exception op node-down)))
+    (is (= {:type :fail :error :unavailable}
+           (cass/handle-exception op unavailable)))
+    (is (= {:type :fail :error :no-host-available}
+           (cass/handle-exception op no-host)))))

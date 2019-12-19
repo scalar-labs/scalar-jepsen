@@ -5,7 +5,8 @@
             [cassandra.core :as cassandra]
             [cassandra.batch :as batch :refer (->BatchSetClient)]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core.exceptions NoHostAvailableException
+  (:import (com.datastax.driver.core WriteType)
+           (com.datastax.driver.core.exceptions NoHostAvailableException
                                                 ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))
@@ -91,7 +92,7 @@
                                 (when (and (string? cql) (re-find #"BATCH" cql))
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil nil 0 0)})))))]
+                                                   :exception (WriteTimeoutException. nil nil WriteType/BATCH_LOG 0 0)})))))]
     (let [client (client/open! (->BatchSetClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
