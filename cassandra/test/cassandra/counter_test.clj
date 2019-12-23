@@ -6,7 +6,8 @@
             [cassandra.core :as cassandra]
             [cassandra.counter :refer [->CQLCounterClient] :as counter]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core.exceptions NoHostAvailableException
+  (:import (com.datastax.driver.core WriteType)
+           (com.datastax.driver.core.exceptions NoHostAvailableException
                                                 ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))
@@ -90,13 +91,13 @@
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil nil 0 0)})))))]
+                                                   :exception (WriteTimeoutException. nil nil WriteType/COUNTER 0 0)})))))]
     (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :add :value 1})]
-      (is (= :info (:type result)))
-      (is (= :write-timed-out (:value result))))))
+      (is (= :fail (:type result)))
+      (is (= :write-timed-out (:error result))))))
 
 (deftest counter-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)

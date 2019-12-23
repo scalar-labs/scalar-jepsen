@@ -6,7 +6,8 @@
             [cassandra.core :as cassandra]
             [cassandra.lwt :refer [->CasRegisterClient] :as lwt]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core.exceptions NoHostAvailableException
+  (:import (com.datastax.driver.core WriteType)
+           (com.datastax.driver.core.exceptions NoHostAvailableException
                                                 ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))
@@ -139,7 +140,7 @@
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil nil 0 0)})))))]
+                                                   :exception (WriteTimeoutException. nil nil WriteType/CAS 0 0)})))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}

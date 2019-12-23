@@ -11,11 +11,7 @@
             [qbits.hayt.utils :refer [set-type]]
             [cassandra.core :refer :all]
             [cassandra.conductors :as conductors])
-  (:import (clojure.lang ExceptionInfo)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
-                                                WriteTimeoutException
-                                                UnavailableException)))
+  (:import (clojure.lang ExceptionInfo)))
 
 (defrecord CQLSetClient [tbl-created? cluster session writec]
   client/Client
@@ -57,15 +53,7 @@
                 (assoc op :type :ok, :value value)))
 
       (catch ExceptionInfo e
-        (let [e (class (:exception (ex-data e)))]
-          (condp = e
-            WriteTimeoutException (assoc op :type :info, :value :write-timed-out)
-            ReadTimeoutException (assoc op :type :fail, :error :read-timed-out)
-            UnavailableException (assoc op :type :fail, :error :unavailable)
-            NoHostAvailableException (do
-                                       (info "All the servers are down - waiting 2s")
-                                       (Thread/sleep 2000)
-                                       (assoc op :type :fail, :error :no-host-available)))))))
+        (handle-exception op e))))
 
   (close! [_ _]
     (close-cassandra cluster session))

@@ -10,11 +10,7 @@
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
-  (:import (clojure.lang ExceptionInfo)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
-                                                WriteTimeoutException
-                                                UnavailableException)))
+  (:import (clojure.lang ExceptionInfo)))
 
 (def ak (keyword "[applied]"))  ; this is the name C* returns, define now because
                                 ; it isn't really a valid keyword from reader's
@@ -74,15 +70,7 @@
                 (assoc op :type :ok, :value v)))
 
       (catch ExceptionInfo e
-        (let [e (class (:exception (ex-data e)))]
-          (condp = e
-            WriteTimeoutException (assoc op :type :info, :value :write-timed-out)
-            ReadTimeoutException (assoc op :type :fail, :error :read-timed-out)
-            UnavailableException (assoc op :type :fail, :error :unavailable)
-            NoHostAvailableException (do
-                                       (info "All the servers are down - waiting 2s")
-                                       (Thread/sleep 2000)
-                                       (assoc op :type :fail, :error :no-host-available)))))))
+        (handle-exception op e))))
 
   (close! [_ _]
     (close-cassandra cluster session))
