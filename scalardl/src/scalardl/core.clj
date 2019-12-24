@@ -125,11 +125,25 @@
                      "scalar.database.password=cassandra")
           :> LEDGER_PROPERTIES))
 
+(defn- install-jdk-with-retry
+  []
+  (letfn [(step [tries]
+            (when (pos? tries)
+              (exponential-backoff tries))
+            (try
+              (c/su (debian/install [:openjdk-8-jre]))
+              (catch clojure.lang.ExceptionInfo e
+                (debian/update!)
+                (if (= tries RETRIES)
+                  (throw e)
+                  (step (inc tries))))))]
+    (step 0)))
+
 (defn- install-server!
   [node test]
   (info node "installing DL server")
   (c/su (c/exec :rm :-rf LEDGER_INSTALL_DIR))
-  (c/su (debian/install [:openjdk-8-jre]))
+  (install-jdk-with-retry)
   (c/upload (:ledger-tarball test) "/tmp/ledger.tar")
   (cu/install-archive! "file:///tmp/ledger.tar" LEDGER_INSTALL_DIR)
   (c/upload (:server-key test) LEDGER_KEY)
