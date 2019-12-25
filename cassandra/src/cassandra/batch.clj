@@ -75,5 +75,6 @@
                                       (->> [(adds)]
                                            (conductors/std-gen opts))
                                       (conductors/terminate-nemesis opts)
-                                      (read-once))})
+                                      ; read after waiting for batchlog replay
+                                      (gen/delay 60 (read-once)))})
          opts))
