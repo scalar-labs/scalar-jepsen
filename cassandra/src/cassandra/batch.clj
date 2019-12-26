@@ -30,8 +30,8 @@
                                            :primary-key [:pid :cid]}}))))
 
   (invoke! [_ _ op]
-    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
+      (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
         :add (let [value (:value op)]
                (alia/execute session

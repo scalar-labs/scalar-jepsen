@@ -35,8 +35,8 @@
                                       (if-exists false))))))
 
   (invoke! [_ _ op]
-    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
+      (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
         :add (do (alia/execute session
                                (update :sets

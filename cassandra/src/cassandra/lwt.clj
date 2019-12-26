@@ -34,8 +34,8 @@
                                            :primary-key [:id]}}))))
 
   (invoke! [_ _ op]
-    (alia/execute session (use-keyspace :jepsen_keyspace))
     (try
+      (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
         :cas (let [[old new] (:value op)
                    result (alia/execute session
