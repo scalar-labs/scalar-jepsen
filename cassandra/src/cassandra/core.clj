@@ -272,16 +272,18 @@
   (let [ex (:exception (ex-data e))
         exception-class (class ex)]
     (condp = exception-class
-      WriteTimeoutException (if-let [write-type (.getWriteType ex)]
-                              (if (or (= write-type WriteType/CAS)
-                                      (= write-type WriteType/BATCH_LOG))
-                                (assoc op :type :info :value :write-timed-out)
-                                (if (or (= write-type WriteType/SIMPLE)
-                                        (= write-type WriteType/BATCH))
-                                  (assoc op :type :ok)
-                                  (assoc op
-                                         :type :fail
-                                         :error :write-timed-out)))
+      WriteTimeoutException (condp = (.getWriteType ex)
+                              WriteType/CAS (assoc op
+                                                   :type :info
+                                                   :value :write-timed-out)
+                              WriteType/BATCH_LOG (assoc op
+                                                         :type :info
+                                                         :value :write-timed-out)
+                              WriteType/SIMPLE (assoc op :type :ok)
+                              WriteType/BATCH (assoc op :type :ok)
+                              WriteType/COUNTER (assoc op
+                                                       :type :info
+                                                       :value :write-timed-out)
                               (assoc op :type :fail :error :write-timed-out))
       ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
       TransportException (assoc op :type :fail :error :node-down)
