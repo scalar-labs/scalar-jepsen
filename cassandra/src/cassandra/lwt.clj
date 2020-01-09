@@ -70,7 +70,7 @@
                 (assoc op :type :ok, :value v)))
 
       (catch ExceptionInfo e
-        (handle-exception op e))))
+        (handle-exception op e true))))
 
   (close! [_ _]
     (close-cassandra cluster session))

@@ -268,7 +268,7 @@
   (some-> cluster alia/shutdown (.get 10 TimeUnit/SECONDS)))
 
 (defn handle-exception
-  [op ^ExceptionInfo e]
+  [op ^ExceptionInfo e & conditional?]
   (let [ex (:exception (ex-data e))
         exception-class (class ex)]
     (condp = exception-class
@@ -279,7 +279,11 @@
                               WriteType/BATCH_LOG (assoc op
                                                          :type :info
                                                          :value :write-timed-out)
-                              WriteType/SIMPLE (assoc op :type :ok)
+                              WriteType/SIMPLE (if conditional?
+                                                 (assoc op :type :ok)
+                                                 (assoc op
+                                                        :type :info
+                                                        :value :write-timed-out))
                               WriteType/BATCH (assoc op :type :ok)
                               WriteType/COUNTER (assoc op
                                                        :type :info

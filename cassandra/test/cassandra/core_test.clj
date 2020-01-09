@@ -270,8 +270,10 @@
                          {:type :execute
                           :exception (NoHostAvailableException. {})})]
     (is (= {:type :info :value :write-timed-out}
-           (cass/handle-exception op cas-timeout)))
+           (cass/handle-exception op cas-timeout true)))
     (is (= {:type :ok}
+           (cass/handle-exception op simple-timeout true)))
+    (is (= {:type :info :value :write-timed-out}
            (cass/handle-exception op simple-timeout)))
     (is (= {:type :info :value :write-timed-out}
            (cass/handle-exception op batch-log-timeout)))
