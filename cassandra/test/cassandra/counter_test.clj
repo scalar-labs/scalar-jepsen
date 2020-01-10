@@ -42,8 +42,7 @@
                             {:update :counters
                              :set-columns {:count [+ 1]}
                              :where [[= :id 0]]}
-                            {:consistency :quorum
-                             :retry-policy (retry/fallthrough-retry-policy)}))
+                            {:consistency :quorum}))
       (is (= :ok (:type result))))))
 
 (deftest counter-client-read-test
@@ -96,8 +95,8 @@
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :add :value 1})]
-      (is (= :fail (:type result)))
-      (is (= :write-timed-out (:error result))))))
+      (is (= :info (:type result)))
+      (is (= :write-timed-out (:value result))))))
 
 (deftest counter-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)

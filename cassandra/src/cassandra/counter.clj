@@ -41,8 +41,7 @@
                                (update :counters
                                        (set-columns {:count [+ (:value op)]})
                                        (where [[= :id 0]]))
-                               {:consistency  writec
-                                :retry-policy (retry/fallthrough-retry-policy)})
+                               {:consistency  writec})
                  (assoc op :type :ok))
         :read (let [value (->> (alia/execute session
                                              (select :counters (where [[= :id 0]]))
