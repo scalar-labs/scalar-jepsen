@@ -9,8 +9,9 @@
             [scalardl
              [cassandra :as cassandra]
              [util :as util]])
-  (:import (com.scalar.client.service ClientService)
-           (com.scalar.client.config ClientConfig)
+  (:import (com.scalar.client.config ClientConfig)
+           (com.scalar.client.exception ClientException)
+           (com.scalar.client.service ClientService)
            (com.scalar.client.service ClientModule)
            (com.google.inject Guice)
            (java.util Optional)
@@ -71,22 +72,24 @@
 
 (defn register-certificate
   [client-service]
-  (let [resp (.registerCertificate client-service)]
-    (when-not (util/success? resp)
+  (try
+    (.registerCertificate client-service)
+    (catch ClientException e
       (throw (ex-info "Failed to register a certificate"
-                      {:cause "Failed to register a certificate"})))))
+                      {:cause e})))))
 
 (defn register-contracts
   "Register contracts which have
   {:name contract-name, :class class-name, :path contract-path}"
   [client-service contracts]
   (doseq [c contracts]
-    (let [resp (.registerContract client-service
-                                  (:name c) (:class c) (:path c)
-                                  (Optional/empty))]
-      (when-not (util/success? resp)
+    (try
+      (.registerContract client-service
+                         (:name c) (:class c) (:path c)
+                         (Optional/empty))
+      (catch ClientException e
         (throw (ex-info "Failed to register a contract"
-                        {:cause "Failed to register a contract"
+                        {:cause e
                          :contract c}))))))
 
 (defn check-tx-committed
