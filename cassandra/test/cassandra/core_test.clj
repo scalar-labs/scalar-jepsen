@@ -281,7 +281,7 @@
            (cass/handle-exception op batch-timeout)))
     (is (= {:type :fail :error :read-timed-out}
            (cass/handle-exception op read-timeout)))
-    (is (= {:type :fail :error :node-down}
+    (is (= {:type :info :value :node-down}
            (cass/handle-exception op node-down)))
     (is (= {:type :fail :error :unavailable}
            (cass/handle-exception op unavailable)))
