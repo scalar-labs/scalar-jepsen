@@ -290,7 +290,7 @@
                                                        :value :write-timed-out)
                               (assoc op :type :fail :error :write-timed-out))
       ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
-      TransportException (assoc op :type :fail :error :node-down)
+      TransportException (assoc op :type :info :value :node-down)
       UnavailableException (assoc op :type :fail :error :unavailable)
       NoHostAvailableException (do
                                  (info "All the servers are down - waiting 2s")
