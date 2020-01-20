@@ -7,15 +7,15 @@
              [checker :as checker]
              [generator :as gen]]
             [scalardb.core :as scalar])
-  (:import (com.scalar.database.api Put
-                                    Scan
-                                    Scan$Ordering
-                                    Scan$Ordering$Order
-                                    Result)
-           (com.scalar.database.exception.transaction CrudException
-                                                      UnknownTransactionStatusException)
-           (com.scalar.database.io IntValue
-                                   Key)))
+  (:import (com.scalar.db.api Put
+                              Scan
+                              Scan$Ordering
+                              Scan$Ordering$Order
+                              Result)
+           (com.scalar.db.exception.transaction CrudException
+                                                UnknownTransactionStatusException)
+           (com.scalar.db.io IntValue
+                             Key)))
 
 (def ^:private ^:const KEYSPACE "jepsen_keyspace")
 (def ^:private ^:const TABLE "transfer")

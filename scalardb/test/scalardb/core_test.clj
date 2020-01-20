@@ -4,16 +4,16 @@
             [cassandra.core :as c]
             [scalardb.core :as scalar]
             [spy.core :as spy])
-  (:import (com.scalar.database.api DistributedStorage
-                                    DistributedTransaction
-                                    DistributedTransactionManager
-                                    Get
-                                    Result)
-           (com.scalar.database.io BigIntValue
-                                   IntValue
-                                   TextValue)
-           (com.scalar.database.service StorageService
-                                        TransactionService)
+  (:import (com.scalar.db.api DistributedStorage
+                              DistributedTransaction
+                              DistributedTransactionManager
+                              Get
+                              Result)
+           (com.scalar.db.io BigIntValue
+                             IntValue
+                             TextValue)
+           (com.scalar.db.service StorageService
+                                  TransactionService)
            (java.util Optional)))
 
 (deftest setup-transaction-tables-test
@@ -43,11 +43,11 @@
   (let [nodes ["n1" "n2" "n3"]
         properties (#'scalar/create-properties nodes)]
     (is (= "n1,n2,n3"
-           (.getProperty properties "scalar.database.contact_points")))
+           (.getProperty properties "scalar.db.contact_points")))
     (is (= "cassandra"
-           (.getProperty properties "scalar.database.username")))
+           (.getProperty properties "scalar.db.username")))
     (is (= "cassandra"
-           (.getProperty properties "scalar.database.password")))))
+           (.getProperty properties "scalar.db.password")))))
 
 (defn- mock-result
   "This is only for Coordinator/get and this returns ID as `tx_state`"

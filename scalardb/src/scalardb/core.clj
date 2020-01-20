@@ -5,14 +5,14 @@
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
-  (:import (com.scalar.database.api TransactionState)
-           (com.scalar.database.config DatabaseConfig)
-           (com.scalar.database.storage.cassandra Cassandra)
-           (com.scalar.database.service StorageModule
-                                        StorageService
-                                        TransactionModule
-                                        TransactionService)
-           (com.scalar.database.transaction.consensuscommit Coordinator)
+  (:import (com.scalar.db.api TransactionState)
+           (com.scalar.db.config DatabaseConfig)
+           (com.scalar.db.storage.cassandra Cassandra)
+           (com.scalar.db.service StorageModule
+                                  StorageService
+                                  TransactionModule
+                                  TransactionService)
+           (com.scalar.db.transaction.consensuscommit Coordinator)
            (com.google.inject Guice)
            (java.util Properties)))
 
@@ -44,9 +44,9 @@
 (defn- create-properties
   [nodes]
   (doto (Properties.)
-    (.setProperty "scalar.database.contact_points" (clojure.string/join "," nodes))
-    (.setProperty "scalar.database.username" "cassandra")
-    (.setProperty "scalar.database.password" "cassandra")))
+    (.setProperty "scalar.db.contact_points" (clojure.string/join "," nodes))
+    (.setProperty "scalar.db.username" "cassandra")
+    (.setProperty "scalar.db.password" "cassandra")))
 
 (defn- close-storage!
   [test]

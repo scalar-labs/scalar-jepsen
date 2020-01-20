@@ -122,10 +122,10 @@
 (defn- create-server-properties
   [test]
   (c/exec :echo (str "scalar.ledger.nonce_txid.enabled=true\n"
-                     "scalar.database.contact_points="
+                     "scalar.db.contact_points="
                      (clojure.string/join "," (:cass-nodes test)) "\n"
-                     "scalar.database.username=cassandra\n"
-                     "scalar.database.password=cassandra")
+                     "scalar.db.username=cassandra\n"
+                     "scalar.db.password=cassandra")
           :> LEDGER_PROPERTIES))
 
 (defn- install-jdk-with-retry
