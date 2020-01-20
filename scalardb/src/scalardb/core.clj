@@ -44,9 +44,9 @@
 (defn- create-properties
   [nodes]
   (doto (Properties.)
-    (.setProperty "scalar.database.contact_points" (clojure.string/join "," nodes))
-    (.setProperty "scalar.database.username" "cassandra")
-    (.setProperty "scalar.database.password" "cassandra")))
+    (.setProperty "scalar.db.contact_points" (clojure.string/join "," nodes))
+    (.setProperty "scalar.db.username" "cassandra")
+    (.setProperty "scalar.db.password" "cassandra")))
 
 (defn- close-storage!
   [test]

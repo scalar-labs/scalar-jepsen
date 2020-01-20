@@ -43,11 +43,11 @@
   (let [nodes ["n1" "n2" "n3"]
         properties (#'scalar/create-properties nodes)]
     (is (= "n1,n2,n3"
-           (.getProperty properties "scalar.database.contact_points")))
+           (.getProperty properties "scalar.db.contact_points")))
     (is (= "cassandra"
-           (.getProperty properties "scalar.database.username")))
+           (.getProperty properties "scalar.db.username")))
     (is (= "cassandra"
-           (.getProperty properties "scalar.database.password")))))
+           (.getProperty properties "scalar.db.password")))))
 
 (defn- mock-result
   "This is only for Coordinator/get and this returns ID as `tx_state`"
