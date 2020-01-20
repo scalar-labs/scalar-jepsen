@@ -5,14 +5,14 @@
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
-  (:import (com.scalar.database.api TransactionState)
-           (com.scalar.database.config DatabaseConfig)
-           (com.scalar.database.storage.cassandra Cassandra)
-           (com.scalar.database.service StorageModule
-                                        StorageService
-                                        TransactionModule
-                                        TransactionService)
-           (com.scalar.database.transaction.consensuscommit Coordinator)
+  (:import (com.scalar.db.api TransactionState)
+           (com.scalar.db.config DatabaseConfig)
+           (com.scalar.db.storage.cassandra Cassandra)
+           (com.scalar.db.service StorageModule
+                                  StorageService
+                                  TransactionModule
+                                  TransactionService)
+           (com.scalar.db.transaction.consensuscommit Coordinator)
            (com.google.inject Guice)
            (java.util Properties)))
 

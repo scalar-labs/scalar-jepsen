@@ -4,16 +4,16 @@
             [cassandra.core :as c]
             [scalardb.core :as scalar]
             [spy.core :as spy])
-  (:import (com.scalar.database.api DistributedStorage
-                                    DistributedTransaction
-                                    DistributedTransactionManager
-                                    Get
-                                    Result)
-           (com.scalar.database.io BigIntValue
-                                   IntValue
-                                   TextValue)
-           (com.scalar.database.service StorageService
-                                        TransactionService)
+  (:import (com.scalar.db.api DistributedStorage
+                              DistributedTransaction
+                              DistributedTransactionManager
+                              Get
+                              Result)
+           (com.scalar.db.io BigIntValue
+                             IntValue
+                             TextValue)
+           (com.scalar.db.service StorageService
+                                  TransactionService)
            (java.util Optional)))
 
 (deftest setup-transaction-tables-test

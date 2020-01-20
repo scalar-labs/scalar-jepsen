@@ -6,15 +6,15 @@
             [scalardb.core :as scalar]
             [scalardb.transfer-append :as transfer]
             [spy.core :as spy])
-  (:import (com.scalar.database.api DistributedTransaction)
-           (com.scalar.database.api Scan
-                                    Put
-                                    Result)
-           (com.scalar.database.io IntValue
-                                   Key)
-           (com.scalar.database.exception.transaction CommitException
-                                                      CrudException
-                                                      UnknownTransactionStatusException)
+  (:import (com.scalar.db.api DistributedTransaction)
+           (com.scalar.db.api Scan
+                              Put
+                              Result)
+           (com.scalar.db.io IntValue
+                             Key)
+           (com.scalar.db.exception.transaction CommitException
+                                                CrudException
+                                                UnknownTransactionStatusException)
            (java.util Optional)))
 
 (def ^:dynamic test-records (atom {0 [{:age 1 :balance 0}]

@@ -8,15 +8,15 @@
              [generator :as gen]]
             [knossos.op :as op]
             [scalardb.core :as scalar])
-  (:import (com.scalar.database.api Consistency
-                                    Get
-                                    Put
-                                    Result)
-           (com.scalar.database.io IntValue
-                                   Key)
-           (com.scalar.database.exception.transaction CommitException
-                                                      CrudException
-                                                      UnknownTransactionStatusException)))
+  (:import (com.scalar.db.api Consistency
+                              Get
+                              Put
+                              Result)
+           (com.scalar.db.io IntValue
+                             Key)
+           (com.scalar.db.exception.transaction CommitException
+                                                CrudException
+                                                UnknownTransactionStatusException)))
 
 (def ^:private ^:const KEYSPACE "jepsen")
 (def ^:private ^:const TABLE "transfer")
