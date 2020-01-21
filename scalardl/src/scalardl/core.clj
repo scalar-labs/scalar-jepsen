@@ -9,10 +9,10 @@
             [scalardl
              [cassandra :as cassandra]
              [util :as util]])
-  (:import (com.scalar.client.config ClientConfig)
-           (com.scalar.client.exception ClientException)
-           (com.scalar.client.service ClientService)
-           (com.scalar.client.service ClientModule)
+  (:import (com.scalar.dl.client.config ClientConfig)
+           (com.scalar.dl.client.exception ClientException)
+           (com.scalar.dl.client.service ClientService)
+           (com.scalar.dl.client.service ClientModule)
            (com.google.inject Guice)
            (java.util Optional)
            (java.util Properties)))
@@ -34,10 +34,10 @@
 (defn- create-client-properties
   [test]
   (doto (Properties.)
-    (.setProperty "scalar.ledger.client.server_host" (rand-nth (:servers test)))
-    (.setProperty "scalar.ledger.client.cert_holder_id" "jepsen")
-    (.setProperty "scalar.ledger.client.cert_path" (:cert test))
-    (.setProperty "scalar.ledger.client.private_key_path" (:client-key test))))
+    (.setProperty "scalar.dl.client.server.host" (rand-nth (:servers test)))
+    (.setProperty "scalar.dl.client.cert_holder_id" "jepsen")
+    (.setProperty "scalar.dl.client.cert_path" (:cert test))
+    (.setProperty "scalar.dl.client.private_key_path" (:client-key test))))
 
 (defn prepare-client-service
   [test]
@@ -106,7 +106,7 @@
 
 (defn- create-server-properties
   [test]
-  (c/exec :echo (str "scalar.ledger.nonce_txid.enabled=true\n"
+  (c/exec :echo (str "scalar.dl.ledger.nonce_txid.enabled=true\n"
                      "scalar.db.contact_points="
                      (clojure.string/join "," (:cass-nodes test)) "\n"
                      "scalar.db.username=cassandra\n"

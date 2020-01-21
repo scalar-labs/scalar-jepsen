@@ -1,8 +1,8 @@
 package com.scalar.jepsen.scalardl;
 
-import com.scalar.ledger.contract.Contract;
-import com.scalar.ledger.database.Ledger;
-import com.scalar.ledger.exception.ContractContextException;
+import com.scalar.dl.ledger.contract.Contract;
+import com.scalar.dl.ledger.database.Ledger;
+import com.scalar.dl.ledger.exception.ContractContextException;
 import java.util.Optional;
 import javax.json.Json;
 import javax.json.JsonObject;

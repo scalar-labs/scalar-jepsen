@@ -10,7 +10,7 @@
              [cassandra :as cassandra]
              [core :as dl]
              [util :as util]])
-  (:import (com.scalar.client.exception ClientException)
+  (:import (com.scalar.dl.client.exception ClientException)
            (javax.json Json)))
 
 (def ^:private ^:const CONTRACTS [{:name "read"

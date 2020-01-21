@@ -11,7 +11,7 @@
               [core :as dl]
               [cassandra :as cassandra]
               [util :as util]])
-  (:import (com.scalar.client.exception ClientException)
+  (:import (com.scalar.dl.client.exception ClientException)
            (javax.json Json)))
 
 (def ^:private ^:const INITIAL_BALANCE 10000)
