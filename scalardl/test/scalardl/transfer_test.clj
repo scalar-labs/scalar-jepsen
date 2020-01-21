@@ -6,10 +6,10 @@
             [scalardl.core :as dl]
             [scalardl.transfer :as transfer]
             [spy.core :as spy])
-  (:import (com.scalar.client.service ClientService
-                                      StatusCode)
-           (com.scalar.rpc ContractExecutionResponse
-                           LedgerServiceResponse)
+  (:import (com.scalar.dl.client.service ClientService)
+           (com.scalar.dl.ledger.service StatusCode)
+           (com.scalar.dl.rpc ContractExecutionResponse
+                              LedgerServiceResponse)
            (javax.json Json)))
 
 (def ^:dynamic contract-count (atom 0))
