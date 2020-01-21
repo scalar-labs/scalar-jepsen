@@ -65,30 +65,30 @@ jobs:
             cd scalardb
             lein cloverage
 
-      - restore_cache:
-          key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
+      #- restore_cache:
+      #    key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
 
-      - run:
-          name: Install Cassandra test for following tests
-          command: |
-            cd cassandra
-            lein install
+      #- run:
+      #    name: Install Cassandra test for following tests
+      #    command: |
+      #      cd cassandra
+      #      lein install
 
-      - run:
-          command: |
-            cd scalardl
-            lein deps
+      #- run:
+      #    command: |
+      #      cd scalardl
+      #      lein deps
 
-      - save_cache:
-          paths:
-            - ~/.m2
-          key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
+      #- save_cache:
+      #    paths:
+      #      - ~/.m2
+      #    key: scalar-jepsen-{{ checksum "scalardl/project.clj" }}
 
-      - run:
-          name: Run tests for Scalar DL
-          command: |
-            cd scalardl
-            lein cloverage
+      #- run:
+      #    name: Run tests for Scalar DL
+      #    command: |
+      #      cd scalardl
+      #      lein cloverage
 
       - run:
           name: Save cloverage reports
