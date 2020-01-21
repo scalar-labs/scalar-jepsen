@@ -10,7 +10,8 @@
              [cassandra :as cassandra]
              [core :as dl]
              [util :as util]])
-  (:import (javax.json Json)))
+  (:import (com.scalar.client.exception ClientException)
+           (javax.json Json)))
 
 (def ^:private ^:const CONTRACTS [{:name "read"
                                    :class "com.scalar.jepsen.scalardl.Read"
@@ -32,20 +33,31 @@
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add NONCE (str (java.util.UUID/randomUUID)))
-       (.build)))
+       .build))
   ([key value]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add ASSET_VALUE value)
        (.add NONCE (str (java.util.UUID/randomUUID)))
-       (.build)))
+       .build))
   ([key cur next]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add ASSET_VALUE cur)
        (.add ASSET_VALUE_NEW next)
        (.add NONCE (str (java.util.UUID/randomUUID)))
-       (.build))))
+       .build)))
+
+(defn- handle-exception
+  [e op txid test]
+  (if (util/unknown? e)
+    (let [committed (dl/check-tx-committed txid test)]
+      (if (nil? committed)
+        (assoc op :type :info :error (.getMessage e)) ;; unknown
+        (if committed
+          (assoc op :type :ok)
+          (assoc op :type :fail :error (.getMessage e)))))
+    (assoc op :type :fail :error (util/get-exception-info e))))
 
 (defrecord CasRegisterClient [initialized? client-service]
   client/Client
@@ -62,41 +74,22 @@
         (dl/register-contracts @client-service CONTRACTS))))
 
   (invoke! [_ test op]
-    (case (:f op)
-      :read (let [argument (create-argument 1)
-                  resp (.executeContract @client-service "read" argument)]
-              (if (util/success? resp)
-                (assoc op :type :ok :value (-> resp
-                                               util/response->obj
-                                               (.getInt ASSET_VALUE)))
-                (do
-                  (reset! client-service
-                          (dl/try-switch-server! @client-service test))
-                  (assoc op :type :fail :error (.getMessage resp)))))
-
-      :write (let [v (:value op)
-                   argument (create-argument 1 v)
-                   resp (.executeContract @client-service "write" argument)
-                   result (dl/response->result resp
-                                               op
-                                               (.getString argument NONCE)
-                                               test)]
-               (when (= (:type result) :fail)
-                 (reset! client-service
-                         (dl/try-switch-server! @client-service test)))
-               result)
-
-      :cas (let [[cur next] (:value op)
-                 argument (create-argument 1 cur next)
-                 resp (.executeContract @client-service "cas" argument)
-                 result (dl/response->result resp
-                                             op
-                                             (.getString argument NONCE)
-                                             test)]
-             (when (= (:type result) :fail)
-               (reset! client-service
-                       (dl/try-switch-server! @client-service test)))
-             result)))
+    (let [arg (case (:f op)
+                :read (create-argument 1)
+                :write (create-argument 1 (:value op))
+                :cas (apply create-argument 1 (:value op)))]
+      (try
+        (let [contract (-> op :f name)
+              result (.executeContract @client-service contract arg)]
+          (if (= contract "read")
+            (assoc op :type :ok :value (-> result
+                                           util/result->json
+                                           (.getInt ASSET_VALUE)))
+            (assoc op :type :ok)))
+        (catch ClientException e
+          (reset! client-service
+                  (dl/try-switch-server! @client-service test))
+          (handle-exception e op (.getString arg NONCE) test)))))
 
   (close! [_ _]
     (.close @client-service))

@@ -20,7 +20,6 @@
 (def ^:const RETRIES 8)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 
-(def ^:private ^:const LOCAL_DIR "/scalar-jepsen/scalardl")
 (def ^:private ^:const LEDGER_INSTALL_DIR "/root/ledger")
 (def ^:private ^:const LEDGER_EXE "bin/scalar-ledger")
 (def ^:private ^:const LEDGER_PROPERTIES (str LEDGER_INSTALL_DIR "/ledger.properties"))
@@ -104,20 +103,6 @@
         (if (pos? tries)
           (recur (dec tries))
           (warn "Failed to check the TX state" txid))))))
-
-(defn response->result
-  [resp op txid test]
-  (if (util/success? resp)
-    (assoc op :type :ok)
-    (if (util/unknown? resp)
-      (let [committed (check-tx-committed txid test)]
-        (if (nil? committed)
-          (assoc op :type :info :error (.getMessage resp)) ;; unknown
-          (if committed
-            (assoc op :type :ok)
-            (assoc op :type :fail :error (.getMessage resp)))))
-      (assoc op :type :fail :error (str "status code:" (.getStatus resp)
-                                        " error message:" (.getMessage resp))))))
 
 (defn- create-server-properties
   [test]

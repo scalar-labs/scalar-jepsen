@@ -1,6 +1,7 @@
 (ns scalardl.util
   (:require [clojure.tools.logging :refer [debug info warn]])
-  (:import (com.scalar.client.service StatusCode)
+  (:import (com.scalar.client.exception ClientException)
+           (com.scalar.ledger.service StatusCode)
            (javax.json Json)
            (java.io StringReader)))
 
@@ -8,17 +9,17 @@
   [node test]
   (if (some #(= % node) (:servers test)) true false))
 
-(defn success?
-  [response]
-  (= (.getStatus response) (.get StatusCode/OK)))
-
 (defn unknown?
-  [response]
-  (= (.getStatus response) (.get StatusCode/UNKNOWN_TRANSACTION_STATUS)))
+  [^ClientException e]
+  (= (.getStatusCode e) StatusCode/UNKNOWN_TRANSACTION_STATUS))
 
-(defn response->obj
-  "Returns the value from a ContractExecutionResponse if it exists, and nil otherwise."
-  [response]
-  (if (success? response)
-    (-> response .getResult StringReader. (Json/createReader) .readObject)
-    (warn "The contract execution failed")))
+(defn get-exception-info
+  [^ClientException e]
+  (str "status code: " (.getStatusCode e)
+       " error message: " (.getMessage e)))
+
+(defn result->json
+  "Returns the value from a ContractExecutionResult if it exists,
+  and nil otherwise."
+  [result]
+  (-> result .getResult .get))

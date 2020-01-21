@@ -6,10 +6,10 @@
             [scalardl.core :as dl]
             [scalardl.transfer :as transfer]
             [spy.core :as spy])
-  (:import (com.scalar.client.service ClientService
-                                      StatusCode)
-           (com.scalar.rpc ContractExecutionResponse
-                           LedgerServiceResponse)
+  (:import (com.scalar.client.exception ClientException)
+           (com.scalar.client.service ClientService)
+           (com.scalar.ledger.model ContractExecutionResult)
+           (com.scalar.ledger.service StatusCode)
            (javax.json Json)))
 
 (def ^:dynamic contract-count (atom 0))
@@ -17,43 +17,30 @@
 (def ^:dynamic test-records (atom []))
 
 (def mock-client-service
-  (proxy [ClientService] [nil nil nil nil nil nil]
-    (registerCertificate []
-      (-> (LedgerServiceResponse/newBuilder)
-          (.setStatus (.get StatusCode/OK))
-          (.build)))
+  (proxy [ClientService] [nil nil]
+    (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
-      (-> (LedgerServiceResponse/newBuilder)
-          (.setStatus (.get StatusCode/OK))
-          (.build)))
+      nil)
     (executeContract [_ _]
       (swap! execute-count inc)
-      (-> (ContractExecutionResponse/newBuilder)
-          (.setStatus (.get StatusCode/OK))
-          (.setResult (-> (Json/createObjectBuilder)
-                          (.add "balance" 1000)
-                          (.add "age" 111)
-                          .build
-                          .toString))
-          (.build)))))
+      (ContractExecutionResult. (-> (Json/createObjectBuilder)
+                                    (.add "balance" 1000)
+                                    (.add "age" 111)
+                                    .build)
+                                nil))))
 
 (def mock-failure-client-service
-  (proxy [ClientService] [nil nil nil nil nil nil]
-    (registerCertificate []
-      (-> (LedgerServiceResponse/newBuilder)
-          (.setStatus (.get StatusCode/OK))
-          (.build)))
+  (proxy [ClientService] [nil nil]
+    (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
-      (-> (LedgerServiceResponse/newBuilder)
-          (.setStatus (.get StatusCode/OK))
-          (.build)))
+      nil)
     (executeContract [_ _]
       (swap! execute-count inc)
-      (-> (ContractExecutionResponse/newBuilder)
-          (.setStatus (.get StatusCode/UNKNOWN_TRANSACTION_STATUS))
-          (.build)))))
+      (throw (ClientException. "the status is unknown"
+                               (Exception.)
+                               StatusCode/UNKNOWN_TRANSACTION_STATUS)))))
 
 (deftest transfer-client-init-test
   (binding [contract-count (atom 0)
