@@ -7,10 +7,10 @@
                  [jepsen "0.1.15"]
                  [cassandra "0.1.0-SNAPSHOT"]
                  [cc.qbits/alia "4.3.1"]
-                 [cc.qbits/hayt "4.1.0"]
-                 [com.scalar-labs/scalardl-java-client-sdk "2.0.0"]]
+                 [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
+             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "2.0.0"]]}
              :use-jars {:dependencies [[org.bouncycastle/bcpkix-jdk15on "1.59"]
                                        [org.bouncycastle/bcprov-jdk15on "1.59"]
                                        [javax.json/javax.json-api "1.1.4"]
@@ -24,7 +24,8 @@
                         :resource-paths ["resources/client.jar"
                                          "resources/common.jar"
                                          "resources/ledger-client.jar"
-                                         "resources/rpc.jar"]}}
+                                         "resources/rpc.jar"]}
+             :default [:base :system :user :provided :dev :use-released]}
   :java-source-paths ["contract"]
   :main scalardl.runner
   :aot :all)
