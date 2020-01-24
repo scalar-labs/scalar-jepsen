@@ -1,17 +1,18 @@
 (ns scalardl.transfer
   (:require  [cassandra.conductors :as conductors]
-            [clojure.tools.logging :refer [debug info warn]]
-            [clojure.core.reducers :as r]
-            [jepsen
-             [client :as client]
-             [checker :as checker]
-             [generator :as gen]]
-            [knossos.op :as op]
-            [scalardl
-             [core :as dl]
-             [cassandra :as cassandra]
-             [util :as util]])
-  (:import (javax.json Json)))
+             [clojure.tools.logging :refer [debug info warn]]
+             [clojure.core.reducers :as r]
+             [jepsen
+              [client :as client]
+              [checker :as checker]
+              [generator :as gen]]
+             [knossos.op :as op]
+             [scalardl
+              [core :as dl]
+              [cassandra :as cassandra]
+              [util :as util]])
+  (:import (com.scalar.dl.client.exception ClientException)
+           (javax.json Json)))
 
 (def ^:private ^:const INITIAL_BALANCE 10000)
 (def ^:private ^:const NUM_ACCOUNTS 10)
@@ -55,19 +56,22 @@
 
 (defn- create-asset
   [client-service id]
-  (let [resp (->> (create-argument id INITIAL_BALANCE)
-                  (.executeContract client-service "create"))]
-    (when-not (util/success? resp)
+  (try
+    (->> (create-argument id INITIAL_BALANCE)
+         (.executeContract client-service "create"))
+    (catch ClientException e
       (throw (RuntimeException. "Fatal error: Failed to create an asset")))))
 
 (defn- get-balance
   [client-service id]
-  (let [resp (->> (create-argument id)
-                  (.executeContract client-service "balance"))]
-    (when (util/success? resp)
-      (let [balance (-> (util/response->obj resp) (.getInt ASSET_BALANCE))
-            age (-> (util/response->obj resp) (.getInt ASSET_AGE))]
-        {:balance balance :age age}))))
+  (try
+    (let [result (->> (create-argument id)
+                      (.executeContract client-service "balance"))
+          balance (-> (util/result->json result) (.getInt ASSET_BALANCE))
+          age (-> (util/result->json result) (.getInt ASSET_AGE))]
+      {:balance balance :age age})
+    (catch ClientException e
+      (warn "Failed to read a balance from id =" id))))
 
 (defn- read-with-retry
   [client-service n]
@@ -106,29 +110,31 @@
           (create-asset @client-service id)))))
 
   (invoke! [_ test op]
-    (let [txid (str (java.util.UUID/randomUUID))]
-      (case (:f op)
-        :transfer (let [{:keys [from to amount]} (:value op)
-                        resp (->> (create-argument txid from to amount)
-                                  (.executeContract @client-service
-                                                    "transfer"))]
-                    (if (util/success? resp)
-                      (assoc op :type :ok)
-                      (do
-                        (when (util/unknown? resp)
-                          (warn "The state of transaction is unknown:" txid)
-                          (swap! (:unknown-tx test) conj txid))
-                        (reset! client-service (dl/try-switch-server!
-                                                @client-service test))
-                        (assoc op :type :fail :error (.getMessage resp)))))
-        :check-tx (let [num-committed (check-tx-states test)]
-                    (if num-committed
-                      (assoc op :type :ok :value num-committed)
-                      (assoc op :type :fail :error "Failed to check status")))
-        :get-all (let [balances (read-with-retry @client-service n)]
-                   (if balances
-                     (assoc op :type :ok :value balances)
-                     (assoc op :type :fail :error "Failed to get balances"))))))
+    (case (:f op)
+      :transfer (let [txid (str (java.util.UUID/randomUUID))
+                      {:keys [from to amount]} (:value op)
+                      arg (create-argument txid from to amount)]
+                  (try
+                    (.executeContract @client-service "transfer" arg)
+                    (assoc op :type :ok)
+                    (catch ClientException e
+                      (reset! client-service
+                              (dl/try-switch-server! @client-service test))
+                      (when (util/unknown? e)
+                        (warn "The state of transaction is unknown:" txid)
+                        (swap! (:unknown-tx test) conj txid))
+                      (assoc op :type :fail
+                             :error (util/get-exception-info e)))))
+
+      :check-tx (let [num-committed (check-tx-states test)]
+                  (if num-committed
+                    (assoc op :type :ok :value num-committed)
+                    (assoc op :type :fail :error "Failed to check status")))
+
+      :get-all (let [balances (read-with-retry @client-service n)]
+                 (if balances
+                   (assoc op :type :ok :value balances)
+                   (assoc op :type :fail :error "Failed to get balances")))))
 
   (close! [_ _]
     (.close @client-service))
