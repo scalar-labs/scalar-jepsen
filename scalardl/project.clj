@@ -10,7 +10,7 @@
                  [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
-             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "2.0.0"]]}
+             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "2.0.1"]]}
              :use-jars {:dependencies [[org.bouncycastle/bcpkix-jdk15on "1.59"]
                                        [org.bouncycastle/bcprov-jdk15on "1.59"]
                                        [javax.json/javax.json-api "1.1.4"]
