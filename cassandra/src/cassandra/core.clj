@@ -188,14 +188,19 @@
      (Thread/sleep 100)))
   (info node "has stopped Cassandra"))
 
+(defn delete-data!
+  "Deletes Cassandra data"
+  [test node all?]
+  (info node "deleting data files")
+  (when all?
+    (c/su (meh (c/exec :rm :-r (str (:cassandra-dir test) "/logs")))))
+  (c/su (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data")))))
+
 (defn wipe!
   "Shuts down Cassandra and wipes data."
   [test node]
   (stop! node)
-  (info node "deleting data files")
-  (c/su
-   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/logs")))
-   (meh (c/exec :rm :-r (str (:cassandra-dir test) "/data")))))
+  (delete-data! test node true))
 
 (defn wait-turn
   "A node has to wait because Cassandra node can't start when another node is bootstrapping"
