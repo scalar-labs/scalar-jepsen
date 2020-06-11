@@ -1,9 +1,8 @@
 (ns cassandra.lwt-test
   (:require [clojure.test :refer :all]
             [jepsen.client :as client]
+            [jepsen.independent :as independent]
             [qbits.alia :as alia]
-            [qbits.alia.policy.retry :as retry]
-            [cassandra.core :as cassandra]
             [cassandra.lwt :refer [->CasRegisterClient] :as lwt]
             [spy.core :as spy])
   (:import (com.datastax.driver.core WriteType)
@@ -35,7 +34,8 @@
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
-                                 {:type :invoke :f :cas :value [1 2]})]
+                                 {:type :invoke :f :cas
+                                  :value (independent/tuple 0 [1 2])})]
       (is (spy/called-with? alia/execute
                             "session"
                             {:use-keyspace :jepsen_keyspace}))
@@ -56,7 +56,8 @@
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
-                                 {:type :invoke :f :write :value 3})]
+                                 {:type :invoke :f :write
+                                  :value (independent/tuple 0 3)})]
       (is (spy/called-with? alia/execute
                             "session"
                             {:use-keyspace :jepsen_keyspace}))
@@ -79,7 +80,8 @@
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
-                                 {:type :invoke :f :write :value 4})]
+                                 {:type :invoke :f :write
+                                  :value (independent/tuple 0 4)})]
       (is (spy/called-with? alia/execute
                             "session"
                             {:use-keyspace :jepsen_keyspace}))
@@ -104,7 +106,9 @@
                                            [{:id 0 :value 4}])))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
-          result (client/invoke! client {} {:type :invoke :f :read})]
+          result (client/invoke! client {}
+                                 {:type :invoke :f :read
+                                  :value (independent/tuple 0 nil)})]
       (is (spy/called-with? alia/execute
                             "session"
                             {:use-keyspace :jepsen_keyspace}))
@@ -115,7 +119,7 @@
                              :where [[= :id 0]]}
                             {:consistency :serial}))
       (is (= :ok (:type result)))
-      (is (= 4 (:value result))))))
+      (is (= [0 4] (:value result))))))
 
 (deftest lwt-client-read-timeout-exception-test
   (with-redefs [alia/cluster (spy/spy)
@@ -128,7 +132,9 @@
                                                     :exception (ReadTimeoutException. nil nil 0 0 false)})))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
-          result (client/invoke! client {} {:type :invoke :f :read})]
+          result (client/invoke! client {}
+                                 {:type :invoke :f :read
+                                  :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
       (is (= :read-timed-out (:error result))))))
 
@@ -144,7 +150,8 @@
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
-                                 {:type :invoke :f :write :value 1})]
+                                 {:type :invoke :f :write
+                                  :value (independent/tuple 0 1)})]
       (is (= :info (:type result)))
       (is (= :write-timed-out (:value result))))))
 
@@ -159,7 +166,9 @@
                                                     :exception (UnavailableException. nil nil 0 0)})))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
-          result (client/invoke! client {} {:type :invoke :f :read})]
+          result (client/invoke! client {}
+                                 {:type :invoke :f :read
+                                  :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
       (is (= :unavailable (:error result))))))
 
@@ -174,6 +183,8 @@
                                                     :exception (NoHostAvailableException. {})})))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
-          result (client/invoke! client {} {:type :invoke :f :read})]
+          result (client/invoke! client {}
+                                 {:type :invoke :f :read
+                                  :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
       (is (= :no-host-available (:error result))))))

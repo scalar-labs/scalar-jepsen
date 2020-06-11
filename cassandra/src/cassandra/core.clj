@@ -231,12 +231,6 @@
     (log-files [_ _ _]
       [])))
 
-(def add {:type :invoke, :f :add, :value 1})
-(def sub {:type :invoke, :f :add, :value -1})
-(def r {:type :invoke, :f :read})
-(defn w [_ _] {:type :invoke, :f :write, :value (rand-int 5)})
-(defn cas [_ _] {:type :invoke, :f :cas, :value [(rand-int 5) (rand-int 5)]})
-
 (defn adds
   "Generator that emits :add operations for sequential integers."
   []
@@ -248,7 +242,7 @@
   "A generator which reads exactly once."
   []
   (gen/clients
-   (gen/once r)))
+   (gen/once {:type :invoke :f :read})))
 
 (defn create-my-keyspace
   [session test {:keys [keyspace]}]
@@ -302,7 +296,8 @@
                                  (Thread/sleep 2000)
                                  (assoc op
                                         :type :fail
-                                        :error :no-host-available)))))
+                                        :error :no-host-available))
+      (assoc op :type :fail :error ex))))
 
 (defn cassandra-test
   [name opts]

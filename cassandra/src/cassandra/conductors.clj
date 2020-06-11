@@ -85,7 +85,7 @@
       (conj base (gen/sleep (+ (rand-int 30) 60)) op)
       base)))
 
-(defn- mix-failure-seq
+(defn mix-failure-seq
   [opts]
   (gen/seq (flatten (repeatedly #(mix-failure opts)))))
 

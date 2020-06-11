@@ -13,6 +13,8 @@
             [qbits.alia.policy.retry :as retry])
   (:import (clojure.lang ExceptionInfo)))
 
+(def add {:type :invoke, :f :add, :value 1})
+
 (defrecord CQLCounterClient [tbl-created? cluster session writec]
   client/Client
   (open! [_ test _]
