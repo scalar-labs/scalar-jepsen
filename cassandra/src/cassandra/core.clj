@@ -297,7 +297,7 @@
                                  (assoc op
                                         :type :fail
                                         :error :no-host-available))
-      (assoc op :type :fail :error ex))))
+      (assoc op :type :fail :error (.getMessage ex)))))
 
 (defn cassandra-test
   [name opts]
