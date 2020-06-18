@@ -31,6 +31,26 @@
   [r]
   (Thread/sleep (reduce * 1000 (repeat r 2))))
 
+(defn- retry-when-exception*
+  [tries f args fallback]
+  (if (pos? tries)
+    (let [res (try {:value (apply f args)}
+                   (catch Exception e
+                     (if (zero? tries)
+                       (throw e)
+                       {:exception e})))]
+      (if-let [e (:exception res)]
+        (do
+          (warn e)
+          (when fallback (fallback))
+          (exponential-backoff (- RETRIES tries))
+          (recur (dec tries) f args fallback))
+        (:value res)))))
+
+(defn retry-when-exception
+  [f args & fallback]
+  (retry-when-exception* RETRIES f args fallback))
+
 (defn- create-client-properties
   [test]
   (doto (Properties.)
@@ -41,23 +61,17 @@
 
 (defn prepare-client-service
   [test]
-  (loop [tries RETRIES]
-    (when (< tries RETRIES)
-      (exponential-backoff (- RETRIES tries)))
-    (if (pos? tries)
-      (if-let [injector (some-> test
-                                create-client-properties
-                                ClientConfig.
-                                ClientModule.
-                                vector
-                                Guice/createInjector)]
-        (try
-          (.getInstance injector ClientService)
-          (catch Exception e
-            (warn (.getMessage e))))
-        (recur (dec tries)))
-      (throw (ex-info "Failed to prepare ClientService"
-                      {:cause "Failed to prepare ClientService"})))))
+  (retry-when-exception (fn []
+                          (if-let [injector (some-> test
+                                                    create-client-properties
+                                                    ClientConfig.
+                                                    ClientModule.
+                                                    vector
+                                                    Guice/createInjector)]
+                            (.getInstance injector ClientService)
+                            (throw (ex-info "Failed to get ClientService"
+                                            {:cause :injection-failure}))))
+                        []))
 
 (defn try-switch-server!
   [client-service test]
@@ -71,38 +85,28 @@
 
 (defn register-certificate
   [client-service]
-  (try
-    (.registerCertificate client-service)
-    (catch ClientException e
-      (throw (ex-info "Failed to register a certificate"
-                      {:cause e})))))
+  (retry-when-exception (fn [] (.registerCertificate client-service)) []))
 
 (defn register-contracts
   "Register contracts which have
   {:name contract-name, :class class-name, :path contract-path}"
   [client-service contracts]
   (doseq [c contracts]
-    (try
-      (.registerContract client-service
-                         (:name c) (:class c) (:path c)
-                         (Optional/empty))
-      (catch ClientException e
-        (throw (ex-info "Failed to register a contract"
-                        {:cause e
-                         :contract c}))))))
+    (retry-when-exception (fn [{:keys [name class path]}]
+                            (.registerContract client-service
+                                               name class path
+                                               (Optional/empty)))
+                          [c])))
 
 (defn check-tx-committed
   [txid test]
   (info "checking a TX state" txid)
-  (loop [tries RETRIES]
-    (when (< tries RETRIES)
-      (exponential-backoff (- RETRIES tries)))
-    (let [committed (cassandra/check-tx-state txid test)]
-      (if-not (nil? committed)
-        committed
-        (if (pos? tries)
-          (recur (dec tries))
-          (warn "Failed to check the TX state" txid))))))
+  (retry-when-exception (fn [id t]
+                          (if-let [committed (cassandra/check-tx-state id t)]
+                            committed
+                            (throw (ex-info "Failed to read the TX state"
+                                            {:cause :read-state-failure}))))
+                        [txid test]))
 
 (defn- create-server-properties
   [test]
@@ -115,17 +119,10 @@
 
 (defn- install-jdk-with-retry
   []
-  (letfn [(step [tries]
-            (when (pos? tries)
-              (exponential-backoff tries))
-            (try
-              (c/su (debian/install [:openjdk-8-jre]))
-              (catch clojure.lang.ExceptionInfo e
-                (debian/update!)
-                (if (= tries RETRIES)
-                  (throw e)
-                  (step (inc tries))))))]
-    (step 0)))
+  (retry-when-exception (fn [package]
+                          (c/su (debian/install package)))
+                        [[:openjdk-8-jre]]
+                        debian/update!))
 
 (defn- install-server!
   [node test]

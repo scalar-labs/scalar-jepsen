@@ -75,15 +75,16 @@
 
 (defn- read-with-retry
   [client-service n]
-  (loop [tries dl/RETRIES]
-    (when (< tries dl/RETRIES)
-      (dl/exponential-backoff tries))
-    (if (pos? tries)
-      (let [balances (mapv (partial get-balance client-service) (range 0 n))]
-        (if (some nil? balances)
-          (recur (dec tries))
-          balances))
-      (warn "Failed to read balances"))))
+  (dl/retry-when-exception (fn [n]
+                             (let [balances (mapv (partial get-balance
+                                                           client-service)
+                                                  (range 0 n))]
+                               (if (some nil? balances)
+                                 (throw (ex-info
+                                         "Failed to read at least 1 record"
+                                         {:cause :read-record-failure}))
+                                 balances)))
+                           [n]))
 
 (defn- check-tx-states
   [test]
