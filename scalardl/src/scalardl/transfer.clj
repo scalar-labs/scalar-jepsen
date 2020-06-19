@@ -56,11 +56,10 @@
 
 (defn- create-asset
   [client-service id]
-  (try
-    (->> (create-argument id INITIAL_BALANCE)
-         (.executeContract client-service "create"))
-    (catch ClientException e
-      (throw (RuntimeException. "Fatal error: Failed to create an asset")))))
+  (dl/retry-when-exception (fn [i]
+                             (->> (create-argument i INITIAL_BALANCE)
+                                  (.executeContract client-service "create")))
+                           [id]))
 
 (defn- get-balance
   [client-service id]
