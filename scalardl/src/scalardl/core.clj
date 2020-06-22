@@ -139,7 +139,7 @@
   (info node "starting DL server")
   (cu/start-daemon! {:logfile LEDGER_LOG :pidfile LEDGER_PID :chdir LEDGER_INSTALL_DIR}
                     LEDGER_EXE
-                    :-config LEDGER_PROPERTIES))
+                    :--config LEDGER_PROPERTIES))
 
 (defn stop-server!
   [node]
