@@ -244,7 +244,7 @@
                                              (->> [diff-transfer]
                                                   (conductors/std-gen opts))
                                              (conductors/terminate-nemesis opts)
-                                             (gen/clients (gen/once check-tx))
-                                             (gen/clients (gen/once get-all)))
+                                             (gen/clients (gen/once get-all))
+                                             (gen/clients (gen/once check-tx)))
                                 :checker    (consistency-checker)})
          opts))
