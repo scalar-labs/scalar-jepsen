@@ -87,11 +87,10 @@
 
 (defn- check-tx-states
   [test]
-  (let [unknowns @(:unknown-tx test)
-        committed (mapv #(dl/check-tx-committed % test) unknowns)]
-    (if (some nil? committed)
-      nil
-      (->> committed (filter true?) count))))
+  (->> @(:unknown-tx test)
+       (mapv #(dl/check-tx-committed? % test))
+       (filter true?)
+       count))
 
 (defrecord TransferClient [initialized? client-service n]
   client/Client

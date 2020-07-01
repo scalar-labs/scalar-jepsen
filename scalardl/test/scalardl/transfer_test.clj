@@ -89,26 +89,28 @@
 
 (deftest transfer-client-check-tx-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service)
-                dl/check-tx-committed (spy/stub true)]
+                dl/check-tx-committed? (spy/stub true)]
     (let [client (client/open! (transfer/->TransferClient (atom false)
                                                           (atom nil) 5)
                                nil nil)
           result (client/invoke! client
-                                 {:unknown-tx (atom #{"tx1"})}
+                                 {:unknown-tx (atom #{"tx1" "tx2"})}
                                  (#'transfer/check-tx {} nil))]
       (is (= :ok (:type result)))
-      (is (= 1 (:value result))))))
+      (is (= 2 (:value result))))))
 
 (deftest transfer-client-check-tx-fail-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service)
-                dl/check-tx-committed (spy/stub nil)]
+                dl/check-tx-committed? (spy/mock (fn [_ _]
+                                                   (throw
+                                                     (ex-info "fail" {}))))]
     (let [client (client/open! (transfer/->TransferClient (atom false)
                                                           (atom nil) 5)
-                               nil nil)
-          result (client/invoke! client
-                                 {:unknown-tx (atom #{"tx1"})}
-                                 (#'transfer/check-tx {} nil))]
-      (is (= :fail (:type result))))))
+                               nil nil)]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (client/invoke! client
+                                   {:unknown-tx (atom #{"tx1"})}
+                                   (#'transfer/check-tx {} nil)))))))
 
 (deftest transfer-client-get-all-test
   (binding [execute-count (atom 0)]
@@ -128,12 +130,10 @@
                 dl/exponential-backoff (spy/spy)]
     (let [client (client/open! (transfer/->TransferClient (atom false)
                                                           (atom nil) 1)
-                               nil nil)
-          result (client/invoke! client
-                                 nil
-                                 (#'transfer/get-all {} nil))]
-      (is (spy/called-n-times? dl/exponential-backoff 8))
-      (is (= :fail (:type result))))))
+                               nil nil)]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (client/invoke! client nil (#'transfer/get-all {} nil))))
+      (is (spy/called-n-times? dl/exponential-backoff 7)))))
 
 (def correct-history
   [{:type :ok :f :transfer}
