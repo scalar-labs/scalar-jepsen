@@ -11,7 +11,7 @@
   [test]
   (cassandra/cassandra-log test))
 
-(defn check-tx-state?
+(defn committed?
   "Return true/false when the transaction has been committed or aborted"
   [txid {:keys [cass-nodes]}]
   (let [cluster (alia/cluster {:contact-points cass-nodes})
@@ -21,7 +21,9 @@
                                 {:consistency :serial})
                   (catch Exception e (throw e))
                   (finally (alia/shutdown cluster)))]
-    (= (some-> rows first :tx_state) TX_COMMITTED)))
+    (if (empty? rows)
+      (throw (ex-info "no entry for the state" {}))
+      (= (-> rows first :tx_state) TX_COMMITTED))))
 
 (defn spinup-cassandra!
   [node test]

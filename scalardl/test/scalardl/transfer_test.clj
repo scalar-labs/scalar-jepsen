@@ -89,7 +89,7 @@
 
 (deftest transfer-client-check-tx-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service)
-                dl/check-tx-committed? (spy/stub true)]
+                dl/committed? (spy/stub true)]
     (let [client (client/open! (transfer/->TransferClient (atom false)
                                                           (atom nil) 5)
                                nil nil)
@@ -101,9 +101,9 @@
 
 (deftest transfer-client-check-tx-fail-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service)
-                dl/check-tx-committed? (spy/mock (fn [_ _]
-                                                   (throw
-                                                     (ex-info "fail" {}))))]
+                dl/committed? (spy/mock (fn [_ _]
+                                          (throw
+                                           (ex-info "fail" {}))))]
     (let [client (client/open! (transfer/->TransferClient (atom false)
                                                           (atom nil) 5)
                                nil nil)]

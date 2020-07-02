@@ -52,7 +52,7 @@
   [e op txid test]
   (if (util/unknown? e)
     (try
-      (if (dl/check-tx-committed? txid test)
+      (if (dl/committed? txid test)
         (assoc op :type :ok)
         (assoc op :type :fail :error :state-write-failure))
       (catch clojure.lang.ExceptionInfo ex

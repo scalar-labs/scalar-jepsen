@@ -98,10 +98,10 @@
                                                (Optional/empty)))
                           [c])))
 
-(defn check-tx-committed?
+(defn committed?
   [txid test]
   (info "checking a TX state" txid)
-  (retry-when-exception cassandra/check-tx-state? [txid test]))
+  (retry-when-exception cassandra/committed? [txid test]))
 
 (defn- create-server-properties
   [test]

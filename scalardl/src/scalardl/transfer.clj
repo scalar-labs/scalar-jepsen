@@ -88,7 +88,7 @@
 (defn- check-tx-states
   [test]
   (->> @(:unknown-tx test)
-       (mapv #(dl/check-tx-committed? % test))
+       (mapv #(dl/committed? % test))
        (filter true?)
        count))
 

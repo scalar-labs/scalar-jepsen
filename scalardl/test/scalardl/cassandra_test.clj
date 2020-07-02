@@ -5,26 +5,31 @@
             [spy.core :as spy]))
 
 (def TX_COMMITTED 3)
+(def TX_ABORTED 4)
 
-(deftest check-tx-state-test
+(deftest committed-test
   (with-redefs [alia/cluster (spy/stub "cluster")
                 alia/connect (spy/stub "session")
                 alia/execute (spy/stub [{:tx_state TX_COMMITTED}])]
-    (is (true? (cassandra/check-tx-state? "txid"
-                                          {:cass-nodes "localhost"})))))
+    (is (true? (cassandra/committed? "txid" {:cass-nodes "localhost"})))))
 
-(deftest check-tx-state-no-state-test
+(deftest committed-when-aborted-test
+  (with-redefs [alia/cluster (spy/stub "cluster")
+                alia/connect (spy/stub "session")
+                alia/execute (spy/stub [{:tx_state TX_ABORTED}])]
+    (is (false? (cassandra/committed? "txid" {:cass-nodes "localhost"})))))
+
+(deftest committed-when-no-state-test
   (with-redefs [alia/cluster (spy/stub "cluster")
                 alia/connect (spy/stub "session")
                 alia/execute (spy/stub [])]
-    (is (false? (cassandra/check-tx-state? "txid"
-                                           {:cass-nodes "localhost"})))))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (cassandra/committed? "txid" {:cass-nodes "localhost"})))))
 
-(deftest check-tx-state-fail-test
+(deftest committed-when-read-fail-test
   (with-redefs [alia/cluster (spy/stub "cluster")
                 alia/connect (spy/stub "session")
                 alia/execute (spy/mock (fn [_ _ _]
                                          (throw (ex-info "fail" {}))))]
     (is (thrown? clojure.lang.ExceptionInfo
-                 (cassandra/check-tx-state? "txid"
-                                            {:cass-nodes "localhost"})))))
+                 (cassandra/committed? "txid" {:cass-nodes "localhost"})))))
