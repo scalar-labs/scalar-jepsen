@@ -101,39 +101,41 @@
 (deftest cas-client-cas-unknown-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service-throws-unknown-status)
                 dl/try-switch-server! (spy/stub mock-client-service)
-                dl/check-tx-committed (spy/stub nil)]
+                dl/committed? (spy/mock (fn [_ _]
+                                          (throw
+                                           (ex-info "fail" {}))))]
     (let [client (client/open! (cas/->CasRegisterClient (atom false) (atom nil))
                                nil nil)
           test {:unknown-tx (atom #{})}
           result (client/invoke! client test (#'cas/cas nil nil))]
       (is (spy/called-once? dl/try-switch-server!))
-      (is (spy/called-once? dl/check-tx-committed))
+      (is (spy/called-once? dl/committed?))
       (is (= mock-client-service @(:client-service client)))
       (is (= :info (:type result))))))
 
 (deftest cas-client-cas-commit-after-unknown-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service-throws-unknown-status)
                 dl/try-switch-server! (spy/stub mock-client-service)
-                dl/check-tx-committed (spy/stub true)]
+                dl/committed? (spy/stub true)]
     (let [client (client/open! (cas/->CasRegisterClient (atom false) (atom nil))
                                nil nil)
           test {:unknown-tx (atom #{})}
           result (client/invoke! client test (#'cas/cas nil nil))]
       (is (spy/called-once? dl/try-switch-server!))
-      (is (spy/called-once? dl/check-tx-committed))
+      (is (spy/called-once? dl/committed?))
       (is (= mock-client-service @(:client-service client)))
       (is (= :ok (:type result))))))
 
 (deftest cas-client-cas-abort-after-unknown-test
   (with-redefs [dl/prepare-client-service (spy/stub mock-client-service-throws-unknown-status)
                 dl/try-switch-server! (spy/stub mock-client-service)
-                dl/check-tx-committed (spy/stub false)]
+                dl/committed? (spy/stub false)]
     (let [client (client/open! (cas/->CasRegisterClient (atom false) (atom nil))
                                nil nil)
           test {:unknown-tx (atom #{})}
           result (client/invoke! client test (#'cas/cas nil nil))]
       (is (spy/called-once? dl/try-switch-server!))
-      (is (spy/called-once? dl/check-tx-committed))
+      (is (spy/called-once? dl/committed?))
       (is (= mock-client-service @(:client-service client)))
       (is (= :fail (:type result))))))
 
@@ -145,6 +147,6 @@
           test {:unknown-tx (atom #{})}
           result (client/invoke! client test (#'cas/cas nil nil))]
       (is (spy/called-once? dl/try-switch-server!))
-      (is (spy/not-called? dl/check-tx-committed))
+      (is (spy/not-called? dl/committed?))
       (is (= mock-client-service @(:client-service client)))
       (is (= :fail (:type result))))))

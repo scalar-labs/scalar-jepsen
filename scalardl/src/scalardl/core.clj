@@ -33,10 +33,10 @@
 
 (defn- retry-when-exception*
   [tries f args fallback]
-  (if (pos? tries)
+  (when (pos? tries)
     (let [res (try {:value (apply f args)}
                    (catch Exception e
-                     (if (zero? tries)
+                     (if (= tries 1)
                        (throw e)
                        {:exception e})))]
       (if-let [e (:exception res)]
@@ -98,15 +98,10 @@
                                                (Optional/empty)))
                           [c])))
 
-(defn check-tx-committed
+(defn committed?
   [txid test]
   (info "checking a TX state" txid)
-  (retry-when-exception (fn [id t]
-                          (if-let [committed (cassandra/check-tx-state id t)]
-                            committed
-                            (throw (ex-info "Failed to read the TX state"
-                                            {:cause :read-state-failure}))))
-                        [txid test]))
+  (retry-when-exception cassandra/committed? [txid test]))
 
 (defn- create-server-properties
   [test]

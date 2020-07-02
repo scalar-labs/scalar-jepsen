@@ -6,25 +6,24 @@
             [qbits.hayt.dsl.statement :refer :all]))
 
 (def ^:private ^:const TX_COMMITTED 3)
-(def ^:private ^:const TX_ABORTED 4)
 
 (defn cassandra-log
   [test]
   (cassandra/cassandra-log test))
 
-(defn check-tx-state
-  "Return true/false when the transaction has been committed or aborted.
-  Return nil when it can't read the state from the coordinator table"
+(defn committed?
+  "Return true/false when the transaction has been committed or aborted"
   [txid {:keys [cass-nodes]}]
   (let [cluster (alia/cluster {:contact-points cass-nodes})
         rows (try (alia/execute (alia/connect cluster)
                                 (select :coordinator.state
                                         (where {:tx_id txid}))
                                 {:consistency :serial})
-                  (catch Exception _
-                    (warn "Failed to read the coordinator table"))
+                  (catch Exception e (throw e))
                   (finally (alia/shutdown cluster)))]
-    (if rows (= (-> rows first :tx_state) TX_COMMITTED) nil)))
+    (if (empty? rows)
+      (throw (ex-info "no entry for the state" {}))
+      (= (-> rows first :tx_state) TX_COMMITTED))))
 
 (defn spinup-cassandra!
   [node test]

@@ -51,12 +51,12 @@
 (defn- handle-exception
   [e op txid test]
   (if (util/unknown? e)
-    (let [committed (dl/check-tx-committed txid test)]
-      (if (nil? committed)
-        (assoc op :type :info :error (.getMessage e)) ;; unknown
-        (if committed
-          (assoc op :type :ok)
-          (assoc op :type :fail :error (.getMessage e)))))
+    (try
+      (if (dl/committed? txid test)
+        (assoc op :type :ok)
+        (assoc op :type :fail :error :state-write-failure))
+      (catch clojure.lang.ExceptionInfo ex
+        (assoc op :type :info :error (.getMessage ex)))) ;; unknown
     (assoc op :type :fail :error (util/get-exception-info e))))
 
 (defrecord CasRegisterClient [initialized? client-service]
