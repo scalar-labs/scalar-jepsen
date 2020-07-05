@@ -21,9 +21,7 @@
                                 {:consistency :serial})
                   (catch Exception e (throw e))
                   (finally (alia/shutdown cluster)))]
-    (if (empty? rows)
-      (throw (ex-info "no entry for the state" {}))
-      (= (-> rows first :tx_state) TX_COMMITTED))))
+    (and (not (empty? rows)) (= (-> rows first :tx_state) TX_COMMITTED))))
 
 (defn spinup-cassandra!
   [node test]

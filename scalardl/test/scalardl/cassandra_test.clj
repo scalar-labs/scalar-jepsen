@@ -23,8 +23,7 @@
   (with-redefs [alia/cluster (spy/stub "cluster")
                 alia/connect (spy/stub "session")
                 alia/execute (spy/stub [])]
-    (is (thrown? clojure.lang.ExceptionInfo
-                 (cassandra/committed? "txid" {:cass-nodes "localhost"})))))
+    (is (false? (cassandra/committed? "txid" {:cass-nodes "localhost"})))))
 
 (deftest committed-when-read-fail-test
   (with-redefs [alia/cluster (spy/stub "cluster")
