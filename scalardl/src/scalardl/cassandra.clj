@@ -21,7 +21,7 @@
                                 {:consistency :serial})
                   (catch Exception e (throw e))
                   (finally (alia/shutdown cluster)))]
-    (and (seq rows) (= (-> rows first :tx_state) TX_COMMITTED))))
+    (and (not (empty? rows)) (= (-> rows first :tx_state) TX_COMMITTED))))
 
 (defn spinup-cassandra!
   [node test]
