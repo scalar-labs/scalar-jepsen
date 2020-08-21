@@ -2,13 +2,11 @@
   (:require [clojure.test :refer :all]
             [jepsen
              [control :as c]
-             [client :as client]
              [nemesis :as jn]]
             [jepsen.nemesis.time :as nt]
             [cassandra
              [core :as cass]
              [runner :as runner]
-             [conductors :as conductors]
              [nemesis :as nemesis]]
             [spy.core :as spy]))
 
@@ -33,7 +31,7 @@
           joining (runner/joinings "rejoin")
           clock (runner/clocks "drift")
           new-opts (runner/combine-nemesis base-opts nemesis joining clock)
-          n (jn/setup-compat! (:nemesis new-opts) new-opts nil)]
+          n (jn/setup! (:nemesis new-opts) new-opts)]
       (is (= "crash-rejoining-clock-drift" (:suffix new-opts)))
       (is (= {:name "-rejoining" :bootstrap true :decommission true}
              (:join new-opts)))

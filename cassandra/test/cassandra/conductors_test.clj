@@ -76,22 +76,23 @@
         (is (= "stop is a no-op with this nemesis" (:value result-stop)))))))
 
 (deftest std-gen-test
-  (let [bootstrap {:join {:bootstrap true :decommission false}}
-        decommission {:join {:bootstrap false :decommission true}}
-        bump {:clock {:bump true :strobe false}}
-        strobe {:clock {:bump false :strobe true}}]
+  (let [with-time-limit #(merge % {:time-limit 10})
+        bootstrap (with-time-limit {:join {:bootstrap true :decommission false}})
+        decommission (with-time-limit {:join {:bootstrap false :decommission true}})
+        bump (with-time-limit {:clock {:bump true :strobe false}})
+        strobe (with-time-limit {:clock {:bump false :strobe true}})]
     (with-redefs [nt/reset-gen (spy/stub {:type :info :f :reset})
                   nt/bump-gen (spy/stub {:type :info :f :bump})
                   nt/strobe-gen (spy/stub {:type :info :f :strobe})]
       (is (->> (conductors/std-gen bootstrap [])
-               .source .sources first .source .elements deref
+               .gen .gens first .gen
                (some #(= {:type :info :f :bootstrap} %))))
       (is (->> (conductors/std-gen decommission [])
-               .source .sources first .source .elements deref
+               .gen .gens first .gen
                (some #(= {:type :info :f :decommission} %))))
       (is (->> (conductors/std-gen bump [])
-               .source .sources first .source .elements deref
+               .gen .gens first .gen
                (some #(= {:type :info :f :bump} %))))
       (is (->> (conductors/std-gen strobe [])
-               .source .sources first .source .elements deref
+               .gen .gens first .gen
                (some #(= {:type :info :f :strobe} %)))))))

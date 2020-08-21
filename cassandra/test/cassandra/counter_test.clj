@@ -96,7 +96,7 @@
           result (client/invoke! client {}
                                  {:type :invoke :f :add :value 1})]
       (is (= :info (:type result)))
-      (is (= :write-timed-out (:value result))))))
+      (is (= :write-timed-out (:error result))))))
 
 (deftest counter-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)
