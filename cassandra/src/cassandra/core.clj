@@ -235,14 +235,12 @@
   "Generator that emits :add operations for sequential integers."
   []
   (->> (range)
-       (map (fn [x] {:type :invoke, :f :add, :value x}))
-       gen/seq))
+       (map (fn [x] {:type :invoke, :f :add, :value x}))))
 
 (defn read-once
   "A generator which reads exactly once."
   []
-  (gen/clients
-   (gen/once {:type :invoke :f :read})))
+  (gen/clients (gen/until-ok {:type :invoke :f :read})))
 
 (defn create-my-keyspace
   [session test {:keys [keyspace]}]
@@ -274,22 +272,22 @@
       WriteTimeoutException (condp = (.getWriteType ex)
                               WriteType/CAS (assoc op
                                                    :type :info
-                                                   :value :write-timed-out)
+                                                   :error :write-timed-out)
                               WriteType/BATCH_LOG (assoc op
                                                          :type :info
-                                                         :value :write-timed-out)
+                                                         :error :write-timed-out)
                               WriteType/SIMPLE (if conditional?
                                                  (assoc op :type :ok)
                                                  (assoc op
                                                         :type :info
-                                                        :value :write-timed-out))
+                                                        :error :write-timed-out))
                               WriteType/BATCH (assoc op :type :ok)
                               WriteType/COUNTER (assoc op
                                                        :type :info
-                                                       :value :write-timed-out)
+                                                       :error :write-timed-out)
                               (assoc op :type :fail :error :write-timed-out))
       ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
-      TransportException (assoc op :type :info :value :node-down)
+      TransportException (assoc op :type :info :error :node-down)
       UnavailableException (assoc op :type :fail :error :unavailable)
       NoHostAvailableException (do
                                  (info "All the servers are down - waiting 2s")
