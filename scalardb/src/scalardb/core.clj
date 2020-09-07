@@ -5,14 +5,16 @@
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
-  (:import (com.scalar.db.api TransactionState)
+  (:import (com.scalar.db.api Isolation
+                              TransactionState)
            (com.scalar.db.config DatabaseConfig)
            (com.scalar.db.storage.cassandra Cassandra)
            (com.scalar.db.service StorageModule
                                   StorageService
                                   TransactionModule
                                   TransactionService)
-           (com.scalar.db.transaction.consensuscommit Coordinator)
+           (com.scalar.db.transaction.consensuscommit Coordinator
+                                                      SerializableStrategy)
            (com.google.inject Guice)
            (java.util Properties)))
 
@@ -23,6 +25,13 @@
 (def ^:private ^:const COORDINATOR "coordinator")
 (def ^:private ^:const STATE_TABLE "state")
 (def ^:const VERSION "tx_version")
+
+(def ^:private ISOLATION_LEVELS {:snapshot Isolation/SNAPSHOT
+                                 :serializable Isolation/SERIALIZABLE})
+
+(def ^:private SERIALIZABLE_STRATEGIES
+  {:extra-write SerializableStrategy/EXTRA_WRITE
+   :extra-read SerializableStrategy/EXTRA_READ})
 
 (defn setup-transaction-tables
   [test schemata]
@@ -125,7 +134,11 @@
 
 (defn start-transaction
   [test]
-  (some-> test :transaction deref .start))
+  (if-let [isolation ((:isolation-level test) ISOLATION_LEVELS)]
+    (some-> test :transaction deref
+            (.start isolation
+                    ((:serializable-strategy test) SERIALIZABLE_STRATEGIES)))
+    (some-> test :transaction deref .start)))
 
 (defmacro with-retry
   [connect-fn test & body]

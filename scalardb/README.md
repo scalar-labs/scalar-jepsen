@@ -24,4 +24,5 @@ The current tests use [Cassandra test tools in Jepsen](https://github.com/scalar
     $ lein run test --test transfer --nemesis crash --join decommission --time-limit 300
     ```
 
+  - For elle-append test, `graphviz` is required
   - See `lein run test --help` for full options
