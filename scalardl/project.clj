@@ -16,10 +16,10 @@
                                        [javax.json/javax.json-api "1.1.4"]
                                        [com.google.inject/guice "4.2.0"]
                                        [com.google.api.grpc/proto-google-common-protos "1.0.0"]
-                                       [io.grpc/grpc-alts "1.13.2"]
-                                       [io.grpc/grpc-netty "1.13.2"]
-                                       [io.grpc/grpc-protobuf "1.13.2"]
-                                       [io.grpc/grpc-stub "1.13.2"]
+                                       [io.grpc/grpc-alts "1.31.1"]
+                                       [io.grpc/grpc-netty "1.31.1"]
+                                       [io.grpc/grpc-protobuf "1.31.1"]
+                                       [io.grpc/grpc-stub "1.31.1"]
                                        [org.glassfish/javax.json "1.1.4"]]
                         :resource-paths ["resources/client.jar"
                                          "resources/common.jar"
