@@ -108,6 +108,7 @@
                     (let [test (-> options
                                    (combine-nemesis nemesis joining clock)
                                    (assoc :db (cassandra/db))
+                                   (assoc :pure-generators true)
                                    (dissoc :test)
                                    test-fn
                                    jepsen/run!)]

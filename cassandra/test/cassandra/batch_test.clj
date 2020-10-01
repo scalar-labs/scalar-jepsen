@@ -98,7 +98,7 @@
           add-result (client/invoke! client {}
                                      {:type :invoke :f :add :value 1})]
       (is (= :info (:type add-result)))
-      (is (= :write-timed-out (:value add-result))))))
+      (is (= :write-timed-out (:error add-result))))))
 
 (deftest batch-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)

@@ -67,6 +67,7 @@
                                       (->> [(adds)]
                                            (conductors/std-gen opts))
                                       (conductors/terminate-nemesis opts)
-                                      (gen/delay 60 (read-once)))
+                                      (gen/sleep 60)
+                                      (read-once))
                           :checker   (checker/set)})
          opts))

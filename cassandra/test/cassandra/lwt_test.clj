@@ -153,7 +153,7 @@
                                  {:type :invoke :f :write
                                   :value (independent/tuple 0 1)})]
       (is (= :info (:type result)))
-      (is (= :write-timed-out (:value result))))))
+      (is (= :write-timed-out (:error result))))))
 
 (deftest lwt-client-unavailable-exception-test
   (with-redefs [alia/cluster (spy/spy)

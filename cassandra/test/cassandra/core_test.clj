@@ -188,17 +188,6 @@
         cassandra (cass/db)]
     (is (= [] (db/log-files cassandra test "n1")))))
 
-(deftest adds-test
-  (let [adds (cass/adds)]
-    (is (= {:type :invoke, :f :add, :value 0} (gen/op adds {} nil)))
-    (is (= {:type :invoke, :f :add, :value 1} (gen/op adds {} nil)))
-    (is (= {:type :invoke, :f :add, :value 2} (gen/op adds {} nil)))))
-
-(deftest read-once-test
-  (let [read-once (cass/read-once)]
-    (is (= {:f :read, :type :invoke} (gen/op read-once {} nil)))
-    (is (= nil (gen/op read-once {} nil)))))
-
 (deftest create-my-keyspace-test
   (with-redefs [alia/execute (spy/spy)]
     (let [test {:rf 3}
@@ -269,19 +258,19 @@
         no-host (ex-info "No host available"
                          {:type :execute
                           :exception (NoHostAvailableException. {})})]
-    (is (= {:type :info :value :write-timed-out}
+    (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op cas-timeout true)))
     (is (= {:type :ok}
            (cass/handle-exception op simple-timeout true)))
-    (is (= {:type :info :value :write-timed-out}
+    (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op simple-timeout)))
-    (is (= {:type :info :value :write-timed-out}
+    (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op batch-log-timeout)))
     (is (= {:type :ok}
            (cass/handle-exception op batch-timeout)))
     (is (= {:type :fail :error :read-timed-out}
            (cass/handle-exception op read-timeout)))
-    (is (= {:type :info :value :node-down}
+    (is (= {:type :info :error :node-down}
            (cass/handle-exception op node-down)))
     (is (= {:type :fail :error :unavailable}
            (cass/handle-exception op unavailable)))

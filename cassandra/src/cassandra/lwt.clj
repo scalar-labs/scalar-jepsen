@@ -98,10 +98,12 @@
                                            (:concurrency opts)
                                            (range)
                                            (fn [_]
-                                             (->> (gen/reserve (quot (:concurrency opts) 2)
-                                                               r (gen/mix [w cas cas]))
-                                                  (gen/stagger 0.1)
-                                                  (gen/limit 100))))
+                                             (->> (gen/reserve
+                                                    (quot (:concurrency opts) 2)
+                                                    r
+                                                    (gen/mix [w cas cas]))
+                                                  (gen/limit 100)
+                                                  (gen/process-limit (:concurrency opts)))))
                                           (gen/nemesis
                                            (conductors/mix-failure-seq opts))
                                           (gen/time-limit (:time-limit opts)))})

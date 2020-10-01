@@ -95,6 +95,7 @@
                          (let [test (-> options
                                         (car/combine-nemesis nemesis joining clock)
                                         (modify-decommissioned-node joining)
+                                        (assoc :pure-generators true)
                                         (dissoc :test)
                                         test-fn
                                         jepsen/run!)]
