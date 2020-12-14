@@ -142,6 +142,26 @@
          (throw (ex-info "Failed to read records"
                          {:cause "Failed to read records"}))))))
 
+(defn- retry-when-exception*
+  [tries f args fallback]
+  (when (pos? tries)
+    (let [res (try {:value (apply f args)}
+                   (catch Exception e
+                     (if (= tries 1)
+                       (throw e)
+                       {:exception e})))]
+      (if-let [e (:exception res)]
+        (do
+          (warn e)
+          (when fallback (fallback))
+          (c/exponential-backoff (- RETRIES tries))
+          (recur (dec tries) f args fallback))
+        (:value res)))))
+
+(defn retry-when-exception
+  [f args & fallback]
+  (retry-when-exception* RETRIES f args fallback))
+
 (defn- is-committed-state?
   "Return true if the status is COMMITTED. Return nil if the read fails."
   [coordinator id]
