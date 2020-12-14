@@ -68,13 +68,13 @@
   "Insert initial records with transaction.
   This method assumes that n is small (< 100)"
   [test n balance]
-  (let [tx (scalar/start-transaction test)]
-    (try
-      (dotimes [i n]
-        (.put tx (prepare-put i 1 balance)))
-      (.commit tx)
-      (catch Exception e
-        (throw (RuntimeException. (.getMessage e)))))))
+  (scalar/retry-when-exception
+   (fn [num]
+     (let [tx (scalar/start-transaction test)]
+       (dotimes [i num]
+         (.put tx (prepare-put i 1 balance)))
+       (.commit tx)))
+   [n]))
 
 (defn- get-balance
   [^Result result]
