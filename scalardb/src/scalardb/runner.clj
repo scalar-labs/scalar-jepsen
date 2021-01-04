@@ -15,7 +15,7 @@
   "A map of test names to test constructors."
   {"transfer"        scalardb.transfer/transfer-test
    "transfer-append" scalardb.transfer-append/transfer-append-test
-   "elle-append" scalardb.elle-append/elle-append-test})
+   "elle-append"     scalardb.elle-append/elle-append-test})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)
@@ -31,7 +31,12 @@
     :default :extra-write
     :parse-fn keyword
     :validate [#{:extra-write :extra-read}
-               "Should be one of extra-write or extra-read"]]])
+               "Should be one of extra-write or extra-read"]]
+
+   [nil "--consistency-model CONSISTENCY_MODEL"
+    "consistency model to be checked"
+    :default :snapshot-isolation
+    :parse-fn keyword]])
 
 (defn test-cmd
   []

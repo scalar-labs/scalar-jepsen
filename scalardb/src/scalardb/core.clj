@@ -5,16 +5,14 @@
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
-  (:import (com.scalar.db.api Isolation
-                              TransactionState)
+  (:import (com.scalar.db.api TransactionState)
            (com.scalar.db.config DatabaseConfig)
            (com.scalar.db.storage.cassandra Cassandra)
            (com.scalar.db.service StorageModule
                                   StorageService
                                   TransactionModule
                                   TransactionService)
-           (com.scalar.db.transaction.consensuscommit Coordinator
-                                                      SerializableStrategy)
+           (com.scalar.db.transaction.consensuscommit Coordinator)
            (com.google.inject Guice)
            (java.util Properties)))
 
@@ -26,12 +24,11 @@
 (def ^:private ^:const STATE_TABLE "state")
 (def ^:const VERSION "tx_version")
 
-(def ^:private ISOLATION_LEVELS {:snapshot Isolation/SNAPSHOT
-                                 :serializable Isolation/SERIALIZABLE})
+(def ^:private ISOLATION_LEVELS {:snapshot "SNAPSHOT"
+                                 :serializable "SERIALIZABLE"})
 
-(def ^:private SERIALIZABLE_STRATEGIES
-  {:extra-write SerializableStrategy/EXTRA_WRITE
-   :extra-read SerializableStrategy/EXTRA_READ})
+(def ^:private SERIALIZABLE_STRATEGIES {:extra-write "EXTRA_WRITE"
+                                        :extra-read "EXTRA_READ"})
 
 (defn setup-transaction-tables
   [test schemata]
@@ -51,11 +48,15 @@
     (c/close-cassandra cluster session)))
 
 (defn- create-properties
-  [nodes]
+  [test nodes]
   (doto (Properties.)
     (.setProperty "scalar.db.contact_points" (clojure.string/join "," nodes))
     (.setProperty "scalar.db.username" "cassandra")
-    (.setProperty "scalar.db.password" "cassandra")))
+    (.setProperty "scalar.db.password" "cassandra")
+    (.setProperty "scalar.db.isolation_level"
+                  ((:isolation-level test) ISOLATION_LEVELS))
+    (.setProperty "scalar.db.consensuscommit.serializable_strategy"
+                  ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))
 
 (defn- close-storage!
   [test]
@@ -84,7 +85,7 @@
   [test mode]
   (when-let [config (some->> (c/live-nodes test)
                              not-empty
-                             create-properties
+                             (create-properties test)
                              DatabaseConfig.)]
     (let [[module service] (condp = mode
                              :storage [(StorageModule. config)
@@ -134,11 +135,7 @@
 
 (defn start-transaction
   [test]
-  (if-let [isolation ((:isolation-level test) ISOLATION_LEVELS)]
-    (some-> test :transaction deref
-            (.start isolation
-                    ((:serializable-strategy test) SERIALIZABLE_STRATEGIES)))
-    (some-> test :transaction deref .start)))
+  (some-> test :transaction deref .start))
 
 (defmacro with-retry
   [connect-fn test & body]
