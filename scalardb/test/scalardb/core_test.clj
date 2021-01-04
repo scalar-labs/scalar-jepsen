@@ -41,13 +41,19 @@
 
 (deftest create-properties-test
   (let [nodes ["n1" "n2" "n3"]
-        properties (#'scalar/create-properties nodes)]
+        properties (#'scalar/create-properties
+                     {:isolation-level :serializable
+                      :serializable-strategy :extra-write} nodes)]
     (is (= "n1,n2,n3"
            (.getProperty properties "scalar.db.contact_points")))
     (is (= "cassandra"
            (.getProperty properties "scalar.db.username")))
     (is (= "cassandra"
-           (.getProperty properties "scalar.db.password")))))
+           (.getProperty properties "scalar.db.password")))
+    (is (= "SERIALIZABLE"
+           (.getProperty properties "scalar.db.isolation_level")))
+    (is (= "EXTRA_WRITE"
+           (.getProperty properties "scalar.db.consensuscommit.serializable_strategy")))))
 
 (defn- mock-result
   "This is only for Coordinator/get and this returns ID as `tx_state`"
