@@ -99,8 +99,8 @@
         (doseq [i (range DEFAULT_TABLE_COUNT)]
           (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
                                                   :table (str TABLE i)
-                                                  :schema SCHEMA}])
-          (scalar/prepare-transaction-service! test)))))
+                                                  :schema SCHEMA}]))
+        (scalar/prepare-transaction-service! test))))
 
   (invoke! [_ test op]
     (let [tx (scalar/start-transaction test)
@@ -112,10 +112,10 @@
 
         (catch UnknownTransactionStatusException _
           (swap! (:unknown-tx test) conj (.getId tx))
-          (assoc op :type :info :error [:unknown-tx-status (.getId tx)]))
+          (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
         (catch Exception e
           (scalar/try-reconnection! test)
-          (assoc op :type :fail :error [:crud-error (.getMessage e)])))))
+          (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
 
   (close! [_ _])
 

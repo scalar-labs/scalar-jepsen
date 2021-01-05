@@ -42,8 +42,8 @@
 (deftest create-properties-test
   (let [nodes ["n1" "n2" "n3"]
         properties (#'scalar/create-properties
-                     {:isolation-level :serializable
-                      :serializable-strategy :extra-write} nodes)]
+                    {:isolation-level :serializable
+                     :serializable-strategy :extra-write} nodes)]
     (is (= "n1,n2,n3"
            (.getProperty properties "scalar.db.contact_points")))
     (is (= "cassandra"
