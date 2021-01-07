@@ -32,9 +32,7 @@
     Result
     (getValue [this column]
       (if-let [v (get (@test-records id) (keyword column))]
-        (if (= "sk" column)
-          (->> v (IntValue. column) Optional/of)
-          (->> v (TextValue. column) Optional/of))
+        (->> v (TextValue. column) Optional/of)
         (Optional/empty)))))
 
 (defn- mock-get
@@ -48,11 +46,8 @@
 (defn- mock-put
   [^Put p]
   (let [id (-> p .getPartitionKey key->id)
-        sk (some-> p .getValues (get "sk") .get)
         v (some-> p .getValues (get "val") .getString .get)]
-    (if sk
-      (swap! test-records #(update % id assoc :sk sk :val v))
-      (swap! test-records #(update % id assoc :val v)))
+    (swap! test-records #(update % id assoc :val v))
     (swap! put-count inc)))
 
 (def mock-transaction
@@ -113,7 +108,7 @@
         (is (= 5 @get-count))
         (is (= 3 @put-count))
         (is (= 1 @commit-count))
-        (is (= {0 {} 1 {:sk 1 :val "0,1"} 2 {} 3 {:sk 3 :val "0"} 4 {}}
+        (is (= {0 {} 1 {:val "0,1"} 2 {} 3 {:val "0"} 4 {}}
                @test-records))
         (is (= :ok (:type result)))))))
 
