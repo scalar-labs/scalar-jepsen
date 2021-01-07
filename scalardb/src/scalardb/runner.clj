@@ -8,15 +8,35 @@
              [core :as jepsen]
              [cli :as cli]]
             [scalardb.transfer]
-            [scalardb.transfer_append]))
+            [scalardb.transfer_append]
+            [scalardb.elle_append]))
 
 (def tests
   "A map of test names to test constructors."
   {"transfer"        scalardb.transfer/transfer-test
-   "transfer-append" scalardb.transfer-append/transfer-append-test})
+   "transfer-append" scalardb.transfer-append/transfer-append-test
+   "elle-append"     scalardb.elle-append/elle-append-test})
 
 (def test-opt-spec
-  [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)])
+  [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)
+
+   [nil "--isolation-level ISOLATION_LEVEL" "isolation level"
+    :default :snapshot
+    :parse-fn keyword
+    :validate [#{:snapshot :serializable}
+               "Should be one of snapshot or serializable"]]
+
+   [nil "--serializable-strategy SERIALIZABLE_STRATEGY"
+    "serializable strategy"
+    :default :extra-write
+    :parse-fn keyword
+    :validate [#{:extra-write :extra-read}
+               "Should be one of extra-write or extra-read"]]
+
+   [nil "--consistency-model CONSISTENCY_MODEL"
+    "consistency model to be checked"
+    :default :snapshot-isolation
+    :parse-fn keyword]])
 
 (defn test-cmd
   []
