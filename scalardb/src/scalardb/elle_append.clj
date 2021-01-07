@@ -6,30 +6,26 @@
             [jepsen.tests.cycle.append :as append]
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
-  (:import (com.scalar.db.api Consistency
-                              Get
+  (:import (com.scalar.db.api Get
                               Put
                               PutIfNotExists
                               Result)
            (com.scalar.db.io IntValue
                              TextValue
                              Key)
-           (com.scalar.db.exception.transaction CommitException
-                                                CrudException
-                                                UnknownTransactionStatusException)))
+           (com.scalar.db.exception.transaction
+            UnknownTransactionStatusException)))
 
 (def ^:private ^:const KEYSPACE "jepsen")
 (def ^:private ^:const TABLE "txn")
 (def ^:private ^:const DEFAULT_TABLE_COUNT 3)
 (def ^:private ^:const SCHEMA {:id                     :int
-                               :sk                     :int
                                :val                    :text
                                :tx_id                  :text
                                :tx_version             :int
                                :tx_state               :int
                                :tx_prepared_at         :bigint
                                :tx_committed_at        :bigint
-                               :before_sk              :int
                                :before_val             :text
                                :before_tx_id           :text
                                :before_tx_version      :int
@@ -38,7 +34,6 @@
                                :before_tx_committed_at :bigint
                                :primary-key [:id]})
 (def ^:private ^:const ID "id")
-(def ^:private ^:const SK "sk")
 (def ^:private ^:const VALUE "val")
 
 (defn- prepare-get
@@ -57,7 +52,6 @@
                 (.withValue (TextValue. VALUE value)))]
     (if insert?
       (-> put
-          (.withValue (IntValue. SK id))
           (.withCondition (PutIfNotExists.)))
       put)))
 
