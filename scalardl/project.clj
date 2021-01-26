@@ -10,17 +10,14 @@
                  [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
-             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "2.0.9" :exclusions [log4j/log4j]]]}
+             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "2.1.0" :exclusions [log4j/log4j]]]}
              :use-jars {:dependencies [[org.bouncycastle/bcpkix-jdk15on "1.59"]
                                        [org.bouncycastle/bcprov-jdk15on "1.59"]
-                                       [javax.json/javax.json-api "1.1.4"]
                                        [com.google.inject/guice "4.2.0"]
-                                       [com.google.api.grpc/proto-google-common-protos "1.0.0"]
-                                       [io.grpc/grpc-alts "1.31.1"]
-                                       [io.grpc/grpc-netty "1.31.1"]
-                                       [io.grpc/grpc-protobuf "1.31.1"]
-                                       [io.grpc/grpc-stub "1.31.1"]
-                                       [org.glassfish/javax.json "1.1.4"]]
+                                       [com.moandjiezana.toml/toml4j "0.7.2"]
+                                       [com.google.protobuf/protobuf-java-util "3.13.0"]
+                                       [com.scalar-labs/scalar-admin "1.0.0"
+                                        :exclusions [org.slf4j/slf4j-log4j12]]]
                         :resource-paths ["resources/client.jar"
                                          "resources/common.jar"
                                          "resources/ledger-client.jar"
