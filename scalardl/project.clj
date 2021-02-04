@@ -18,9 +18,8 @@
                                        [com.google.protobuf/protobuf-java-util "3.13.0"]
                                        [com.scalar-labs/scalar-admin "1.0.0"
                                         :exclusions [org.slf4j/slf4j-log4j12]]]
-                        :resource-paths ["resources/client.jar"
+                        :resource-paths ["resources/scalardl-java-client-sdk.jar"
                                          "resources/common.jar"
-                                         "resources/ledger-client.jar"
                                          "resources/rpc.jar"]}
              :default [:base :system :user :provided :dev :use-released]}
   :java-source-paths ["contract"]
