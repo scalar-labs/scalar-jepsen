@@ -48,8 +48,10 @@
         (:value res)))))
 
 (defn retry-when-exception
-  [f args & fallback]
-  (retry-when-exception* RETRIES f args fallback))
+  ([f args]
+   (retry-when-exception f args nil))
+  ([f args fallback]
+   (retry-when-exception* RETRIES f args fallback)))
 
 (defn- create-client-properties
   [test]
