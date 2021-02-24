@@ -2,6 +2,7 @@
 
 # Run tests with Jepsen Docker
 1. Clone [Jepsen repository](https://github.com/jepsen-io/jepsen)
+    - Use 0.2.0 since 0.2.1+ uses newer debian version for DB nodes that does not have `openjdk-8-jre` package any more.
 2. Configure to mount `scalar-jepsen` directory by editing `${JEPSEN_ROOT}/docker/docker-compose.dev.yml` like the following
 
 ```yaml
@@ -17,6 +18,8 @@
 $ cd ${JEPSEN_ROOT}/docker
 $ ./up.sh --dev
 ```
+
+Note that you may need to update the `up.sh` script because there is an issue. See [this](https://github.com/jepsen-io/jepsen/issues/463) for more detail.
 
 4. Run tests in `jepsen-control`
   - You can login `jepsen-control` by the following command
