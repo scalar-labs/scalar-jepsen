@@ -76,8 +76,19 @@
                                            :primary-key            [:id :age]}})
       (cassandra/create-my-table {:keyspace "scalar"
                                   :table "asset_metadata"
-                                  :schema {:asset_id    :text
-                                           :latest_age  :int
+                                  :schema {:asset_id               :text
+                                           :latest_age             :int
+                                           :tx_committed_at        :bigint
+                                           :tx_id                  :text
+                                           :tx_prepared_at         :bigint
+                                           :tx_state               :int
+                                           :tx_version             :int
+                                           :before_latest_age      :int
+                                           :before_tx_committed_at :bigint
+                                           :before_tx_id           :text
+                                           :before_tx_prepared_at  :bigint
+                                           :before_tx_state        :int
+                                           :before_tx_version      :int
                                            :primary-key [:asset_id]}})
 
       (cassandra/create-my-table {:keyspace "scalar"
