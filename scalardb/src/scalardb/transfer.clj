@@ -1,6 +1,5 @@
 (ns scalardb.transfer
   (:require [cassandra.conductors :as conductors]
-            [clojure.tools.logging :refer [debug info warn]]
             [clojure.core.reducers :as r]
             [jepsen
              [client :as client]
@@ -14,8 +13,7 @@
                               Result)
            (com.scalar.db.io IntValue
                              Key)
-           (com.scalar.db.exception.transaction CommitException
-                                                CrudException
+           (com.scalar.db.exception.transaction CrudException
                                                 UnknownTransactionStatusException)))
 
 (def ^:private ^:const KEYSPACE "jepsen")
@@ -109,11 +107,11 @@
   [tx i]
   (try
     (.get tx (prepare-get i))
-    (catch CrudException e nil)))
+    (catch CrudException _ nil)))
 
 (defn- read-all-with-retry
   [test n]
-  (scalar/check-connection! test)
+  (scalar/check-transaction-connection! test)
   (scalar/with-retry scalar/prepare-transaction-service! test
     (let [tx (scalar/start-transaction test)
           results (map #(read-record tx %) (range n))]
@@ -139,14 +137,14 @@
                   (try
                     (tx-transfer tx (:value op))
                     (assoc op :type :ok)
-                    (catch UnknownTransactionStatusException e
+                    (catch UnknownTransactionStatusException _
                       (swap! (:unknown-tx test) conj (.getId tx))
                       (assoc op :type :fail :error {:unknown-tx-status (.getId tx)}))
                     (catch Exception e
-                      (scalar/try-reconnection! test)
+                      (scalar/try-reconnection-for-transaction! test)
                       (assoc op :type :fail :error (.getMessage e))))
                   (do
-                    (scalar/try-reconnection! test)
+                    (scalar/try-reconnection-for-transaction! test)
                     (assoc op :type :fail :error "Skipped due to no connection")))
       :get-all (if-let [results (read-all-with-retry test (:num op))]
                  (assoc op :type :ok :value {:balance (get-balances results)
@@ -183,7 +181,7 @@
    :num  (-> test :client :n)})
 
 (defn- check-tx
-  [test _]
+  [_ _]
   {:type :invoke
    :f    :check-tx})
 

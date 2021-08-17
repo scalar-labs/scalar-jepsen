@@ -6,8 +6,8 @@
             [scalardb.core :as scalar]
             [scalardb.transfer :as transfer]
             [spy.core :as spy])
-  (:import (com.scalar.db.api DistributedTransaction)
-           (com.scalar.db.api Get
+  (:import (com.scalar.db.api DistributedTransaction
+                              Get
                               Put
                               Result)
            (com.scalar.db.io IntValue
@@ -124,7 +124,7 @@
 
 (deftest transfer-client-transfer-no-tx-test
   (with-redefs [scalar/start-transaction (spy/stub nil)
-                scalar/try-reconnection! (spy/spy)]
+                scalar/try-reconnection-for-transaction! (spy/spy)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                nil nil)
           result (client/invoke! client
@@ -132,12 +132,12 @@
                                  (#'transfer/transfer {:client client}
                                                       nil))]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection!))
+      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-crud-exception-test
   (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
-                scalar/try-reconnection! (spy/spy)]
+                scalar/try-reconnection-for-transaction! (spy/spy)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                nil nil)
           result (client/invoke! client
@@ -145,14 +145,14 @@
                                  (#'transfer/transfer {:client client}
                                                       nil))]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection!))
+      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-unknown-exception-test
   (binding [get-count (atom 0)
             put-count (atom 0)]
     (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-unknown)
-                  scalar/try-reconnection! (spy/spy)]
+                  scalar/try-reconnection-for-transaction! (spy/spy)]
       (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                  nil nil)
             result (client/invoke! client
@@ -160,7 +160,7 @@
                                    (#'transfer/transfer {:client client}
                                                         nil))]
         (is (spy/called-once? scalar/start-transaction))
-        (is (spy/not-called? scalar/try-reconnection!))
+        (is (spy/not-called? scalar/try-reconnection-for-transaction!))
         (is (= 2 @get-count))
         (is (= 2 @put-count))
         (is (= :fail (:type result)))
@@ -169,20 +169,20 @@
 
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 1000 1 100 2 10 3 1 4 0})]
-    (with-redefs [scalar/check-connection! (spy/spy)
+    (with-redefs [scalar/check-transaction-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
       (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                  nil nil)
             result (client/invoke! client {}
                                    (#'transfer/get-all {:client client}
                                                        nil))]
-        (is (spy/called-once? scalar/check-connection!))
+        (is (spy/called-once? scalar/check-transaction-connection!))
         (is (= :ok (:type result)))
         (is (= [1000 100 10 1 0] (get-in result [:value :balance])))
         (is (= [1000 100 10 1 0] (get-in result [:value :version])))))))
 
 (deftest transfer-client-get-all-fail-test
-  (with-redefs [scalar/check-connection! (spy/spy)
+  (with-redefs [scalar/check-transaction-connection! (spy/spy)
                 cass/exponential-backoff (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]

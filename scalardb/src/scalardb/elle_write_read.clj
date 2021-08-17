@@ -1,15 +1,12 @@
 (ns scalardb.elle-write-read
   (:require [jepsen.checker :as checker]
-            [clojure.tools.logging :refer [debug info warn]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.tests.cycle.wr :as wr]
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
   (:import (com.scalar.db.api Get
-                              Put
-                              PutIfNotExists
-                              Result)
+                              Put)
            (com.scalar.db.io IntValue
                              Key)
            (com.scalar.db.exception.transaction
@@ -43,28 +40,20 @@
       (.forTable table)))
 
 (defn- prepare-put
-  [table id value insert?]
-  (let [put (-> (Key. [(IntValue. ID id)])
-                (Put.)
-                (.forNamespace KEYSPACE)
-                (.forTable table)
-                (.withValue (IntValue. VALUE value)))]
-    (if insert?
-      (.withCondition put (PutIfNotExists.))
-      put)))
+  [table id value]
+  (-> (Key. [(IntValue. ID id)])
+      (Put.)
+      (.forNamespace KEYSPACE)
+      (.forTable table)
+      (.withValue (IntValue. VALUE value))))
 
 (defn- get-value
   [r]
   (some-> r .get (.getValue VALUE) .get .get long))
 
-(defn- tx-insert
+(defn- tx-write
   [tx table id value]
-  (.put tx (prepare-put table id value true))
-  value)
-
-(defn- tx-update
-  [tx table id value]
-  (.put tx (prepare-put table id value false))
+  (.put tx (prepare-put table id value))
   value)
 
 (defn- tx-execute
@@ -73,9 +62,7 @@
         result (.get tx (prepare-get table k))]
     [f k (case f
            :r (when (.isPresent result) (get-value result))
-           :w (if (.isPresent result)
-                (tx-update tx table k v)
-                (tx-insert tx table k v)))]))
+           :w (tx-write tx table k v))]))
 
 (defrecord WriteReadClient [initialized?]
   client/Client
@@ -102,7 +89,7 @@
           (swap! (:unknown-tx test) conj (.getId tx))
           (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
         (catch Exception e
-          (scalar/try-reconnection! test)
+          (scalar/try-reconnection-for-transaction! test)
           (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
 
   (close! [_ _])

@@ -7,13 +7,13 @@
   (:import (com.scalar.db.api DistributedStorage
                               DistributedTransaction
                               DistributedTransactionManager
+                              TwoPhaseCommitTransaction
+                              TwoPhaseCommitTransactionManager
                               Get
                               Result)
            (com.scalar.db.io BigIntValue
                              IntValue
                              TextValue)
-           (com.scalar.db.service StorageService
-                                  TransactionService)
            (java.util Optional)))
 
 (deftest setup-transaction-tables-test
@@ -85,12 +85,27 @@
     (start [this] mock-transaction)
     (close [this])))
 
+(def mock-2pc
+  (reify
+    TwoPhaseCommitTransaction
+    (prepare [this])
+    (commit [this])))
+
+(def mock-2pc-manager
+  (reify
+    TwoPhaseCommitTransactionManager
+    (start [this] mock-2pc)
+    (join [this tx-id] mock-2pc)
+    (close [this])))
+
 (deftest close-all-test
   (let [test {:storage (atom mock-storage)
-              :transaction (atom mock-tx-manager)}]
+              :transaction (atom mock-tx-manager)
+              :2pc (atom mock-2pc-manager)}]
     (scalar/close-all! test)
     (is (nil? @(:storage test)))
-    (is (nil? @(:transaction test)))))
+    (is (nil? @(:transaction test)))
+    (is (nil? @(:2pc test)))))
 
 (deftest prepare-storage-service-test
   (with-redefs [c/live-nodes (spy/stub ["n1" "n2" "n3"])
@@ -122,7 +137,7 @@
                                                         (:transaction t)
                                                         mock-tx-manager)))]
     (let [test {:transaction (atom nil)}]
-      (scalar/check-connection! test)
+      (scalar/check-transaction-connection! test)
       (is (spy/called-once? scalar/prepare-transaction-service!))
       (is (= mock-tx-manager @(:transaction test))))))
 
@@ -134,13 +149,13 @@
                                                         mock-tx-manager)))]
     (let [test {:transaction (atom nil)
                 :failures (atom 999)}]
-      (scalar/try-reconnection! test)
+      (scalar/try-reconnection-for-transaction! test)
       (is (spy/called-once? scalar/prepare-transaction-service!))
       (is (= mock-tx-manager @(:transaction test)))
       (is (= 0 @(:failures test)))
 
       ;; the next one doesn't reconnect
-      (scalar/try-reconnection! test)
+      (scalar/try-reconnection-for-transaction! test)
       (is (spy/called-once? scalar/prepare-transaction-service!))
       (is (= 1 @(:failures test))))))
 
