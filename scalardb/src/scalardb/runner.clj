@@ -30,10 +30,10 @@
 
    [nil "--serializable-strategy SERIALIZABLE_STRATEGY"
     "serializable strategy"
-    :default :extra-write
+    :default :extra-read
     :parse-fn keyword
-    :validate [#{:extra-write :extra-read}
-               "Should be one of extra-write or extra-read"]]
+    :validate [#{:extra-read :extra-write}
+               "Should be one of extra-read or extra-write"]]
 
    [nil "--consistency-model CONSISTENCY_MODEL"
     "consistency model to be checked"

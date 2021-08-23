@@ -53,7 +53,7 @@
     (is (= "SERIALIZABLE"
            (.getProperty properties "scalar.db.isolation_level")))
     (is (= "EXTRA_WRITE"
-           (.getProperty properties "scalar.db.consensuscommit.serializable_strategy")))))
+           (.getProperty properties "scalar.db.consensus_commit.serializable_strategy")))))
 
 (defn- mock-result
   "This is only for Coordinator/get and this returns ID as `tx_state`"

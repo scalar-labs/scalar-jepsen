@@ -27,8 +27,8 @@
 (def ^:private ISOLATION_LEVELS {:snapshot "SNAPSHOT"
                                  :serializable "SERIALIZABLE"})
 
-(def ^:private SERIALIZABLE_STRATEGIES {:extra-write "EXTRA_WRITE"
-                                        :extra-read "EXTRA_READ"})
+(def ^:private SERIALIZABLE_STRATEGIES {:extra-read "EXTRA_READ"
+                                        :extra-write "EXTRA_WRITE"})
 
 (defn setup-transaction-tables
   [test schemata]
@@ -55,7 +55,7 @@
     (.setProperty "scalar.db.password" "cassandra")
     (.setProperty "scalar.db.isolation_level"
                   ((:isolation-level test) ISOLATION_LEVELS))
-    (.setProperty "scalar.db.consensuscommit.serializable_strategy"
+    (.setProperty "scalar.db.consensus_commit.serializable_strategy"
                   ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))
 
 (defn- close-storage!
