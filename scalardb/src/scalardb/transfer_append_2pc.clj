@@ -1,4 +1,4 @@
-(ns scalardb.transfer-append
+(ns scalardb.transfer-append-2pc
   (:require [cassandra.conductors :as conductors]
             [clojure.core.reducers :as r]
             [jepsen
@@ -104,18 +104,30 @@
   (-> r get-age inc))
 
 (defn- tx-transfer
-  [tx {:keys [from to amount]}]
-  (let [^Result from-result (scan-for-latest tx (prepare-scan-for-latest from))
-        ^Result to-result (scan-for-latest tx (prepare-scan-for-latest to))]
-    (->> (prepare-put from
-                      (calc-new-age from-result)
-                      (calc-new-balance from-result (- amount)))
-         (.put tx))
-    (->> (prepare-put to
-                      (calc-new-age to-result)
-                      (calc-new-balance to-result amount))
-         (.put tx))
-    (.commit tx)))
+  [tx1 tx2  {:keys [from to amount]}]
+  (try
+    (let [^Result from-result (scan-for-latest tx1 (prepare-scan-for-latest from))
+          ^Result to-result (scan-for-latest tx2 (prepare-scan-for-latest to))]
+      (->> (prepare-put from
+                        (calc-new-age from-result)
+                        (calc-new-balance from-result (- amount)))
+           (.put tx1))
+      (->> (prepare-put to
+                        (calc-new-age to-result)
+                        (calc-new-balance to-result amount))
+           (.put tx2)))
+    (.prepare tx1)
+    (.prepare tx2)
+    (.validate tx1)
+    (.validate tx2)
+    (.commit tx1)
+    (.commit tx2)
+    (catch UnknownTransactionStatusException e
+      (throw e))
+    (catch Exception e
+      (.rollback tx1)
+      (.rollback tx2)
+      (throw e))))
 
 (defn- scan-records
   [tx id]
@@ -142,24 +154,23 @@
         (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
                                                 :table TABLE
                                                 :schema SCHEMA}])
+        (scalar/prepare-2pc-service! test)
         (scalar/prepare-transaction-service! test)
         (populate-accounts test n initial-balance))))
 
   (invoke! [_ test op]
     (case (:f op)
-      :transfer (if-let [tx (scalar/start-transaction test)]
+      :transfer (let [tx1 (scalar/start-2pc test)
+                      tx2 (scalar/join-2pc test (.getId tx1))]
                   (try
-                    (tx-transfer tx (:value op))
+                    (tx-transfer tx1 tx2 (:value op))
                     (assoc op :type :ok)
                     (catch UnknownTransactionStatusException _
-                      (swap! (:unknown-tx test) conj (.getId tx))
-                      (assoc op :type :fail, :error {:unknown-tx-status (.getId tx)}))
+                      (swap! (:unknown-tx test) conj (.getId tx1))
+                      (assoc op :type :fail, :error {:unknown-tx-status (.getId tx1)}))
                     (catch Exception e
-                      (scalar/try-reconnection-for-transaction! test)
-                      (assoc op :type :fail, :error (.getMessage e))))
-                  (do
-                    (scalar/try-reconnection-for-transaction! test)
-                    (assoc op :type :fail, :error "Skipped due to no connection")))
+                      (scalar/try-reconnection-for-2pc! test)
+                      (assoc op :type :fail, :error (.getMessage e)))))
       :get-all (if-let [results (scan-all-records-with-retry test (:num op))]
                  (assoc op :type, :ok :value {:balance (get-balances results)
                                               :age (get-ages results)
@@ -236,9 +247,9 @@
          :bad-balance          bad-balance
          :bad-age              bad-age}))))
 
-(defn transfer-append-test
+(defn transfer-append-2pc-test
   [opts]
-  (merge (scalar/scalardb-test (str "transfer-append-" (:suffix opts))
+  (merge (scalar/scalardb-test (str "transfer-append-2pc-" (:suffix opts))
                                {:client     (TransferClient. (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
                                 :unknown-tx (atom #{})
                                 :failures   (atom 0)

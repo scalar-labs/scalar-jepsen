@@ -1,17 +1,18 @@
 (ns scalardb.core
   (:require [cassandra.core :as c]
-            [clojure.tools.logging :refer [debug info warn]]
+            [clojure.string :as string]
+            [clojure.tools.logging :refer [info warn]]
             [jepsen.tests :as tests]
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
   (:import (com.scalar.db.api TransactionState)
            (com.scalar.db.config DatabaseConfig)
-           (com.scalar.db.storage.cassandra Cassandra)
            (com.scalar.db.service StorageModule
                                   StorageService
                                   TransactionModule
-                                  TransactionService)
+                                  TransactionService
+                                  TwoPhaseCommitTransactionService)
            (com.scalar.db.transaction.consensuscommit Coordinator)
            (com.google.inject Guice)
            (java.util Properties)))
@@ -40,17 +41,17 @@
 
     (c/create-my-keyspace session test {:keyspace COORDINATOR})
     (c/create-my-table session {:keyspace COORDINATOR
-                                :table STATE_TABLE
-                                :schema {:tx_id         :text
-                                         :tx_state      :int
-                                         :tx_created_at :bigint
-                                         :primary-key   [:tx_id]}})
+                                :table    STATE_TABLE
+                                :schema   {:tx_id         :text
+                                           :tx_state      :int
+                                           :tx_created_at :bigint
+                                           :primary-key   [:tx_id]}})
     (c/close-cassandra cluster session)))
 
 (defn- create-properties
   [test nodes]
   (doto (Properties.)
-    (.setProperty "scalar.db.contact_points" (clojure.string/join "," nodes))
+    (.setProperty "scalar.db.contact_points" (string/join "," nodes))
     (.setProperty "scalar.db.username" "cassandra")
     (.setProperty "scalar.db.password" "cassandra")
     (.setProperty "scalar.db.isolation_level"
@@ -76,10 +77,20 @@
         (reset! transaction nil)
         (info "The current transaction service closed")))))
 
+(defn- close-2pc!
+  [test]
+  (let [tx (:2pc test)]
+    (locking tx
+      (when @tx
+        (.close @tx)
+        (reset! tx nil)
+        (info "The current 2pc service closed")))))
+
 (defn close-all!
   [test]
   (close-storage! test)
-  (close-transaction! test))
+  (close-transaction! test)
+  (close-2pc! test))
 
 (defn- create-service-instance
   [test mode]
@@ -91,7 +102,9 @@
                              :storage [(StorageModule. config)
                                        StorageService]
                              :transaction [(TransactionModule. config)
-                                           TransactionService])
+                                           TransactionService]
+                             :2pc [(TransactionModule. config)
+                                   TwoPhaseCommitTransactionService])
           injector (Guice/createInjector (vector module))]
       (try
         (.getInstance injector service)
@@ -100,9 +113,10 @@
 
 (defn- prepare-service!
   [test mode]
-  (if (= mode :storage)
-    (close-storage! test)
-    (close-transaction! test))
+  (condp = mode
+    :storage (close-storage! test)
+    :transaction (close-transaction! test)
+    :2pc (close-2pc! test))
   (info "reconnecting to the cluster")
   (loop [tries RETRIES]
     (when (< tries RETRIES)
@@ -122,24 +136,42 @@
   [test]
   (prepare-service! test :transaction))
 
-(defn check-connection!
+(defn prepare-2pc-service!
+  [test]
+  (prepare-service! test :2pc))
+
+(defn check-transaction-connection!
   [test]
   (when-not @(:transaction test)
     (prepare-transaction-service! test)))
 
-(defn try-reconnection!
+(defn try-reconnection-for-transaction!
   [test]
   (when (= (swap! (:failures test) inc) NUM_FAILURES_FOR_RECONNECTION)
     (prepare-transaction-service! test)
+    (reset! (:failures test) 0)))
+
+(defn try-reconnection-for-2pc!
+  [test]
+  (when (= (swap! (:failures test) inc) NUM_FAILURES_FOR_RECONNECTION)
+    (prepare-2pc-service! test)
     (reset! (:failures test) 0)))
 
 (defn start-transaction
   [test]
   (some-> test :transaction deref .start))
 
+(defn start-2pc
+  [test]
+  (some-> test :2pc deref .start))
+
+(defn join-2pc
+  [test tx-id]
+  (some-> test :2pc deref (.join tx-id)))
+
 (defmacro with-retry
-  [connect-fn test & body]
   "If the result of the body is nil, it retries it"
+  [connect-fn test & body]
   `(loop [tries# RETRIES]
      (when (< tries# RETRIES)
        (c/exponential-backoff (- RETRIES tries#)))
@@ -179,7 +211,7 @@
     (let [state (.getState coordinator id)]
       (and (.isPresent state)
            (-> state .get .getState (.equals TransactionState/COMMITTED))))
-    (catch Exception e nil)))
+    (catch Exception _ nil)))
 
 (defn check-transaction-states
   "Return the number of COMMITTED states by checking the coordinator."
@@ -201,5 +233,6 @@
   (merge tests/noop-test
          {:name        (str "scalardb-" name)
           :storage     (atom nil)
-          :transaction (atom nil)}
+          :transaction (atom nil)
+          :2pc (atom nil)}
          opts))

@@ -1,15 +1,13 @@
-(ns scalardb.elle-append
-  (:require [clojure.string :as str]
-            [jepsen.checker :as checker]
+(ns scalardb.elle-write-read-2pc
+  (:require [jepsen.checker :as checker]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
-            [jepsen.tests.cycle.append :as append]
+            [jepsen.tests.cycle.wr :as wr]
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
-                             TextValue
                              Key)
            (com.scalar.db.exception.transaction
             UnknownTransactionStatusException)))
@@ -18,13 +16,13 @@
 (def ^:private ^:const TABLE "txn")
 (def ^:private ^:const DEFAULT_TABLE_COUNT 3)
 (def ^:private ^:const SCHEMA {:id                     :int
-                               :val                    :text
+                               :val                    :int
                                :tx_id                  :text
                                :tx_version             :int
                                :tx_state               :int
                                :tx_prepared_at         :bigint
                                :tx_committed_at        :bigint
-                               :before_val             :text
+                               :before_val             :int
                                :before_tx_id           :text
                                :before_tx_version      :int
                                :before_tx_state        :int
@@ -47,39 +45,31 @@
       (Put.)
       (.forNamespace KEYSPACE)
       (.forTable table)
-      (.withValue (TextValue. VALUE value))))
+      (.withValue (IntValue. VALUE value))))
 
 (defn- get-value
   [r]
-  (some-> r .get (.getValue VALUE) .get .getString .get))
+  (some-> r .get (.getValue VALUE) .get .get long))
 
-(defn- tx-insert
+(defn- tx-write
   [tx table id value]
-  (.put tx (prepare-put table id value)))
-
-(defn- tx-update
-  [tx table id prev value]
-  (.put tx (prepare-put table id (str prev "," value))))
+  (.put tx (prepare-put table id value))
+  value)
 
 (defn- tx-execute
-  [tx [f k v]]
-  (let [table (str TABLE (mod (hash k) DEFAULT_TABLE_COUNT))]
+  [tx1 tx2 [f k v]]
+  (let [key_hash (hash k)
+        table (str TABLE (mod key_hash DEFAULT_TABLE_COUNT))
+        tx (if (= (mod key_hash 2) 0) tx1 tx2)
+        result (.get tx (prepare-get table k))]
     [f k (case f
-           :r (let [result (.get tx (prepare-get table k))]
-                (when (.isPresent result)
-                  (mapv #(Long/valueOf %)
-                        (str/split (get-value result) #","))))
-           :append (let [v' (str v)
-                         result (.get tx (prepare-get table k))]
-                     (if (.isPresent result)
-                       (tx-update tx table k (get-value result) v')
-                       (tx-insert tx table k v'))
-                     v))]))
+           :r (when (.isPresent result) (get-value result))
+           :w (tx-write tx table k v))]))
 
-(defrecord AppendClient [initialized?]
+(defrecord WriteReadClient [initialized?]
   client/Client
   (open! [_ _ _]
-    (AppendClient. initialized?))
+    (WriteReadClient. initialized?))
 
   (setup! [_ test]
     (locking initialized?
@@ -88,21 +78,28 @@
           (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
                                                   :table (str TABLE i)
                                                   :schema SCHEMA}]))
-        (scalar/prepare-transaction-service! test))))
+        (scalar/prepare-2pc-service! test))))
 
   (invoke! [_ test op]
-    (let [tx (scalar/start-transaction test)
+    (let [tx1 (scalar/start-2pc test)
+          tx2 (scalar/join-2pc test (.getId tx1))
           txn (:value op)]
       (try
-        (let [txn' (mapv (partial tx-execute tx) txn)]
-          (.commit tx)
+        (let [txn' (mapv (partial tx-execute tx1 tx2) txn)]
+          (.prepare tx1)
+          (.prepare tx2)
+          (.validate tx1)
+          (.validate tx2)
+          (.commit tx1)
+          (.commit tx2)
           (assoc op :type :ok :value txn'))
-
         (catch UnknownTransactionStatusException _
-          (swap! (:unknown-tx test) conj (.getId tx))
-          (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
+          (swap! (:unknown-tx test) conj (.getId tx1))
+          (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
         (catch Exception e
-          (scalar/try-reconnection-for-transaction! test)
+          (.rollback tx1)
+          (.rollback tx2)
+          (scalar/try-reconnection-for-2pc! test)
           (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
 
   (close! [_ _])
@@ -110,26 +107,29 @@
   (teardown! [_ test]
     (scalar/close-all! test)))
 
-(defn- append-test
-  [opts]
-  (append/test {:key-count 10
-                :min-txn-length 1
-                :max-txn-length 10
-                :max-writes-per-key 10
-                :consistency-models [(:consistency-model opts)]}))
+(defn- write-read-gen
+  []
+  (wr/gen {:key-count 10
+           :min-txn-length 1
+           :max-txn-length 10
+           :max-writes-per-key 10}))
 
-(defn elle-append-test
+(defn- write-read-checker
   [opts]
-  (merge (scalar/scalardb-test (str "elle-append-" (:suffix opts))
+  (wr/checker {:consistency-models [(:consistency-model opts)]}))
+
+(defn elle-write-read-2pc-test
+  [opts]
+  (merge (scalar/scalardb-test (str "elle-wr-2pc-" (:suffix opts))
                                {:unknown-tx (atom #{})
                                 :failures (atom 0)
                                 :generator (gen/phases
-                                            (->> (:generator (append-test opts))
+                                            (->> (write-read-gen)
                                                  (gen/nemesis
                                                   (cond/mix-failure-seq opts))
                                                  (gen/time-limit
                                                   (:time-limit opts))))
-                                :client (AppendClient. (atom false))
+                                :client (WriteReadClient. (atom false))
                                 :checker (checker/compose
                                           {:clock
                                            (checker/clock-plot)
@@ -138,5 +138,5 @@
                                            :exceptions
                                            (checker/unhandled-exceptions)
                                            :workload
-                                           (:checker (append-test opts))})})
+                                           (write-read-checker opts)})})
          opts))
