@@ -1,5 +1,5 @@
 (ns scalardb.elle-write-read
-  (:require [jepsen.checker :as checker]
+  (:require [clojure.tools.logging :refer [debug info warn]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
@@ -148,9 +148,5 @@
                             (cond/mix-failure-seq opts))
                            (gen/time-limit (:time-limit opts)))
            :client (WriteReadClient. (atom false))
-           :checker (independent/checker
-                     (checker/compose
-                      {:stats (checker/stats)
-                       :exceptions (checker/unhandled-exceptions)
-                       :workload (write-read-checker opts)}))})
+           :checker (scalar/independent-checker (write-read-checker opts))})
          opts))

@@ -1,7 +1,6 @@
 (ns scalardb.elle-append
   (:require [clojure.string :as str]
             [clojure.tools.logging :refer [debug info warn]]
-            [jepsen.checker :as checker]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
@@ -112,7 +111,7 @@
   (invoke! [_ test op]
     (let [tx (scalar/start-transaction test)
           [seq-id txn] (:value op)]
-      (when-not (> @(:table-id test) seq-id)
+      (when (<= @(:table-id test) seq-id)
         ;; add tables for the next sequence
         (add-tables test (inc seq-id)))
       (try
@@ -158,9 +157,5 @@
                             (cond/mix-failure-seq opts))
                            (gen/time-limit (:time-limit opts)))
            :client (AppendClient. (atom false))
-           :checker (independent/checker
-                     (checker/compose
-                      {:stats (checker/stats)
-                       :exceptions (checker/unhandled-exceptions)
-                       :workload (:checker (append-test opts))}))})
+           :checker (scalar/independent-checker (:checker (append-test opts)))})
          opts))
