@@ -1,5 +1,5 @@
 (ns scalardb.elle-write-read
-  (:require [clojure.tools.logging :refer [debug info warn]]
+  (:require [clojure.tools.logging :refer [info]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]

@@ -1,6 +1,6 @@
 (ns scalardb.elle-append
   (:require [clojure.string :as str]
-            [clojure.tools.logging :refer [debug info warn]]
+            [clojure.tools.logging :refer [info]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
