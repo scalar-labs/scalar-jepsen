@@ -1,8 +1,9 @@
 (ns scalardb.elle-append-2pc
   (:require [clojure.string :as str]
-            [jepsen.checker :as checker]
+            [clojure.tools.logging :refer [info]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
+            [jepsen.independent :as independent]
             [jepsen.tests.cycle.append :as append]
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
@@ -16,6 +17,7 @@
 
 (def ^:private ^:const KEYSPACE "jepsen")
 (def ^:private ^:const TABLE "txn")
+(def ^:private ^:const NUM_TABLE_ID_COUNT 2)
 (def ^:private ^:const DEFAULT_TABLE_COUNT 3)
 (def ^:private ^:const SCHEMA {:id                     :int
                                :val                    :text
@@ -62,9 +64,9 @@
   (.put tx (prepare-put table id (str prev "," value))))
 
 (defn- tx-execute
-  [tx1 tx2 [f k v]]
+  [seq-id tx1 tx2 [f k v]]
   (let [key_hash (hash k)
-        table (str TABLE (mod key_hash DEFAULT_TABLE_COUNT))
+        table (str TABLE seq-id \_ (mod key_hash DEFAULT_TABLE_COUNT))
         tx (if (= (mod key_hash 2) 0) tx1 tx2)
         result (.get tx (prepare-get table k))]
     [f k (case f
@@ -76,6 +78,21 @@
                        (tx-insert tx table k v'))
                      v))]))
 
+(defn- add-tables
+  [test next-id]
+  (let [current-id @(:table-id test)]
+    (when (< current-id next-id)
+      (locking (:table-id test)
+        (when (compare-and-set! (:table-id test) current-id next-id)
+          (info (str "Creating new tables for " next-id))
+          (doseq [i (range DEFAULT_TABLE_COUNT)]
+            (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                                    :table (str TABLE
+                                                                next-id
+                                                                \_
+                                                                i)
+                                                    :schema SCHEMA}])))))))
+
 (defrecord AppendClient [initialized?]
   client/Client
   (open! [_ _ _]
@@ -84,25 +101,29 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (doseq [i (range DEFAULT_TABLE_COUNT)]
+        (doseq [id (range NUM_TABLE_ID_COUNT)
+                i (range DEFAULT_TABLE_COUNT)]
           (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                  :table (str TABLE i)
+                                                  :table (str TABLE id \_ i)
                                                   :schema SCHEMA}]))
         (scalar/prepare-2pc-service! test))))
 
   (invoke! [_ test op]
     (let [tx1 (scalar/start-2pc test)
           tx2 (scalar/join-2pc test (.getId tx1))
-          txn (:value op)]
+          [seq-id txn] (:value op)]
+      (when (<= @(:table-id test) seq-id)
+        ;; add tables for the next sequence
+        (add-tables test (inc seq-id)))
       (try
-        (let [txn' (mapv (partial tx-execute tx1 tx2) txn)]
+        (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
           (.prepare tx1)
           (.prepare tx2)
           (.validate tx1)
           (.validate tx2)
           (.commit tx1)
           (.commit tx2)
-          (assoc op :type :ok :value txn'))
+          (assoc op :type :ok :value (independent/tuple seq-id txn')))
         (catch UnknownTransactionStatusException _
           (swap! (:unknown-tx test) conj (.getId tx1))
           (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
@@ -127,23 +148,22 @@
 
 (defn elle-append-2pc-test
   [opts]
-  (merge (scalar/scalardb-test (str "elle-append-2pc-" (:suffix opts))
-                               {:unknown-tx (atom #{})
-                                :failures (atom 0)
-                                :generator (gen/phases
-                                            (->> (:generator (append-test opts))
-                                                 (gen/nemesis
-                                                  (cond/mix-failure-seq opts))
-                                                 (gen/time-limit
-                                                  (:time-limit opts))))
-                                :client (AppendClient. (atom false))
-                                :checker (checker/compose
-                                          {:clock
-                                           (checker/clock-plot)
-                                           :stats
-                                           (checker/stats)
-                                           :exceptions
-                                           (checker/unhandled-exceptions)
-                                           :workload
-                                           (:checker (append-test opts))})})
+  (merge (scalar/scalardb-test
+          (str "elle-append-2pc-" (:suffix opts))
+          {:table-id (atom (dec NUM_TABLE_ID_COUNT))
+           :unknown-tx (atom #{})
+           :failures (atom 0)
+           :generator (->> (independent/concurrent-generator
+                            (:concurrency opts)
+                            (range)
+                            (fn [_]
+                              (->> (:generator (append-test opts))
+                                   (gen/limit 100)
+                                   (gen/process-limit
+                                    (:concurrency opts)))))
+                           (gen/nemesis
+                            (cond/mix-failure-seq opts))
+                           (gen/time-limit (:time-limit opts)))
+           :client (AppendClient. (atom false))
+           :checker (scalar/independent-checker (:checker (append-test opts)))})
          opts))

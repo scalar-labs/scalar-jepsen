@@ -2,6 +2,8 @@
   (:require [cassandra.core :as c]
             [clojure.string :as string]
             [clojure.tools.logging :refer [info warn]]
+            [jepsen.checker :as checker]
+            [jepsen.independent :as independent]
             [jepsen.tests :as tests]
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
@@ -227,6 +229,37 @@
             nil
             (count (filter true? committed))))))
     0))
+
+(defn- independent-stats-checker
+  []
+  (reify checker/Checker
+    (check [_ test history opts]
+      (let [result (checker/check (checker/stats) test history opts)]
+        ;; ignore if no transaction succeeded
+        (if (and (not (:valid? result))
+                 (zero? (:ok-count result)))
+          (assoc result :valid? true)
+          result)))))
+
+(defn- independent-workload-checker
+  [workload-checker]
+  (reify checker/Checker
+    (check [_ test history opts]
+      (let [result (checker/check workload-checker test history opts)]
+        ;; ignore if no transaction succeeded
+        (if (and (= (:valid? result) :unknown)
+                 (= (:anomalies result) {:empty-transaction-graph true}))
+          (assoc result :valid? true)
+          result)))))
+
+(defn independent-checker
+  "wrapped checker for jepsen/independent"
+  [workload-checker]
+  (independent/checker
+   (checker/compose
+    {:stats (independent-stats-checker)
+     :exceptions (checker/unhandled-exceptions)
+     :workload (independent-workload-checker workload-checker)})))
 
 (defn scalardb-test
   [name opts]

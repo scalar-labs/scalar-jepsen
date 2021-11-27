@@ -78,12 +78,12 @@
                                nil nil)]
       (client/setup! client nil)
       (is (true? @(:initialized? client)))
-      (is (spy/called-n-times? scalar/setup-transaction-tables 3))
+      (is (spy/called-n-times? scalar/setup-transaction-tables 6))
       (is (spy/called-once? scalar/prepare-transaction-service!))
 
         ;; setup isn't executed
       (client/setup! client nil)
-      (is (spy/called-n-times? scalar/setup-transaction-tables 3)))))
+      (is (spy/called-n-times? scalar/setup-transaction-tables 6)))))
 
 (deftest append-client-invoke-test
   (binding [test-records (atom {0 {} 1 {} 2 {} 3 {} 4 {}})
@@ -95,14 +95,16 @@
                                  nil nil)
             result (client/invoke! client
                                    {:isolation-level :serializable
-                                    :serializable-strategy :extra-write}
+                                    :serializable-strategy :extra-write
+                                    :table-id (atom 1)}
                                    {:type :invoke
                                     :f :txn
-                                    :value [[:r 1 nil]
-                                            [:append 1 0]
-                                            [:r 0 nil]
-                                            [:append 1 1]
-                                            [:append 3 0]]})]
+                                    :value [0
+                                            [[:r 1 nil]
+                                             [:append 1 0]
+                                             [:r 0 nil]
+                                             [:append 1 1]
+                                             [:append 3 0]]]})]
         (is (spy/called-once? scalar/start-transaction))
         (is (= 5 @get-count))
         (is (= 3 @put-count))
@@ -118,10 +120,11 @@
                                nil nil)
           result (client/invoke! client
                                  {:isolation-level :serializable
-                                  :serializable-strategy :extra-write}
+                                  :serializable-strategy :extra-write
+                                  :table-id (atom 1)}
                                  {:type :invoke
                                   :f :txn
-                                  :value [[:r 1 nil]]})]
+                                  :value [0 [[:r 1 nil]]]})]
       (is (spy/called-once? scalar/start-transaction))
       (is (spy/called-once? scalar/try-reconnection-for-transaction!))
       (is (= :fail (:type result))))))
@@ -136,11 +139,13 @@
             result (client/invoke! client
                                    {:isolation-level :serializable
                                     :serializable-strategy :extra-write
+                                    :table-id (atom 1)
                                     :unknown-tx (atom #{})}
                                    {:type :invoke
                                     :f :txn
-                                    :value [[:r 1 nil]
-                                            [:append 1 0]]})]
+                                    :value [0
+                                            [[:r 1 nil]
+                                             [:append 1 0]]]})]
         (is (spy/called-once? scalar/start-transaction))
         (is (spy/not-called? scalar/try-reconnection-for-transaction!))
         (is (= 2 @get-count))

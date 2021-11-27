@@ -1,7 +1,8 @@
 (ns scalardb.elle-write-read
-  (:require [jepsen.checker :as checker]
+  (:require [clojure.tools.logging :refer [info]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
+            [jepsen.independent :as independent]
             [jepsen.tests.cycle.wr :as wr]
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
@@ -14,6 +15,7 @@
 
 (def ^:private ^:const KEYSPACE "jepsen")
 (def ^:private ^:const TABLE "txn")
+(def ^:private ^:const NUM_TABLE_ID_COUNT 2)
 (def ^:private ^:const DEFAULT_TABLE_COUNT 3)
 (def ^:private ^:const SCHEMA {:id                     :int
                                :val                    :int
@@ -57,12 +59,27 @@
   value)
 
 (defn- tx-execute
-  [tx [f k v]]
-  (let [table (str TABLE (mod (hash k) DEFAULT_TABLE_COUNT))
+  [seq-id tx [f k v]]
+  (let [table (str TABLE seq-id \_ (mod (hash k) DEFAULT_TABLE_COUNT))
         result (.get tx (prepare-get table k))]
     [f k (case f
            :r (when (.isPresent result) (get-value result))
            :w (tx-write tx table k v))]))
+
+(defn- add-tables
+  [test next-id]
+  (let [current-id @(:table-id test)]
+    (when (< current-id next-id)
+      (locking (:table-id test)
+        (when (compare-and-set! (:table-id test) current-id next-id)
+          (info (str "Creating new tables for " next-id))
+          (doseq [i (range DEFAULT_TABLE_COUNT)]
+            (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                                    :table (str TABLE
+                                                                next-id
+                                                                \_
+                                                                i)
+                                                    :schema SCHEMA}])))))))
 
 (defrecord WriteReadClient [initialized?]
   client/Client
@@ -72,19 +89,23 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (doseq [i (range DEFAULT_TABLE_COUNT)]
+        (doseq [id (range NUM_TABLE_ID_COUNT)
+                i (range DEFAULT_TABLE_COUNT)]
           (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                  :table (str TABLE i)
+                                                  :table (str TABLE id \_ i)
                                                   :schema SCHEMA}]))
         (scalar/prepare-transaction-service! test))))
 
   (invoke! [_ test op]
     (let [tx (scalar/start-transaction test)
-          txn (:value op)]
+          [seq-id txn] (:value op)]
+      (when (<= @(:table-id test) seq-id)
+        ;; add tables for the next sequence
+        (add-tables test (inc seq-id)))
       (try
-        (let [txn' (mapv (partial tx-execute tx) txn)]
+        (let [txn' (mapv (partial tx-execute seq-id tx) txn)]
           (.commit tx)
-          (assoc op :type :ok :value txn'))
+          (assoc op :type :ok :value (independent/tuple seq-id txn')))
         (catch UnknownTransactionStatusException _
           (swap! (:unknown-tx test) conj (.getId tx))
           (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
@@ -110,23 +131,22 @@
 
 (defn elle-write-read-test
   [opts]
-  (merge (scalar/scalardb-test (str "elle-wr-" (:suffix opts))
-                               {:unknown-tx (atom #{})
-                                :failures (atom 0)
-                                :generator (gen/phases
-                                            (->> (write-read-gen)
-                                                 (gen/nemesis
-                                                  (cond/mix-failure-seq opts))
-                                                 (gen/time-limit
-                                                  (:time-limit opts))))
-                                :client (WriteReadClient. (atom false))
-                                :checker (checker/compose
-                                          {:clock
-                                           (checker/clock-plot)
-                                           :stats
-                                           (checker/stats)
-                                           :exceptions
-                                           (checker/unhandled-exceptions)
-                                           :workload
-                                           (write-read-checker opts)})})
+  (merge (scalar/scalardb-test
+          (str "elle-wr-" (:suffix opts))
+          {:table-id (atom (dec NUM_TABLE_ID_COUNT))
+           :unknown-tx (atom #{})
+           :failures (atom 0)
+           :generator (->> (independent/concurrent-generator
+                            (:concurrency opts)
+                            (range)
+                            (fn [_]
+                              (->> write-read-gen
+                                   (gen/limit 100)
+                                   (gen/process-limit
+                                    (:concurrency opts)))))
+                           (gen/nemesis
+                            (cond/mix-failure-seq opts))
+                           (gen/time-limit (:time-limit opts)))
+           :client (WriteReadClient. (atom false))
+           :checker (scalar/independent-checker (write-read-checker opts))})
          opts))

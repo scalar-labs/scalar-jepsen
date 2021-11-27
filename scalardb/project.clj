@@ -9,8 +9,12 @@
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
              :use-released {:dependencies [[com.scalar-labs/scalardb "3.2.0"
-                                            :exclusions [software.amazon.awssdk/core
-                                                         com.oracle.database.jdbc/ojdbc8-production]]]}
+                                            ;; avoid the netty dependency issue
+                                            :exclusions [software.amazon.awssdk/*
+                                                         com.oracle.database.jdbc/ojdbc8-production
+                                                         com.azure/azure-cosmos
+                                                         io.grpc/grpc-core
+                                                         com.scalar-labs/scalardb-rpc]]]}
              :use-jars {:dependencies [[com.google.inject/guice "4.2.0"]
                                        [com.google.guava/guava "24.1-jre"]]
                         :resource-paths ["resources/scalardb.jar"]}
