@@ -95,7 +95,7 @@
    (fn start [test node] (meh (c/su (c/exec :killall :-9 :java))) [:killed node])
    (fn stop  [test node]
      (meh (cass/guarded-start! node test))
-     (Thread/sleep (* 1000 60))
+     (meh (cass/wait-ready node 300 10 test))
      [:restarted node])))
 
 ;; empty nemesis

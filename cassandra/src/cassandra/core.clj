@@ -202,13 +202,26 @@
   (stop! node)
   (delete-data! test node true))
 
+(defn wait-ready
+  "Wait until the Cassandra node is ready. Check the readiness each interval-sec."
+  [node timeout-sec interval-sec test]
+  (try
+    (c/exec (lit (str (:cassandra-dir test) "/bin/cqlsh " node))
+            :-e (lit "'describe cluster'"))
+    (catch Exception e
+      (info (str "wating for " node))
+      (Thread/sleep (* interval-sec 1000))
+      (if (>= timeout-sec interval-sec)
+        (wait-ready node (- timeout-sec interval-sec) interval-sec test)
+        (throw (ex-info "The Cassandra node failed to start" {:causes e}))))))
+
 (defn wait-turn
   "A node has to wait because Cassandra node can't start when another node is bootstrapping"
-  [node {:keys [decommissioned nodes]}]
-  (let [indexed-nodes (zipmap nodes (range (count nodes)))
-        idx (indexed-nodes node)]
+  [node {:keys [decommissioned nodes] :as test}]
+  (let [starting-nodes (filter #(not (contains? @decommissioned %)) nodes)
+        ready-nodes (take-while #(not= % node) starting-nodes)]
     (when-not (@decommissioned node)
-      (Thread/sleep (* 1000 60 idx)))))
+      (mapv #(wait-ready % 300 10 test) ready-nodes))))
 
 (defn db
   "Setup Cassandra."
