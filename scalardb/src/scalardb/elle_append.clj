@@ -111,10 +111,10 @@
   (invoke! [_ test op]
     (let [tx (scalar/start-transaction test)
           [seq-id txn] (:value op)]
-      (when (<= @(:table-id test) seq-id)
-        ;; add tables for the next sequence
-        (add-tables test (inc seq-id)))
       (try
+        (when (<= @(:table-id test) seq-id)
+          ;; add tables for the next sequence
+          (add-tables test (inc seq-id)))
         (let [txn' (mapv (partial tx-execute seq-id tx) txn)]
           (.commit tx)
           (assoc op :type :ok :value (independent/tuple seq-id txn')))

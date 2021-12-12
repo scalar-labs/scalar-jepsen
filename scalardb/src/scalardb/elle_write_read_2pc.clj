@@ -102,10 +102,10 @@
     (let [tx1 (scalar/start-2pc test)
           tx2 (scalar/join-2pc test (.getId tx1))
           [seq-id txn] (:value op)]
-      (when (<= @(:table-id test) seq-id)
-        ;; add tables for the next sequence
-        (add-tables test (inc seq-id)))
       (try
+        (when (<= @(:table-id test) seq-id)
+          ;; add tables for the next sequence
+          (add-tables test (inc seq-id)))
         (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
           (.prepare tx1)
           (.prepare tx2)
