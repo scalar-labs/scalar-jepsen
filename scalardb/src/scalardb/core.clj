@@ -142,6 +142,11 @@
   [test]
   (prepare-service! test :2pc))
 
+(defn check-storage-connection!
+  [test]
+  (when-not @(:storage test)
+    (prepare-storage-service! test)))
+
 (defn check-transaction-connection!
   [test]
   (when-not @(:transaction test)
