@@ -13,6 +13,7 @@
                               Result)
            (com.scalar.db.io IntValue
                              Key)
+           (com.scalar.db.exception.storage ExecutionException)
            (com.scalar.db.exception.transaction CrudException
                                                 UnknownTransactionStatusException)))
 
@@ -104,17 +105,20 @@
 
 (defn- read-record
   "Read a record with a transaction. If read fails, this function returns nil."
-  [tx i]
+  [tx storage i]
   (try
     (.get tx (prepare-get i))
-    (catch CrudException _ nil)))
+    (.get storage (prepare-get i))
+    (catch CrudException _ nil)
+    (catch ExecutionException _ nil)))
 
 (defn- read-all-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
-  (scalar/with-retry scalar/prepare-transaction-service! test
+  (scalar/check-storage-connection! test)
+  (scalar/with-retry (fn [test] (scalar/prepare-transaction-service! test) (scalar/prepare-storage-service! test)) test
     (let [tx (scalar/start-transaction test)
-          results (map #(read-record tx %) (range n))]
+          results (map #(read-record tx @(:storage test) %) (range n))]
       (if (some nil? results) nil results))))
 
 (defrecord TransferClient [initialized? n initial-balance]
