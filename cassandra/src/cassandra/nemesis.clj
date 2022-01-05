@@ -63,7 +63,7 @@
                               (str "nemesis already disrupting " @nodes))
                             :no-target)
                    :stop (if-let [ns @nodes]
-                           (let [all-nodes (:nodes test)
+                           (let [all-nodes (or (:cass-nodes test) (:nodes test))
                                  decommissioned @(:decommissioned test)
                                  seed (-> test
                                           cass/seed-nodes

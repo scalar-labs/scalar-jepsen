@@ -152,7 +152,7 @@
         (do
           (install-server! node test)
           (info node "waiting for starting C* cluster")
-          (Thread/sleep (* 1000 60 (count (:cass-nodes test))))
+          (cassandra/wait-cassandra-up node test)
           (start-server! node test))
         (cassandra/spinup-cassandra! node test)))
 
