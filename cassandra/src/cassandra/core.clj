@@ -64,7 +64,8 @@
 
 (defn- get-shuffled-nodes
   [test]
-  (-> test :nodes set (set/difference @(:decommissioned test)) shuffle))
+  (let [nodes (or (:cass-nodes test) (:nodes test))]
+    (-> nodes set (set/difference @(:decommissioned test)) shuffle)))
 
 (defn- get-jmx-status
   [node attr]
@@ -93,9 +94,10 @@
 (defn seed-nodes
   "Get a list of seed nodes"
   [test]
-  (if (= (:rf test) 1)
-    (take 1 (:nodes test))
-    (take (dec (:rf test)) (:nodes test))))
+  (let [nodes (or (:cass-nodes test) (:nodes test))]
+    (if (= (:rf test) 1)
+      (take 1 nodes)
+      (take (dec (:rf test)) nodes))))
 
 (defn nodetool
   "Run a nodetool command"
@@ -217,8 +219,9 @@
 
 (defn wait-turn
   "A node has to wait because Cassandra node can't start when another node is bootstrapping"
-  [node {:keys [decommissioned nodes] :as test}]
-  (let [starting-nodes (filter #(not (contains? @decommissioned %)) nodes)
+  [node {:keys [decommissioned cass-nodes nodes] :as test}]
+  (let [nodes (or cass-nodes nodes)
+        starting-nodes (filter #(not (contains? @decommissioned %)) nodes)
         ready-nodes (take-while #(not= % node) starting-nodes)]
     (when-not (@decommissioned node)
       (mapv #(wait-ready % 300 10 test) ready-nodes))))
