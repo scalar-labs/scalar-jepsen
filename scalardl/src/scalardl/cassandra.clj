@@ -23,10 +23,6 @@
                   (finally (alia/shutdown cluster)))]
     (and (not (empty? rows)) (= (-> rows first :tx_state) TX_COMMITTED))))
 
-(defn wait-cassandra-up
-  [node test]
-  (cassandra/wait-turn node test))
-
 (defn spinup-cassandra!
   [node test]
   (when (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
