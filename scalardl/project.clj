@@ -15,7 +15,7 @@
                                        [org.bouncycastle/bcprov-jdk15on "1.59"]
                                        [com.google.inject/guice "4.2.0"]
                                        [com.moandjiezana.toml/toml4j "0.7.2"]
-                                       [com.google.protobuf/protobuf-java-util "3.19.0"]
+                                       [com.google.protobuf/protobuf-java-util "3.19.2"]
                                        [com.scalar-labs/scalar-admin "1.0.0"
                                         :exclusions [org.slf4j/slf4j-log4j12]]]
                         :resource-paths ["resources/scalardl-java-client-sdk.jar"
