@@ -27,6 +27,7 @@
       (ContractExecutionResult. (-> (Json/createObjectBuilder)
                                     (.add "value" 3)
                                     .build)
+                                nil
                                 nil))))
 
 (def mock-client-service-throws-unknown-status
