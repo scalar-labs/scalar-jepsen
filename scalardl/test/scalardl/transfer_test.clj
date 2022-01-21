@@ -28,6 +28,7 @@
                                     (.add "balance" 1000)
                                     (.add "age" 111)
                                     .build)
+                                nil
                                 nil))))
 
 (def mock-failure-client-service
