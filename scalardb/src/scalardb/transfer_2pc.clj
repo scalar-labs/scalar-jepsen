@@ -34,7 +34,6 @@
                                :tx_state               :int
                                :tx_prepared_at         :bigint
                                :tx_committed_at        :bigint
-                               :before_account_id      :int
                                :before_balance         :int
                                :before_tx_id           :text
                                :before_tx_version      :int
