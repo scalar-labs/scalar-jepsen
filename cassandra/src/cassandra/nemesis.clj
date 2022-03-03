@@ -31,6 +31,16 @@
       (set/difference @(:decommissioned test))
       shuffle))
 
+(defn- reorder-restarting-nodes
+  "Reorder the list of nodes to start with a seed node when all nodes crash."
+  [nodes test]
+  (let [all-nodes (or (:cass-nodes test) (:nodes test))
+        decommissioned @(:decommissioned test)
+        seed (-> test cass/seed-nodes set (set/difference decommissioned) first)
+        all-crashed? (= (+ (count nodes) (count decommissioned))
+                        (count all-nodes))]
+    (if all-crashed? (conj (remove #(= seed %) nodes) seed) nodes)))
+
 (defn test-aware-node-start-stopper
   "Takes a targeting function which, given a list of nodes, returns a single
   node or collection of nodes to affect, and two functions `(start! test node)`
@@ -63,19 +73,7 @@
                               (str "nemesis already disrupting " @nodes))
                             :no-target)
                    :stop (if-let [ns @nodes]
-                           (let [all-nodes (or (:cass-nodes test) (:nodes test))
-                                 decommissioned @(:decommissioned test)
-                                 seed (-> test
-                                          cass/seed-nodes
-                                          set
-                                          (set/difference decommissioned)
-                                          first)
-                                 all-crashed? (= (+ (count ns)
-                                                    (count decommissioned))
-                                                 (count all-nodes))
-                                 reordered (if all-crashed?
-                                             (conj (remove #(= seed %) ns) seed)
-                                             ns)
+                           (let [reordered (reorder-restarting-nodes ns test)
                                  restarted (for [node reordered]
                                              (c/on node (stop! test node)))]
                              (reset! nodes nil)
@@ -84,7 +82,8 @@
 
       (teardown! [this test]
         (when-let [ns @nodes]
-          (for [node ns] (c/on node (stop! test node)))
+          (for [node (reorder-restarting-nodes ns test)]
+            (c/on node (stop! test node)))
           (reset! nodes nil))))))
 
 (defn crash-nemesis
