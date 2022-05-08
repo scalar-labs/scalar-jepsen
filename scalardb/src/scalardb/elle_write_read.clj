@@ -7,7 +7,8 @@
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
   (:import (com.scalar.db.api Get
-                              Put)
+                              Put
+                              PutIfNotExists)
            (com.scalar.db.io IntValue
                              Key)
            (com.scalar.db.exception.transaction
@@ -42,20 +43,28 @@
       (.forTable table)))
 
 (defn- prepare-put
-  [table id value]
-  (-> (Key. [(IntValue. ID id)])
-      (Put.)
-      (.forNamespace KEYSPACE)
-      (.forTable table)
-      (.withValue (IntValue. VALUE value))))
+  [table id value insert?]
+  (let [put (-> (Key. [(IntValue. ID id)])
+                (Put.)
+                (.forNamespace KEYSPACE)
+                (.forTable table)
+                (.withValue (IntValue. VALUE value)))]
+    (if insert?
+      (.withCondition put (PutIfNotExists.))
+      put)))
 
 (defn- get-value
   [r]
   (some-> r .get (.getValue VALUE) .get .get long))
 
-(defn- tx-write
+(defn- tx-insert
   [tx table id value]
-  (.put tx (prepare-put table id value))
+  (.put tx (prepare-put table id value true))
+  value)
+
+(defn- tx-update
+  [tx table id value]
+  (.put tx (prepare-put table id value false))
   value)
 
 (defn- tx-execute
@@ -64,7 +73,9 @@
         result (.get tx (prepare-get table k))]
     [f k (case f
            :r (when (.isPresent result) (get-value result))
-           :w (tx-write tx table k v))]))
+           :w (if (.isPresent result)
+                (tx-update tx table k v)
+                (tx-insert tx table k v)))]))
 
 (defn- add-tables
   [test next-id]
@@ -127,7 +138,7 @@
 
 (defn- write-read-checker
   [opts]
-  (wr/checker {:consistency-models [(:consistency-model opts)]}))
+  (wr/checker {:consistency-models (:consistency-model opts)}))
 
 (defn elle-write-read-test
   [opts]

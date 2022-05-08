@@ -136,7 +136,7 @@
                 :min-txn-length 1
                 :max-txn-length 10
                 :max-writes-per-key 10
-                :consistency-models [(:consistency-model opts)]}))
+                :consistency-models (:consistency-model opts)}))
 
 (defn elle-append-test
   [opts]
