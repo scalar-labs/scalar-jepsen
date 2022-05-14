@@ -7,8 +7,7 @@
             [cassandra.conductors :as cond]
             [scalardb.core :as scalar])
   (:import (com.scalar.db.api Get
-                              Put
-                              PutIfNotExists)
+                              Put)
            (com.scalar.db.io IntValue
                              Key)
            (com.scalar.db.exception.transaction
@@ -43,39 +42,36 @@
       (.forTable table)))
 
 (defn- prepare-put
-  [table id value insert?]
-  (let [put (-> (Key. [(IntValue. ID id)])
-                (Put.)
-                (.forNamespace KEYSPACE)
-                (.forTable table)
-                (.withValue (IntValue. VALUE value)))]
-    (if insert?
-      (.withCondition put (PutIfNotExists.))
-      put)))
+  [table id value]
+  (-> (Key. [(IntValue. ID id)])
+      (Put.)
+      (.forNamespace KEYSPACE)
+      (.forTable table)
+      (.withValue (IntValue. VALUE value))))
 
 (defn- get-value
   [r]
   (some-> r .get (.getValue VALUE) .get .get long))
 
-(defn- tx-insert
-  [tx table id value]
-  (.put tx (prepare-put table id value true))
-  value)
+(defn- tx-read
+  [tx table id]
+  (let [result (.get tx (prepare-get table id))]
+    (when (.isPresent result)
+      (get-value result))))
 
-(defn- tx-update
+(defn- tx-write
   [tx table id value]
-  (.put tx (prepare-put table id value false))
+  (.put tx (prepare-put table id value))
   value)
 
 (defn- tx-execute
   [seq-id tx [f k v]]
-  (let [table (str TABLE seq-id \_ (mod (hash k) DEFAULT_TABLE_COUNT))
-        result (.get tx (prepare-get table k))]
+  (let [table (str TABLE seq-id \_ (mod (hash k) DEFAULT_TABLE_COUNT))]
     [f k (case f
-           :r (when (.isPresent result) (get-value result))
-           :w (if (.isPresent result)
-                (tx-update tx table k v)
-                (tx-insert tx table k v)))]))
+           :r (tx-read tx table k)
+           :w (do
+                (tx-read tx table k)
+                (tx-write tx table k v)))]))
 
 (defn- add-tables
   [test next-id]
