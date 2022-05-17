@@ -11,7 +11,7 @@
   :repositories {"sonartype" "https://oss.sonatype.org/content/repositories/snapshots"}
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
-             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "4.0.0-SNAPSHOT'"
+             :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "4.0.0-SNAPSHOT"
                                             :exclusions [org.slf4j/slf4j-log4j12
                                                          com.oracle.database.jdbc/ojdbc8-production
                                                          software.amazon.awssdk/*]]]}
