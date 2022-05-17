@@ -53,6 +53,12 @@
   [r]
   (some-> r .get (.getValue VALUE) .get .get long))
 
+(defn- tx-read
+  [tx table id]
+  (let [result (.get tx (prepare-get table id))]
+    (when (.isPresent result)
+      (get-value result))))
+
 (defn- tx-write
   [tx table id value]
   (.put tx (prepare-put table id value))
@@ -60,11 +66,12 @@
 
 (defn- tx-execute
   [seq-id tx [f k v]]
-  (let [table (str TABLE seq-id \_ (mod (hash k) DEFAULT_TABLE_COUNT))
-        result (.get tx (prepare-get table k))]
+  (let [table (str TABLE seq-id \_ (mod (hash k) DEFAULT_TABLE_COUNT))]
     [f k (case f
-           :r (when (.isPresent result) (get-value result))
-           :w (tx-write tx table k v))]))
+           :r (tx-read tx table k)
+           :w (do
+                (tx-read tx table k)
+                (tx-write tx table k v)))]))
 
 (defn- add-tables
   [test next-id]
@@ -127,7 +134,7 @@
 
 (defn- write-read-checker
   [opts]
-  (wr/checker {:consistency-models [(:consistency-model opts)]}))
+  (wr/checker {:consistency-models (:consistency-model opts)}))
 
 (defn elle-write-read-test
   [opts]

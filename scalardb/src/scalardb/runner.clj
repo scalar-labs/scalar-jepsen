@@ -42,10 +42,9 @@
     :validate [#{:extra-read :extra-write}
                "Should be one of extra-read or extra-write"]]
 
-   [nil "--consistency-model CONSISTENCY_MODEL"
-    "consistency model to be checked"
-    :default :snapshot-isolation
-    :parse-fn keyword]])
+   (cli/repeated-opt nil "--consistency-model CONSISTENCY_MODEL"
+                     "consistency model to be checked"
+                     ["snapshot-isolation"])])
 
 (defn test-cmd
   []
@@ -64,6 +63,9 @@
                                         (car/combine-nemesis nemesis joining clock)
                                         (assoc :db (cassandra/db))
                                         (assoc :pure-generators true)
+                                        (update :consistency-model
+                                                (fn [models]
+                                                  (mapv #(keyword %) models)))
                                         (dissoc :test)
                                         test-fn
                                         jepsen/run!)]
