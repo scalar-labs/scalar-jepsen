@@ -22,7 +22,7 @@
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
       nil)
-    (executeContract [_ _]
+    (executeContract [& _]
       (swap! execute-count inc)
       (ContractExecutionResult. (-> (Json/createObjectBuilder)
                                     (.add "balance" 1000)
@@ -37,7 +37,7 @@
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
       nil)
-    (executeContract [_ _]
+    (executeContract [& _]
       (swap! execute-count inc)
       (throw (ClientException. "the status is unknown"
                                (Exception.)
