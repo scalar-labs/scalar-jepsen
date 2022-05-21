@@ -137,7 +137,7 @@
 
 (defn- write-read-checker
   [opts]
-  (wr/checker {:consistency-models [(:consistency-model opts)]}))
+  (wr/checker {:consistency-models (:consistency-model opts)}))
 
 (defn elle-write-read-2pc-test
   [opts]
