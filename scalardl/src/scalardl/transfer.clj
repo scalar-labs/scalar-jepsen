@@ -46,9 +46,8 @@
        (.add ASSET_ID id)
        (.add ASSET_BALANCE initial-balance)
        (.build)))
-  ([txid from to amount]
+  ([from to amount]
    (-> (Json/createObjectBuilder)
-       (.add NONCE txid)
        (.add ASSET_ID_FROM from)
        (.add ASSET_ID_TO to)
        (.add ASSET_AMOUNT amount)
@@ -112,9 +111,9 @@
     (case (:f op)
       :transfer (let [txid (str (java.util.UUID/randomUUID))
                       {:keys [from to amount]} (:value op)
-                      arg (create-argument txid from to amount)]
+                      arg (create-argument from to amount)]
                   (try
-                    (.executeContract @client-service "transfer" arg)
+                    (.executeContract @client-service txid "transfer" arg)
                     (assoc op :type :ok)
                     (catch ClientException e
                       (reset! client-service
