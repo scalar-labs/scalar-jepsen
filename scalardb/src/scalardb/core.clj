@@ -115,10 +115,6 @@
 
 (defn- prepare-service!
   [test mode]
-  (condp = mode
-    :storage (close-storage! test)
-    :transaction (close-transaction! test)
-    :2pc (close-2pc! test))
   (info "reconnecting to the cluster")
   (loop [tries RETRIES]
     (when (< tries RETRIES)
@@ -126,7 +122,13 @@
     (if-not (pos? tries)
       (warn "Failed to connect to the cluster")
       (if-let [instance (create-service-instance test mode)]
-        (reset! (mode test) instance)
+        (do
+          (condp = mode
+            :storage (close-storage! test)
+            :transaction (close-transaction! test)
+            :2pc (close-2pc! test))
+          (reset! (mode test) instance)
+          (info "reconnected to the cluster"))
         (when-not @(mode test)
           (recur (dec tries)))))))
 
