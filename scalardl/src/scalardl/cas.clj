@@ -23,7 +23,6 @@
                                    :class "com.scalar.jepsen.scalardl.Cas"
                                    :path "target/classes/com/scalar/jepsen/scalardl/Cas.class"}])
 
-(def ^:private ^:const NONCE "nonce")
 (def ^:private ^:const ASSET_KEY "key")
 (def ^:private ^:const ASSET_VALUE "value")
 (def ^:private ^:const ASSET_VALUE_NEW "new_value")
@@ -32,20 +31,17 @@
   ([key]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
-       (.add NONCE (str (java.util.UUID/randomUUID)))
        .build))
   ([key value]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add ASSET_VALUE value)
-       (.add NONCE (str (java.util.UUID/randomUUID)))
        .build))
   ([key cur next]
    (-> (Json/createObjectBuilder)
        (.add ASSET_KEY key)
        (.add ASSET_VALUE cur)
        (.add ASSET_VALUE_NEW next)
-       (.add NONCE (str (java.util.UUID/randomUUID)))
        .build)))
 
 (defn- handle-exception
@@ -74,13 +70,14 @@
         (dl/register-contracts @client-service CONTRACTS))))
 
   (invoke! [_ test op]
-    (let [arg (case (:f op)
+    (let [txid (str (java.util.UUID/randomUUID))
+          arg (case (:f op)
                 :read (create-argument 1)
                 :write (create-argument 1 (:value op))
                 :cas (apply create-argument 1 (:value op)))]
       (try
         (let [contract (-> op :f name)
-              result (.executeContract @client-service contract arg)]
+              result (.executeContract @client-service txid contract arg)]
           (if (= contract "read")
             (assoc op :type :ok :value (-> result
                                            util/result->json
@@ -89,7 +86,7 @@
         (catch ClientException e
           (reset! client-service
                   (dl/try-switch-server! @client-service test))
-          (handle-exception e op (.getString arg NONCE) test)))))
+          (handle-exception e op txid test)))))
 
   (close! [_ _]
     (.close @client-service))
