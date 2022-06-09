@@ -18,7 +18,7 @@
    (fn stop  [test node]
      (when-not (util/server? node test)
        (meh (cass/guarded-start! node test))
-       (Thread/sleep (* 1000 60))
+       (meh (cass/wait-ready node 300 10 test))
        [:cassandra-restarted node]))))
 
 (defn crash
