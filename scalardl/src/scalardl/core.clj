@@ -66,7 +66,7 @@
                           (if-let [config (some-> test
                                                   create-client-properties
                                                   ClientConfig.)]
-                            (. (ClientServiceFactory.) create config)
+                            (doto (ClientServiceFactory.) (.create config))
                             (throw (ex-info "Failed to get ClientService"
                                             {:cause :injection-failure}))))
                         []))
