@@ -12,8 +12,7 @@
   (:import (com.scalar.dl.client.config ClientConfig)
            (com.scalar.dl.client.exception ClientException)
            (com.scalar.dl.client.service ClientService)
-           (com.scalar.dl.client.service ClientModule)
-           (com.google.inject Guice)
+           (com.scalar.dl.client.service ClientServiceFactory)
            (java.util Optional)
            (java.util Properties)))
 
@@ -64,13 +63,10 @@
 (defn prepare-client-service
   [test]
   (retry-when-exception (fn []
-                          (if-let [injector (some-> test
-                                                    create-client-properties
-                                                    ClientConfig.
-                                                    ClientModule.
-                                                    vector
-                                                    Guice/createInjector)]
-                            (.getInstance injector ClientService)
+                          (if-let [config (some-> test
+                                                  create-client-properties
+                                                  ClientConfig.)]
+                            (doto (ClientServiceFactory.) (.create config))
                             (throw (ex-info "Failed to get ClientService"
                                             {:cause :injection-failure}))))
                         []))
