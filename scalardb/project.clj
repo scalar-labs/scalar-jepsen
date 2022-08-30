@@ -16,7 +16,7 @@
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
              :use-jars {:dependencies [[com.google.inject/guice "4.2.0"]
-                                       [com.google.guava/guava "24.1-jre"]]
+                                       [com.google.guava/guava "31.1-jre"]]
                         :resource-paths ["resources/scalardb.jar"]}
              :default [:base :system :user :provided :dev :use-released]}
   :jvm-opts ["-Djava.awt.headless=true"]
