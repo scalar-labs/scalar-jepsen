@@ -34,6 +34,9 @@
            (java.net InetAddress)
            (java.util.concurrent TimeUnit)))
 
+(def ^:private ^:const TIMEOUT_SEC 600)
+(def ^:private ^:const INTERVAL_SEC 10)
+
 (defn exponential-backoff
   [r]
   (Thread/sleep (reduce * 1000 (repeat r 2))))
@@ -224,7 +227,7 @@
         starting-nodes (filter #(not (contains? @decommissioned %)) nodes)
         ready-nodes (take-while #(not= % node) starting-nodes)]
     (when-not (@decommissioned node)
-      (mapv #(wait-ready % 300 10 test) ready-nodes))))
+      (mapv #(wait-ready % TIMEOUT_SEC INTERVAL_SEC test) ready-nodes))))
 
 (defn db
   "Setup Cassandra."
