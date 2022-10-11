@@ -80,8 +80,8 @@
   (let [tms (:2pc test)]
     (locking tms
       (mapv #(.close %) @tms)
-        (reset! tms nil)
-        (info "The current 2pc service closed")))))
+      (reset! tms nil)
+      (info "The current 2pc service closed"))))
 
 (defn close-all!
   [test]
