@@ -198,7 +198,7 @@
         (is (= 2 @prepare-count))
         (is (= 2 @validate-count))
         (is (= 0 @rollback-count))
-        (is (= :fail (:type result)))
+        (is (= :info (:type result)))
         (is (= "unknown-state-tx" (get-in result
                                           [:error :unknown-tx-status])))))))
 

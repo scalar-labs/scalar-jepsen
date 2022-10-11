@@ -167,7 +167,7 @@
                     (assoc op :type :ok)
                     (catch UnknownTransactionStatusException _
                       (swap! (:unknown-tx test) conj (.getId tx1))
-                      (assoc op :type :fail, :error {:unknown-tx-status (.getId tx1)}))
+                      (assoc op :type :info, :error {:unknown-tx-status (.getId tx1)}))
                     (catch Exception e
                       (scalar/try-reconnection-for-2pc! test)
                       (assoc op :type :fail, :error (.getMessage e)))))
