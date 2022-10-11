@@ -79,10 +79,7 @@
   [test]
   (let [tms (:2pc test)]
     (locking tms
-      (when @tms
-        (let [[tm1 tm2] @tms]
-          (.close tm1)
-          (.close tm2))
+      (mapv #(.close %) @tms)
         (reset! tms nil)
         (info "The current 2pc service closed")))))
 
@@ -169,14 +166,12 @@
 (defn start-2pc
   [test]
   ; use the first transaction manager to start a transaction
-  (let [[tm1 _] (deref (:2pc test))]
-    (some-> tm1 .start)))
+  (some-> test :2pc deref first .start))
 
 (defn join-2pc
   [test tx-id]
   ; use the second transaction manager to join a transaction
-  (let [[_ tm2] (deref (:2pc test))]
-    (some-> tm2 (.join tx-id))))
+  (some-> test :2pc deref second (.join tx-id)))
 
 (defmacro with-retry
   "If the result of the body is nil, it retries it"
