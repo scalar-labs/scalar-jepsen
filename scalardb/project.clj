@@ -8,15 +8,14 @@
                  [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
-             :use-released {:dependencies [[com.scalar-labs/scalardb "3.2.0"
+             :use-released {:dependencies [[com.scalar-labs/scalardb "3.7.0"
                                             ;; avoid the netty dependency issue
                                             :exclusions [software.amazon.awssdk/*
                                                          com.oracle.database.jdbc/ojdbc8-production
                                                          com.azure/azure-cosmos
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
-             :use-jars {:dependencies [[com.google.inject/guice "4.2.0"]
-                                       [com.google.guava/guava "31.1-jre"]]
+             :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]]
                         :resource-paths ["resources/scalardb.jar"]}
              :default [:base :system :user :provided :dev :use-released]}
   :jvm-opts ["-Djava.awt.headless=true"]
