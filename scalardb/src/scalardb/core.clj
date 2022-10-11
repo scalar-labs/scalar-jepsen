@@ -10,13 +10,9 @@
             [qbits.hayt.dsl.statement :refer :all])
   (:import (com.scalar.db.api TransactionState)
            (com.scalar.db.config DatabaseConfig)
-           (com.scalar.db.service StorageModule
-                                  StorageService
-                                  TransactionModule
-                                  TransactionService
-                                  TwoPhaseCommitTransactionService)
+           (com.scalar.db.service TransactionFactory
+                                  StorageFactory)
            (com.scalar.db.transaction.consensuscommit Coordinator)
-           (com.google.inject Guice)
            (java.util Properties)))
 
 (def ^:const RETRIES 8)
@@ -81,11 +77,13 @@
 
 (defn- close-2pc!
   [test]
-  (let [tx (:2pc test)]
-    (locking tx
-      (when @tx
-        (.close @tx)
-        (reset! tx nil)
+  (let [tms (:2pc test)]
+    (locking tms
+      (when @tms
+        (let [[tm1 tm2] @tms]
+          (.close tm1)
+          (.close tm2))
+        (reset! tms nil)
         (info "The current 2pc service closed")))))
 
 (defn close-all!
@@ -96,22 +94,20 @@
 
 (defn- create-service-instance
   [test mode]
-  (when-let [config (some->> (c/live-nodes test)
-                             not-empty
-                             (create-properties test)
-                             DatabaseConfig.)]
-    (let [[module service] (condp = mode
-                             :storage [(StorageModule. config)
-                                       StorageService]
-                             :transaction [(TransactionModule. config)
-                                           TransactionService]
-                             :2pc [(TransactionModule. config)
-                                   TwoPhaseCommitTransactionService])
-          injector (Guice/createInjector (vector module))]
-      (try
-        (.getInstance injector service)
-        (catch Exception e
-          (warn (.getMessage e)))))))
+  (when-let [properties (some->> (c/live-nodes test)
+                                 not-empty
+                                 (create-properties test))]
+    (try
+      (condp = mode
+        :storage (.getStorage (StorageFactory/create properties))
+        :transaction (.getTransactionManager
+                      (TransactionFactory/create properties))
+        :2pc (let [factory (TransactionFactory/create properties)]
+               ; create two Two-phase commit transaction managers
+               [(.getTwoPhaseCommitTransactionManager factory)
+                (.getTwoPhaseCommitTransactionManager factory)]))
+      (catch Exception e
+        (warn (.getMessage e))))))
 
 (defn- prepare-service!
   [test mode]
@@ -172,11 +168,15 @@
 
 (defn start-2pc
   [test]
-  (some-> test :2pc deref .start))
+  ; use the first transaction manager to start a transaction
+  (let [[tm1 _] (deref (:2pc test))]
+    (some-> tm1 .start)))
 
 (defn join-2pc
   [test tx-id]
-  (some-> test :2pc deref (.join tx-id)))
+  ; use the second transaction manager to join a transaction
+  (let [[_ tm2] (deref (:2pc test))]
+    (some-> tm2 (.join tx-id))))
 
 (defmacro with-retry
   "If the result of the body is nil, it retries it"

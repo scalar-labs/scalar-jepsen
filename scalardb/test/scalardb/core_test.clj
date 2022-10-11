@@ -101,7 +101,7 @@
 (deftest close-all-test
   (let [test {:storage (atom mock-storage)
               :transaction (atom mock-tx-manager)
-              :2pc (atom mock-2pc-manager)}]
+              :2pc (atom [mock-2pc-manager mock-2pc-manager])}]
     (scalar/close-all! test)
     (is (nil? @(:storage test)))
     (is (nil? @(:transaction test)))
