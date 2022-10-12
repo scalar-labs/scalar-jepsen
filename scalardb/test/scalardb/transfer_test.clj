@@ -170,7 +170,7 @@
         (is (spy/not-called? scalar/try-reconnection-for-transaction!))
         (is (= 2 @get-count))
         (is (= 2 @put-count))
-        (is (= :fail (:type result)))
+        (is (= :info (:type result)))
         (is (= "unknown-state-tx" (get-in result
                                           [:error :unknown-tx-status])))))))
 
