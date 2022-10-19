@@ -204,7 +204,8 @@
 
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 1000 1 100 2 10 3 1 4 0})]
-    (with-redefs [scalar/check-transaction-connection! (spy/spy)
+    (with-redefs [cass/wait-rf-nodes (spy/spy)
+                  scalar/check-transaction-connection! (spy/spy)
                   scalar/check-storage-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
       (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
@@ -219,9 +220,10 @@
         (is (= [1000 100 10 1 0] (get-in result [:value :version])))))))
 
 (deftest transfer-client-get-all-fail-test
-  (with-redefs [scalar/check-transaction-connection! (spy/spy)
-                scalar/check-storage-connection! (spy/spy)
+  (with-redefs [cass/wait-rf-nodes (spy/spy)
                 cass/exponential-backoff (spy/spy)
+                scalar/check-transaction-connection! (spy/spy)
+                scalar/check-storage-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/prepare-storage-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]

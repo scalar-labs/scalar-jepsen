@@ -115,7 +115,8 @@
 
 (deftest transfer-client-get-all-test
   (binding [execute-count (atom 0)]
-    (with-redefs [dl/prepare-client-service (spy/stub mock-client-service)]
+    (with-redefs [cassandra/wait-cassandra (spy/spy)
+                  dl/prepare-client-service (spy/stub mock-client-service)]
       (let [client (client/open! (transfer/->TransferClient (atom false)
                                                             (atom nil) 1)
                                  nil nil)
@@ -127,7 +128,8 @@
         (is (= [{:balance 1000 :age 111}] (:value result)))))))
 
 (deftest transfer-client-get-all-fail-test
-  (with-redefs [dl/prepare-client-service (spy/stub mock-failure-client-service)
+  (with-redefs [cassandra/wait-cassandra (spy/spy)
+                dl/prepare-client-service (spy/stub mock-failure-client-service)
                 dl/exponential-backoff (spy/spy)]
     (let [client (client/open! (transfer/->TransferClient (atom false)
                                                           (atom nil) 1)

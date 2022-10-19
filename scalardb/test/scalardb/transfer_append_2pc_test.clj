@@ -220,7 +220,8 @@
                                    {:age 2 :balance 100}
                                    {:age 3 :balance 10}]
                                 2 [{:age 1 :balance 1}]})]
-    (with-redefs [scalar/check-transaction-connection! (spy/spy)
+    (with-redefs [cass/wait-rf-nodes (spy/spy)
+                  scalar/check-transaction-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
       (let [client (client/open! (transfer/->TransferClient (atom false) 3 100)
                                  nil nil)
@@ -234,8 +235,9 @@
         (is (= [2 3 1] (get-in result [:value :num])))))))
 
 (deftest transfer-client-get-all-fail-test
-  (with-redefs [scalar/check-transaction-connection! (spy/spy)
+  (with-redefs [cass/wait-rf-nodes (spy/spy)
                 cass/exponential-backoff (spy/spy)
+                scalar/check-transaction-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)

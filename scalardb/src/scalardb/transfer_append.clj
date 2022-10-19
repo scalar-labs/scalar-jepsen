@@ -1,5 +1,6 @@
 (ns scalardb.transfer-append
   (:require [cassandra.conductors :as conductors]
+            [cassandra.core :as cassandra]
             [clojure.core.reducers :as r]
             [jepsen
              [client :as client]
@@ -160,11 +161,13 @@
                   (do
                     (scalar/try-reconnection-for-transaction! test)
                     (assoc op :type :fail, :error "Skipped due to no connection")))
-      :get-all (if-let [results (scan-all-records-with-retry test (:num op))]
-                 (assoc op :type, :ok :value {:balance (get-balances results)
-                                              :age (get-ages results)
-                                              :num (get-nums results)})
-                 (assoc op :type, :fail, :error "Failed to get all records"))
+      :get-all (do
+                 (cassandra/wait-rf-nodes test)
+                 (if-let [results (scan-all-records-with-retry test (:num op))]
+                   (assoc op :type, :ok :value {:balance (get-balances results)
+                                                :age (get-ages results)
+                                                :num (get-nums results)})
+                   (assoc op :type, :fail, :error "Failed to get all records")))
       :check-tx (if-let [num-committed (scalar/check-transaction-states test
                                                                         @(:unknown-tx test))]
                   (assoc op :type :ok, :value num-committed)
