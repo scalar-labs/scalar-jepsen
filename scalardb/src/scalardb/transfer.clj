@@ -1,5 +1,6 @@
 (ns scalardb.transfer
   (:require [cassandra.conductors :as conductors]
+            [cassandra.core :as cassandra]
             [clojure.core.reducers :as r]
             [jepsen
              [client :as client]
@@ -149,10 +150,12 @@
                   (do
                     (scalar/try-reconnection-for-transaction! test)
                     (assoc op :type :fail :error "Skipped due to no connection")))
-      :get-all (if-let [results (read-all-with-retry test (:num op))]
-                 (assoc op :type :ok :value {:balance (get-balances results)
-                                             :version (get-versions results)})
-                 (assoc op :type :fail :error "Failed to get balances"))
+      :get-all (do
+                 (cassandra/wait-rf-nodes test)
+                 (if-let [results (read-all-with-retry test (:num op))]
+                   (assoc op :type :ok :value {:balance (get-balances results)
+                                               :version (get-versions results)})
+                   (assoc op :type :fail :error "Failed to get balances")))
       :check-tx (if-let [num-committed (scalar/check-transaction-states test
                                                                         @(:unknown-tx test))]
                   (assoc op :type :ok, :value num-committed)

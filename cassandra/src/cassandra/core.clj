@@ -229,6 +229,18 @@
     (when-not (@decommissioned node)
       (mapv #(wait-ready % TIMEOUT_SEC INTERVAL_SEC test) ready-nodes))))
 
+(defn wait-rf-nodes
+  "Wait for nodes' bootstrapping for the number of replication factor"
+  ([test]
+   (wait-rf-nodes TIMEOUT_SEC INTERVAL_SEC test))
+  ([timeout-sec interval-sec test]
+   (when (< (count (live-nodes test)) (:rf test))
+     (Thread/sleep (* interval-sec 1000))
+     (if (>= timeout-sec interval-sec)
+       (wait-rf-nodes (- timeout-sec interval-sec) interval-sec test)
+       (throw (ex-info "Timed out waiting for Cassandra nodes"
+                       {:causes "Some nodes couldn't start"}))))))
+
 (defn db
   "Setup Cassandra."
   []

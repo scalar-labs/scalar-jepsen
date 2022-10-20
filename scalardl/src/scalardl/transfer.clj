@@ -129,10 +129,12 @@
                     (assoc op :type :ok :value num-committed)
                     (assoc op :type :fail :error "Failed to check status")))
 
-      :get-all (let [balances (read-with-retry @client-service n)]
-                 (if balances
-                   (assoc op :type :ok :value balances)
-                   (assoc op :type :fail :error "Failed to get balances")))))
+      :get-all (do
+                 (cassandra/wait-cassandra test)
+                 (let [balances (read-with-retry @client-service n)]
+                   (if balances
+                     (assoc op :type :ok :value balances)
+                     (assoc op :type :fail :error "Failed to get balances"))))))
 
   (close! [_ _]
     (.close @client-service))

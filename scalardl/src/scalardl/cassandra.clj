@@ -11,6 +11,10 @@
   [test]
   (cassandra/cassandra-log test))
 
+(defn wait-cassandra
+  [test]
+  (cassandra/wait-rf-nodes test))
+
 (defn committed?
   "Return true/false when the transaction has been committed or aborted"
   [txid {:keys [cass-nodes]}]
