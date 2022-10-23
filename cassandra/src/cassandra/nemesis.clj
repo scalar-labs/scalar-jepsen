@@ -64,8 +64,7 @@
         (locking nodes
           (assoc op :type :info, :value
                  (case (:f op)
-                   :start (if-let [ns (-> test
-                                          :nodes
+                   :start (if-let [ns (-> (or (:cass-nodes test) (:nodes test))
                                           (targeter test)
                                           util/coll)]
                             (if (compare-and-set! nodes nil ns)
