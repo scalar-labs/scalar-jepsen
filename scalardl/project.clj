@@ -13,7 +13,7 @@
                    :plugins [[lein-cloverage "1.1.2"]]}
              :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "4.0.0-SNAPSHOT"
                                             :exclusions [org.slf4j/slf4j-log4j12
-                                                         com.oracle.database.jdbc/ojdbc8-production
+                                                         com.oracle.database.jdbc/ojdbc8
                                                          software.amazon.awssdk/*]]]}
              :use-jars {:dependencies [[org.bouncycastle/bcpkix-jdk15on "1.59"]
                                        [org.bouncycastle/bcprov-jdk15on "1.59"]
@@ -28,4 +28,5 @@
              :default [:base :system :user :provided :dev :use-released]}
   :java-source-paths ["contract"]
   :main scalardl.runner
-  :aot :all)
+  :aot :all
+  :pedantic? false)
