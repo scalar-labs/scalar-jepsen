@@ -4,3 +4,4 @@ pom.xml
 */store/**
 */report/**
 */resources/ledger*
+docker/keys/
