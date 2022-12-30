@@ -1,11 +1,9 @@
 (ns cassandra.counter
-  (:require [cassandra.conductors :as conductors]
-            [cassandra.core :refer :all]
+  (:require [cassandra.core :refer :all]
             [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [client :as client]
-             [checker :as checker]
-             [generator :as gen]]
+             [checker :as checker]]
             [qbits.alia :as alia]
             [qbits.hayt]
             [qbits.hayt.dsl.clause :refer :all]
@@ -45,7 +43,8 @@
                                        (where [[= :id 0]]))
                                {:consistency  writec})
                  (assoc op :type :ok))
-        :read (let [value (->> (alia/execute session
+        :read (let [_ (wait-rf-nodes test)
+                    value (->> (alia/execute session
                                              (select :counters (where [[= :id 0]]))
                                              {:consistency  :all
                                               :retry-policy (retry/fallthrough-retry-policy)})
@@ -61,16 +60,9 @@
 
   (teardown! [_ _]))
 
-(defn cnt-inc-test
-  [opts]
-  (merge (cassandra-test (str "counter-inc-" (:suffix opts))
-                         {:client    (->CQLCounterClient (atom false)
-                                                         nil nil :quorum)
-                          :checker   (checker/counter)
-                          :generator (gen/phases
-                                      (->> [add]
-                                           (conductors/std-gen opts))
-                                      (conductors/terminate-nemesis opts)
-                                      (gen/sleep 60)
-                                      (read-once))})
-         opts))
+(defn workload
+  [_]
+  {:client (->CQLCounterClient (atom false) nil nil :quorum)
+   :generator [add]
+   :final-generator (read-once)
+   :checker (checker/counter)})

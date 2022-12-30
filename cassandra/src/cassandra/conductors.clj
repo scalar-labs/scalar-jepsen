@@ -1,6 +1,7 @@
 (ns cassandra.conductors
-  (:require [cassandra.core :as cassandra]
-            [clojure.set :as set]
+  (:require [cassandra
+             [core :as cassandra]
+             [nemesis :as cn]]
             [clojure.tools.logging :refer :all]
             [jepsen
              [control :as c]
@@ -12,7 +13,7 @@
   []
   (reify nemesis/Nemesis
     (setup! [this _] this)
-    (invoke! [this test op]
+    (invoke! [_ test op]
       (let [decommissioned (:decommissioned test)]
         (if-let [node (first @decommissioned)]
           (do (info node "starting bootstrapping")
@@ -30,11 +31,11 @@
   []
   (reify nemesis/Nemesis
     (setup! [this _] this)
-    (invoke! [this test op]
+    (invoke! [_ test op]
       (let [decommissioned (:decommissioned test)]
         (if-let [node (some-> test
                               cassandra/live-nodes
-                              (set/difference @decommissioned)
+                              (clojure.set/difference @decommissioned)
                               shuffle
                               (get (:rf test)))] ; keep at least RF nodes
           (do (info node "decommissioning")
@@ -50,7 +51,7 @@
   []
   (reify nemesis/Nemesis
     (setup! [this _] this)
-    (invoke! [this test op]
+    (invoke! [_ test op]
       (case (:f op)
         :start (do (doseq [node (:nodes test)]
                      (cassandra/nodetool test node "flush")
@@ -84,21 +85,3 @@
     (if-let [op (some-> ops seq rand-nth)]
       (conj base (gen/sleep (+ (rand-int 30) 60)) op)
       base)))
-
-(defn mix-failure-seq
-  [opts]
-  (flatten (repeatedly #(mix-failure opts))))
-
-(defn terminate-nemesis
-  [opts]
-  (if (or (:bump (:clock opts)) (:strobe (:clock opts)))
-    (gen/nemesis [{:type :info :f :stop} (nt/reset-gen opts nil)])
-    (gen/nemesis {:type :info :f :stop})))
-
-(defn std-gen
-  [opts gen]
-  (->> gen
-       gen/mix
-       (gen/nemesis
-        (mix-failure-seq opts))
-       (gen/time-limit (:time-limit opts))))

@@ -1,6 +1,5 @@
 (ns cassandra.batch
   (:require [cassandra.core :refer :all]
-            [cassandra.conductors :as conductors]
             [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [client :as client]
@@ -43,7 +42,8 @@
                                   "APPLY BATCH;")
                              {:consistency :quorum})
                (assoc op :type :ok))
-        :read (let [results (alia/execute session
+        :read (let [_ (wait-rf-nodes test)
+                    results (alia/execute session
                                           (select :bat)
                                           {:consistency :all})
                     value-a (->> results
@@ -66,16 +66,9 @@
 
   (teardown! [_ _]))
 
-(defn batch-test
-  [opts]
-  (merge (cassandra-test (str "batch-set-" (:suffix opts))
-                         {:client    (->BatchSetClient (atom false) nil nil)
-                          :checker   (checker/set)
-                          :generator (gen/phases
-                                      (->> [(adds)]
-                                           (conductors/std-gen opts))
-                                      (conductors/terminate-nemesis opts)
-                                      ; read after waiting for batchlog replay
-                                      (gen/sleep 60)
-                                      (read-once))})
-         opts))
+(defn workload
+  [_]
+  {:client (->BatchSetClient (atom false) nil nil)
+   :generator [(adds)]
+   :final-generator (read-once)
+   :checker (checker/set)})

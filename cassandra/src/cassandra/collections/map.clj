@@ -2,14 +2,12 @@
   (:require [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [client :as client]
-             [checker :as checker]
-             [generator :as gen]]
+             [checker :as checker]]
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all]
             [qbits.hayt.utils :refer [map-type]]
-            [cassandra.core :refer :all]
-            [cassandra.conductors :as conductors])
+            [cassandra.core :refer :all])
   (:import (clojure.lang ExceptionInfo)))
 
 (defrecord CQLMapClient [tbl-created? cluster session writec]
@@ -58,16 +56,9 @@
 
   (teardown! [_ _]))
 
-(defn map-test
-  [opts]
-  (merge (cassandra-test (str "map-" (:suffix opts))
-                         {:client    (->CQLMapClient (atom false)
-                                                     nil nil :quorum)
-                          :generator (gen/phases
-                                      (->> [(adds)]
-                                           (conductors/std-gen opts))
-                                      (conductors/terminate-nemesis opts)
-                                      (gen/sleep 60)
-                                      (read-once))
-                          :checker   (checker/set)})
-         opts))
+(defn workload
+  [_]
+  {:client (->CQLMapClient (atom false) nil nil :quorum)
+   :generator [(adds)]
+   :final-generator (read-once)
+   :checker (checker/set)})

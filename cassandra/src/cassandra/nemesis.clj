@@ -2,11 +2,15 @@
   (:require [clojure.set :as set]
             [jepsen
              [control :as c]
+             [generator :as gen]
              [nemesis :as nemesis]
              [util    :as util :refer [meh]]]
-            [cassandra
-             [core       :as cass]
-             [conductors :as conductors]]))
+            [jepsen.nemesis [combined :as nc]]
+            [cassandra.core :as cass]))
+
+(def ^:const ^:private default-interval
+  "The default interval, in seconds, between nemesis operations."
+  60)
 
 (defn safe-mostly-small-nonempty-subset
   "Returns a subset of the given collection, with a logarithmically decreasing
@@ -57,27 +61,31 @@
       {:value {:n1 [:killed \"java\"]}}"
   [targeter start! stop!]
   (let [nodes (atom nil)]
-    (reify nemesis/Nemesis
+    (reify
+      nemesis/Reflection
+      (fs [this] #{:start :kill})
+
+      nemesis/Nemesis
       (setup! [this _] this)
 
       (invoke! [this test op]
         (locking nodes
           (assoc op :type :info, :value
                  (case (:f op)
-                   :start (if-let [ns (-> (or (:cass-nodes test) (:nodes test))
-                                          (targeter test)
-                                          util/coll)]
-                            (if (compare-and-set! nodes nil ns)
-                              (vals (c/on-many ns (start! test c/*host*)))
-                              (str "nemesis already disrupting " @nodes))
-                            :no-target)
-                   :stop (if-let [ns @nodes]
-                           (let [reordered (reorder-restarting-nodes ns test)
-                                 restarted (for [node reordered]
-                                             (c/on node (stop! test node)))]
-                             (reset! nodes nil)
-                             restarted)
-                           :not-started)))))
+                   :kill (if-let [ns (-> (or (:cass-nodes test) (:nodes test))
+                                         (targeter test)
+                                         util/coll)]
+                           (if (compare-and-set! nodes nil ns)
+                             (vals (c/on-many ns (start! test c/*host*)))
+                             (str "nemesis already disrupting " @nodes))
+                           :no-target)
+                   :start (if-let [ns @nodes]
+                            (let [reordered (reorder-restarting-nodes ns test)
+                                  restarted (for [node reordered]
+                                              (c/on node (stop! test node)))]
+                              (reset! nodes nil)
+                              restarted)
+                            :not-started)))))
 
       (teardown! [this test]
         (when-let [ns @nodes]
@@ -85,7 +93,7 @@
             (c/on node (stop! test node)))
           (reset! nodes nil))))))
 
-(defn crash-nemesis
+(defn- crash-nemesis
   "A nemesis that crashes a random subset of nodes."
   []
   (test-aware-node-start-stopper
@@ -96,38 +104,43 @@
      (meh (cass/wait-ready node 300 10 test))
      [:restarted node])))
 
-;; empty nemesis
-(defn none
-  []
-  {:name "steady"
-   :nemesis nemesis/noop})
+(defn- crash-generators
+  [opts]
+  (let [faults (:faults opts)
+        kill?  (contains? faults :crash)
 
-(defn flush-and-compacter
-  []
-  {:name "flush"
-   :nemesis (conductors/flush-and-compacter)})
+        ; Starts and kills
+        start  {:type :info, :f :start, :value :all}
+        kill   (fn [_ _] {:type   :info
+                          :f      :kill
+                          :value  :nil})
 
-(defn clock-drift
-  []
-  {:name "clock-drift"
-   :nemesis (nemesis/clock-scrambler 10000)})
+        ; Flip-flop generators
+        kill-start (gen/flip-flop kill (repeat start))]
+    {:generator       [kill-start]
+     :final-generator [start]}))
 
-(defn bridge
-  []
-  {:name "bridge"
-   :nemesis (nemesis/partitioner (comp nemesis/bridge shuffle))})
+(defn- crash-package
+  "Crash nemesis and generator package for Cassandra."
+  [opts]
+  (let [needed? (contains? (:faults opts) :crash)
+        {:keys [generator final-generator]} (crash-generators opts)
+        generator (gen/stagger (:interval opts default-interval)
+                               generator)]
+    {:generator       (when needed? generator)
+     :final-generator (when needed? final-generator)
+     :nemesis         (crash-nemesis)
+     :perf #{{:name   "kill"
+              :start  #{:kill}
+              :stop   #{:start}
+              :color  "#E9A4A0"}}}))
 
-(defn halves
-  []
-  {:name "halves"
-   :nemesis (nemesis/partition-random-halves)})
-
-(defn isolation
-  []
-  {:name "isolation"
-   :nemesis (nemesis/partition-random-node)})
-
-(defn crash
-  []
-  {:name "crash"
-   :nemesis (crash-nemesis)})
+(defn nemesis-package
+  "Constructs a nemesis and generators for etcd."
+  [opts]
+  (let [opts (update opts :faults set)]
+    (->> [(nc/partition-package opts)
+          (nc/clock-package opts)
+          (crash-package opts)]
+         (remove nil?)
+         nc/compose-packages)))
