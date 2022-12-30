@@ -6,7 +6,8 @@ RUN apt-get -y -q update && \
     openssh-server \
     psmisc \
     python \
-    ntpdate
+    ntpdate \
+    iptables
 
 ADD ./init.sh /init.sh
 RUN chmod +x /init.sh
