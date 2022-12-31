@@ -3,7 +3,6 @@
   (:require [clojure.string :as str]
             [cassandra
              [batch      :as batch]
-             [conductors :as conductors]
              [core       :as cassandra]
              [counter    :as counter]
              [lwt        :as lwt]
@@ -14,13 +13,12 @@
              [core    :as jepsen]
              [cli     :as cli]
              [generator :as gen]
-             [tests :as tests]]
-            [jepsen.nemesis.time :as nt]))
+             [tests :as tests]]))
 
 (def link-to-tarball "https://archive.apache.org/dist/cassandra/3.11.6/apache-cassandra-3.11.6-bin.tar.gz")
 
-(def workload-names
-  "A map of workload names"
+(def workload-keys
+  "A map of workload keys"
   {"batch"   :batch
    "map"     :map
    "set"     :set
@@ -37,39 +35,28 @@
 
 (def nemeses
   {"none"      []
-   "flush"     [:flush]
    "partition" [:partition]
    "clock"     [:clock]
    "crash"     [:crash]
    "mix"       [:crash :partition :clock]})
 
-(def joinings
-  {"none"         {:name ""                 :bootstrap false :decommission false}
-   "bootstrap"    {:name "-bootstrap"       :bootstrap true  :decommission false}
-   "decommission" {:name "-decommissioning" :bootstrap false :decommission true}
-   "rejoin"       {:name "-rejoining"       :bootstrap true  :decommission true}})
-
-(def clocks
-  {"none"   {:name ""              :bump false :strobe false}
-   "bump"   {:name "-clock-bump"   :bump true  :strobe false}
-   "strobe" {:name "-clock-strobe" :bump false :strobe true}
-   "drift"  {:name "-clock-drift"  :bump true  :strobe true}})
+(def admin
+  {"none" []
+   "join" [:join]
+   "flush" [:flush-compact]
+   "mix" [:member :flush-compact]})
 
 (def test-opt-spec
-  [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-names)])
+  [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)])
 
 (def cassandra-opt-spec
   [(cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
                      [[]]
                      nemeses)
 
-   (cli/repeated-opt nil "--join NAME" "Which node joinings to use"
-                     [{:name "" :bootstrap false :decommission false}]
-                     joinings)
-
-   (cli/repeated-opt nil "--clock NAME" "Which clock-drift to use"
-                     [{:name "" :bump false :strobe false}]
-                     clocks)
+   (cli/repeated-opt nil "--admin NAME" "Which admin operations to use"
+                     [[]]
+                     admin)
 
    [nil "--rf REPLICATION_FACTOR" "Replication factor"
     :default 3
@@ -81,33 +68,14 @@
 
    (cli/tarball-opt link-to-tarball)])
 
-(defn combine-nemesis
-  "Combine nemesis options with bootstrapper and decommissioner"
-  [opts nemesis joining clock]
-  (-> opts
-      (assoc :suffix (str (:name nemesis) (:name joining) (:name clock)))
-      (assoc :join joining)
-      (assoc :clock clock)
-      (assoc :decommissioned
-             (if (:bootstrap joining)
-               (atom #{(last (:nodes opts))})
-               (atom #{})))
-      (assoc :nemesis nemesis)))
-      ;(assoc :nemesis
-      ;       (jn/compose
-      ;        (conj {#{:start :stop} (:nemesis (eval nemesis))}
-      ;              (when (:decommission joining)
-      ;                {#{:decommission} (conductors/decommissioner)})
-      ;              (when (:bootstrap joining)
-      ;                {#{:bootstrap} (conductors/bootstrapper)})
-      ;              (when (or (:bump clock) (:strobe clock))
-      ;                {#{:reset :bump :strobe} (nt/clock-nemesis)}))))))
-
 (defn cassandra-test
   [opts]
   (let [workload-key (:workload opts)
         workload ((workload-key workloads) opts)
-        nemesis (cn/nemesis-package {:faults    (:nemesis opts)
+        db (cassandra/db)
+        nemesis (cn/nemesis-package {:db db
+                                     :faults (:nemesis opts)
+                                     :admin (:admin opts)
                                      :partition {:targets [:one
                                                            :primaries
                                                            :majority
@@ -116,10 +84,12 @@
     (merge tests/noop-test
            opts
            {:name (str "cassandra-" (name workload-key)
-                       (when seq (:nemesis opts)
-                         (str "-" (str/join "-" (map name (:nemesis opts))))))
+                       (when (seq (:nemesis opts))
+                         (str "-" (str/join "-" (map name (:nemesis opts)))))
+                       (when (seq (:admin opts))
+                         (str "-" (str/join "-" (map name (:admin opts))))))
             :client (:client workload)
-            :db (cassandra/db)
+            :db db
             :pure-generators true
             :generator (gen/phases
                         (->> (:generator workload)
@@ -145,9 +115,12 @@
            :run (fn [{:keys [options]}]
                   (doseq [_ (range (:test-count options))
                           workload (:workload options)
-                          nemesis (:nemesis options)]
+                          nemesis (:nemesis options)
+                          admin (:admin options)]
                     (let [test (-> options
-                                   (assoc :workload workload :nemesis nemesis)
+                                   (assoc :workload workload
+                                          :nemesis nemesis
+                                          :admin admin)
                                    cassandra-test
                                    jepsen/run!)]
                       (when-not (:valid? (:results test))

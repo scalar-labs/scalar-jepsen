@@ -1,5 +1,6 @@
 (ns cassandra.nemesis
-  (:require [clojure.set :as set]
+  (:require [clojure.tools.logging :refer [info]]
+            [clojure.set :as set]
             [jepsen
              [control :as c]
              [generator :as gen]
@@ -93,54 +94,139 @@
             (c/on node (stop! test node)))
           (reset! nodes nil))))))
 
-(defn- crash-nemesis
+(defn crash-nemesis
   "A nemesis that crashes a random subset of nodes."
   []
   (test-aware-node-start-stopper
    safe-mostly-small-nonempty-subset
-   (fn start [test node] (meh (c/su (c/exec :killall :-9 :java))) [:killed node])
+   (fn start [_ node] (meh (c/su (c/exec :killall :-9 :java))) [:killed node])
    (fn stop  [test node]
      (meh (cass/guarded-start! node test))
      (meh (cass/wait-ready node 300 10 test))
      [:restarted node])))
 
-(defn- crash-generators
+(defn crash-generators
   [opts]
-  (let [faults (:faults opts)
-        kill?  (contains? faults :crash)
-
-        ; Starts and kills
-        start  {:type :info, :f :start, :value :all}
-        kill   (fn [_ _] {:type   :info
-                          :f      :kill
-                          :value  :nil})
-
-        ; Flip-flop generators
-        kill-start (gen/flip-flop kill (repeat start))]
+  (let [start  {:type :info, :f :start}
+        kill   (fn [_ _] {:type :info, :f :kill})
+        kill-start (gen/stagger (:interval opts default-interval)
+                                (gen/flip-flop kill (repeat start)))]
     {:generator       [kill-start]
      :final-generator [start]}))
 
-(defn- crash-package
+(defn crash-package
   "Crash nemesis and generator package for Cassandra."
   [opts]
-  (let [needed? (contains? (:faults opts) :crash)
-        {:keys [generator final-generator]} (crash-generators opts)
-        generator (gen/stagger (:interval opts default-interval)
-                               generator)]
-    {:generator       (when needed? generator)
-     :final-generator (when needed? final-generator)
-     :nemesis         (crash-nemesis)
-     :perf #{{:name   "kill"
-              :start  #{:kill}
-              :stop   #{:start}
-              :color  "#E9A4A0"}}}))
+  (when (contains? (:faults opts) :crash)
+    (let [{:keys [generator final-generator]} (crash-generators opts)]
+      {:generator       generator
+       :final-generator final-generator
+       :nemesis         (crash-nemesis)
+       :perf #{{:name   "kill"
+                :start  #{:kill}
+                :stop   #{:start}
+                :color  "#E9A4A0"}}})))
+
+(defn join-nemesis
+  []
+  (reify
+    nemesis/Reflection
+    (fs [_] #{:bootstrap :decommission})
+
+    nemesis/Nemesis
+    (setup! [this _] this)
+
+    (invoke! [_ test op]
+      (let [decommissioned (:decommissioned test)]
+        (case (:f op)
+          :bootstrap (if-let [node (first @decommissioned)]
+                       (do (info node "starting bootstrapping")
+                           (swap! decommissioned (comp set rest))
+                           (c/on node (cass/delete-data! test node false))
+                           (c/on node (cass/start! node test))
+                           (while (seq (cass/joining-nodes test))
+                             (info node "still joining")
+                             (Thread/sleep 1000))
+                           (assoc op :value (str node " bootstrapped")))
+                       (assoc op :value "no nodes left to bootstrap"))
+          :decommission (if-let [node (some-> test
+                                              cass/live-nodes
+                                              shuffle
+                                              (get (:rf test)))] ; keep at least RF nodes
+                          (do (info node "decommissioning")
+                              (info @decommissioned "already decommissioned")
+                              (swap! decommissioned conj node)
+                              (cass/nodetool test node "decommission")
+                              (assoc op :value (str node " decommissioned")))
+                          (assoc op :value "no nodes eligible for decommission")))))
+
+    (teardown! [this _] this)))
+
+(defn join-generator
+  [opts]
+  (when (contains? (:admin opts) :join)
+    (->> (gen/mix [(repeat {:type :info, :f :bootstrap})
+                   (repeat {:type :info, :f :decommission})])
+         (gen/stagger default-interval))))
+
+(defn join-package
+  "A combined nemesis package for adding and removing nodes."
+  [opts]
+  (when (contains? (:admin opts) :join)
+    {:nemesis   (join-nemesis)
+     :generator (join-generator opts)
+     :perf      #{{:name  "bootstrap"
+                   :fs    [:bootstrap]
+                   :color "#E9A0E6"}
+                  {:name  "decommission"
+                   :fs    [:decommision]
+                   :color "#ACA0E9"}}}))
+
+(defn flush-nemesis
+  []
+  (reify
+    nemesis/Reflection
+    (fs [_] #{:flush :compact})
+
+    nemesis/Nemesis
+    (setup! [this _] this)
+    (invoke! [_ test op]
+      (if-let [node (some-> test cass/live-nodes vec rand-nth)]
+        (do (cass/nodetool test node (name (:f op)))
+            (assoc op :value (str node " started " (name (:f op)) "ing")))
+        (assoc op :value (str "no nodes left to " (name (:f op))))))
+    (teardown! [this _] this)))
+
+(defn flush-generator
+  [opts]
+  (when (contains? (:admin opts) :flush-compact)
+    (->> (gen/mix [(repeat {:type :info, :f :flush})
+                   (repeat {:type :info, :f :compact})])
+         (gen/stagger default-interval))))
+
+(defn flush-package
+  "A combined nemesis package for flush and compaction."
+  [opts]
+  (when (contains? (:admin opts) :flush-compact)
+    {:nemesis   (flush-nemesis)
+     :generator (flush-generator opts)
+     :perf      #{{:name  "flush"
+                   :fs    [:flush]
+                   :color "#E9A0E6"}
+                  {:name  "compact"
+                   :fs    [:compact]
+                   :color "#ACA0E9"}}}))
 
 (defn nemesis-package
   "Constructs a nemesis and generators for etcd."
   [opts]
-  (let [opts (update opts :faults set)]
+  (let [opts (-> opts
+                 (update :faults set)
+                 (update :admin set))]
     (->> [(nc/partition-package opts)
           (nc/clock-package opts)
-          (crash-package opts)]
+          (crash-package opts)
+          (join-package opts)
+          (flush-package opts)]
          (remove nil?)
          nc/compose-packages)))

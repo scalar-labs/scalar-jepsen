@@ -42,14 +42,14 @@
                                        (where [[= :id 0]]))
                                {:consistency writec})
                  (assoc op :type :ok))
-        :read (let [_ (wait-rf-nodes test)
-                    value (->> (alia/execute session
-                                             (select :sets (where [[= :id 0]]))
-                                             {:consistency :all})
-                               first
-                               :elements
-                               (into (sorted-set)))]
-                (assoc op :type :ok, :value value)))
+        :read (do (wait-rf-nodes test)
+                  (let [value (->> (alia/execute session
+                                                 (select :sets (where [[= :id 0]]))
+                                                 {:consistency :all})
+                                   first
+                                   :elements
+                                   (into (sorted-set)))]
+                    (assoc op :type :ok, :value value))))
 
       (catch ExceptionInfo e
         (handle-exception op e))))

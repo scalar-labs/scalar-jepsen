@@ -42,21 +42,21 @@
                                   "APPLY BATCH;")
                              {:consistency :quorum})
                (assoc op :type :ok))
-        :read (let [_ (wait-rf-nodes test)
-                    results (alia/execute session
-                                          (select :bat)
-                                          {:consistency :all})
-                    value-a (->> results
-                                 (filter (fn [ret] (= (:cid ret) 0)))
-                                 (map :value)
-                                 (into (sorted-set)))
-                    value-b (->> results
-                                 (filter (fn [ret] (= (:cid ret) 1)))
-                                 (map :value)
-                                 (into (sorted-set)))]
-                (if (= value-a value-b)
-                  (assoc op :type :ok :value value-a)
-                  (assoc op :type :fail :value [value-a value-b]))))
+        :read (do (wait-rf-nodes test)
+                  (let [results (alia/execute session
+                                              (select :bat)
+                                              {:consistency :all})
+                        value-a (->> results
+                                     (filter (fn [ret] (= (:cid ret) 0)))
+                                     (map :value)
+                                     (into (sorted-set)))
+                        value-b (->> results
+                                     (filter (fn [ret] (= (:cid ret) 1)))
+                                     (map :value)
+                                     (into (sorted-set)))]
+                    (if (= value-a value-b)
+                      (assoc op :type :ok :value value-a)
+                      (assoc op :type :fail :value [value-a value-b])))))
 
       (catch ExceptionInfo e
         (handle-exception op e))))

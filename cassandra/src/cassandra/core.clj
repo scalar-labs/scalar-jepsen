@@ -72,6 +72,7 @@
 (defn live-nodes
   "Get the list of live nodes from a random node in the cluster"
   [test]
+  (info (->> test get-shuffled-nodes (some #(get-jmx-status % :LiveNodes)) (dns-hostnames test)))
   (->> test get-shuffled-nodes
        (some #(get-jmx-status % :LiveNodes))
        (dns-hostnames test)))
@@ -95,7 +96,10 @@
 (defn nodetool
   "Run a nodetool command"
   [test node & args]
-  (c/on node (apply c/exec (lit (str (:cassandra-dir test) "/bin/nodetool")) args)))
+  (c/on node (apply c/exec
+                    (lit (str (:cassandra-dir test) "/bin/nodetool"))
+                    :-Dcom.sun.jndi.rmiURLParsing=legacy
+                    args)))
 
 (defn- install-jdk-with-retry
   []
@@ -254,8 +258,7 @@
     (setup-primary! [_ _ _])
 
     db/LogFiles
-    (log-files [_ _ _]
-      [])))
+    (log-files [_ test _] [(cassandra-log test)])))
 
 (defn adds
   "Generator that emits :add operations for sequential integers."
