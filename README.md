@@ -7,7 +7,7 @@ $ cd docker
 ```
 2. Run docker-compose
 ```sh
-$ docker-compose up
+$ docker-compose up -d
 ```
 3. Enter the control node
 ```sh
