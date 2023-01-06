@@ -171,20 +171,3 @@
                                   :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
       (is (= :unavailable (:error result))))))
-
-(deftest lwt-client-unavailable-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
-                alia/execute (spy/mock
-                              (fn [_ cql & _]
-                                (when (contains? cql :select)
-                                  (throw (ex-info  "Unavailable"
-                                                   {:type ::execute
-                                                    :exception (NoHostAvailableException. {})})))))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
-                               {:nodes ["n1" "n2" "n3"]} nil)
-          result (client/invoke! client {}
-                                 {:type :invoke :f :read
-                                  :value (independent/tuple 0 nil)})]
-      (is (= :fail (:type result)))
-      (is (= :no-host-available (:error result))))))

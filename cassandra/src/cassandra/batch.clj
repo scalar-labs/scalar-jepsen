@@ -28,7 +28,7 @@
                                            :value       :int
                                            :primary-key [:pid :cid]}}))))
 
-  (invoke! [_ _ op]
+  (invoke! [_ test op]
     (try
       (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
