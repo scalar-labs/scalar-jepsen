@@ -16,9 +16,10 @@ $ docker exec -it jepsen-control bash
 4. Run a test
 ```
 # cd /scalar-jepsen/cassandra
-# lein run test --test lwt
+# lein run test --test lwt --ssh-private-key ~/.ssh/id_rsa
 ```
   - Check README in each test for more detail
+  - `--ssh-private-key` should be always set to specify the SSH key
 
 # Run tests without Docker
 1. Launch debian machines as a control machine and Cassandra nodes
