@@ -1,7 +1,7 @@
 #!/bin/sh
 
 mkdir -m 700 ~/.ssh
-ssh-keygen -t rsa -b 4096 -N '' -f ~/.ssh/id_rsa
+ssh-keygen -t rsa -b 4096 -m PEM -N '' -f ~/.ssh/id_rsa
 cp ~/.ssh/id_rsa.pub /keys
 touch /keys/control_ready
 
