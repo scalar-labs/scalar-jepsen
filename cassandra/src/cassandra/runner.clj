@@ -69,7 +69,7 @@
    (cli/tarball-opt link-to-tarball)])
 
 (defn cassandra-test
-  [opts workloads]
+  [opts]
   (let [target (:target opts)
         workload-key (:workload opts)
         workload ((workload-key workloads) opts)
@@ -124,7 +124,7 @@
                                           :workload workload
                                           :nemesis nemesis
                                           :admin admin)
-                                   (cassandra-test workloads)
+                                   cassandra-test
                                    jepsen/run!)]
                       (when-not (:valid? (:results test))
                         (System/exit 1)))))}})

@@ -65,25 +65,26 @@
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
-                  (doseq [_ (range (:test-count options))
-                          workload (:workload options)
-                          nemesis (:nemesis options)
-                          admin (:admin options)]
-                    (let [test (-> options
-                                   (assoc :target "scalardb"
-                                          :workload workload
-                                          :nemesis nemesis
-                                          :admin admin
-                                          :storage (atom nil)
-                                          :transaction (atom nil)
-                                          :2pc (atom nil)
-                                          :table-id INITIAL_TABLE_ID
-                                          :unknown-tx (atom #{})
-                                          :failures (atom 0))
-                                   (car/cassandra-test workloads)
-                                   jepsen/run!)]
-                      (when-not (:valid? (:results test))
-                        (System/exit 1)))))}})
+                  (with-redefs [car/workloads workloads]
+                    (doseq [_ (range (:test-count options))
+                            workload (:workload options)
+                            nemesis (:nemesis options)
+                            admin (:admin options)]
+                      (let [test (-> options
+                                     (assoc :target "scalardb"
+                                            :workload workload
+                                            :nemesis nemesis
+                                            :admin admin
+                                            :storage (atom nil)
+                                            :transaction (atom nil)
+                                            :2pc (atom nil)
+                                            :table-id INITIAL_TABLE_ID
+                                            :unknown-tx (atom #{})
+                                            :failures (atom 0))
+                                     car/cassandra-test
+                                     jepsen/run!)]
+                        (when-not (:valid? (:results test))
+                          (System/exit 1))))))}})
 
 (defn -main
   [& args]

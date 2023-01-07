@@ -63,7 +63,8 @@
            :opt-fn   (fn [parsed] (-> parsed parse-nodes cli/test-opt-fn))
            :usage    (cli/test-usage)
            :run (fn [{:keys [options]}]
-                  (with-redefs [cassandra/db dl/db]
+                  (with-redefs [cassandra/db dl/db
+                                car/workloads workloads]
                     (doseq [_ (range (:test-count options))
                             workload (:workload options)
                             nemesis (:nemesis options)
