@@ -1,6 +1,5 @@
 (ns scalardb.transfer-append-2pc
-  (:require [cassandra.conductors :as conductors]
-            [cassandra.core :as cassandra]
+  (:require [cassandra.core :as cassandra]
             [clojure.core.reducers :as r]
             [jepsen
              [client :as client]
@@ -250,17 +249,11 @@
          :bad-balance          bad-balance
          :bad-age              bad-age}))))
 
-(defn transfer-append-2pc-test
-  [opts]
-  (merge (scalar/scalardb-test (str "transfer-append-2pc-" (:suffix opts))
-                               {:client     (TransferClient. (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
-                                :unknown-tx (atom #{})
-                                :failures   (atom 0)
-                                :generator  (gen/phases
-                                             (->> [diff-transfer]
-                                                  (conductors/std-gen opts))
-                                             (conductors/terminate-nemesis opts)
-                                             (gen/clients (gen/once check-tx))
-                                             (gen/clients (gen/once get-all)))
-                                :checker    (consistency-checker)})
-         opts))
+(defn workload
+  [_]
+  {:client (->TransferClient (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
+   :generator [diff-transfer]
+   :final-generator (gen/phases
+                     (gen/once check-tx)
+                     (gen/once get-all))
+   :checker (consistency-checker)})

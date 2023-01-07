@@ -69,13 +69,16 @@
    (cli/tarball-opt link-to-tarball)])
 
 (defn cassandra-test
-  [opts]
-  (let [workload-key (:workload opts)
+  [opts workloads]
+  (let [target (:target opts)
+        workload-key (:workload opts)
         workload ((workload-key workloads) opts)
+        faults (:nemesis opts)
+        admin (:admin opts)
         db (cassandra/db)
         nemesis (cn/nemesis-package {:db db
-                                     :faults (:nemesis opts)
-                                     :admin (:admin opts)
+                                     :faults faults
+                                     :admin admin
                                      :partition {:targets [:one
                                                            :primaries
                                                            :majority
@@ -83,11 +86,10 @@
                                                            :minority-third]}})]
     (merge tests/noop-test
            opts
-           {:name (str "cassandra-" (name workload-key)
-                       (when (seq (:nemesis opts))
-                         (str "-" (str/join "-" (map name (:nemesis opts)))))
-                       (when (seq (:admin opts))
-                         (str "-" (str/join "-" (map name (:admin opts))))))
+           {:name (-> [target (name workload-key)]
+                      (into (map name faults))
+                      (into (map name admin))
+                      (->> (remove nil?) (str/join "-")))
             :client (:client workload)
             :db db
             :pure-generators true
@@ -118,10 +120,11 @@
                           nemesis (:nemesis options)
                           admin (:admin options)]
                     (let [test (-> options
-                                   (assoc :workload workload
+                                   (assoc :target "cassandra"
+                                          :workload workload
                                           :nemesis nemesis
                                           :admin admin)
-                                   cassandra-test
+                                   (cassandra-test workloads)
                                    jepsen/run!)]
                       (when-not (:valid? (:results test))
                         (System/exit 1)))))}})

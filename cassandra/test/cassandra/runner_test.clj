@@ -3,9 +3,10 @@
             [cassandra.runner :as runner]))
 
 (deftest name-test
-  (let [opts {:workload :batch
+  (let [opts {:target "cassandra"
+              :workload :batch
               :nemesis [:crash]
               :admin [:flush-compact]
               :time-limit 60}
         test (runner/cassandra-test opts)]
-    (is (= (:name test) "cassandra-batch-crash-flush-compact"))))
+    (is (= "cassandra-batch-crash-flush-compact" (:name test)))))

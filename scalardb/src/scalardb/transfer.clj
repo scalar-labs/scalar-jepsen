@@ -1,6 +1,5 @@
 (ns scalardb.transfer
-  (:require [cassandra.conductors :as conductors]
-            [cassandra.core :as cassandra]
+  (:require [cassandra.core :as cassandra]
             [clojure.core.reducers :as r]
             [jepsen
              [client :as client]
@@ -194,7 +193,7 @@
 (defn- consistency-checker
   []
   (reify checker/Checker
-    (check [this test history opts]
+    (check [_ test history _]
       (let [read-result (->> history
                              (r/filter #(= :get-all (:f %)))
                              (r/filter identity)
@@ -203,7 +202,7 @@
                              :value)
             actual-balance (->> (:balance read-result)
                                 (reduce +))
-            bad-balance (if-not (= actual-balance TOTAL_BALANCE)
+            bad-balance (when-not (= actual-balance TOTAL_BALANCE)
                           {:type     :wrong-balance
                            :expected TOTAL_BALANCE
                            :actual   actual-balance})
@@ -226,7 +225,7 @@
             expected-version (-> total-ok
                                  (* 2)                      ; update 2 records per a transfer
                                  (+ (-> test :client :n)))  ; initial insertions
-            bad-version (if-not (= actual-version expected-version)
+            bad-version (when-not (= actual-version expected-version)
                           {:type     :wrong-version
                            :expected expected-version
                            :actual   actual-version})]
@@ -236,19 +235,11 @@
          :bad-balance          bad-balance
          :bad-version          bad-version}))))
 
-(defn transfer-test
-  [opts]
-  (merge (scalar/scalardb-test (str "transfer-" (:suffix opts))
-                               {:client     (TransferClient. (atom false)
-                                                             NUM_ACCOUNTS
-                                                             INITIAL_BALANCE)
-                                :unknown-tx (atom #{})
-                                :failures   (atom 0)
-                                :generator  (gen/phases
-                                             (->> [diff-transfer]
-                                                  (conductors/std-gen opts))
-                                             (conductors/terminate-nemesis opts)
-                                             (gen/clients (gen/once get-all))
-                                             (gen/clients (gen/once check-tx)))
-                                :checker    (consistency-checker)})
-         opts))
+(defn workload
+  [_]
+  {:client (->TransferClient (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
+   :generator [diff-transfer]
+   :final-generator (gen/phases
+                     (gen/once check-tx)
+                     (gen/once get-all))
+   :checker (consistency-checker)})

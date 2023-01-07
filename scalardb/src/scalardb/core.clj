@@ -18,6 +18,8 @@
 (def ^:const RETRIES 8)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
+(def ^:const INITIAL_TABLE_ID 1)
+(def ^:const DEFAULT_TABLE_COUNT 3)
 
 (def ^:private ^:const COORDINATOR "coordinator")
 (def ^:private ^:const STATE_TABLE "state")
@@ -262,12 +264,3 @@
     {:stats (independent-stats-checker)
      :exceptions (checker/unhandled-exceptions)
      :workload (independent-workload-checker workload-checker)})))
-
-(defn scalardb-test
-  [name opts]
-  (merge tests/noop-test
-         {:name        (str "scalardb-" name)
-          :storage     (atom nil)
-          :transaction (atom nil)
-          :2pc (atom nil)}
-         opts))
