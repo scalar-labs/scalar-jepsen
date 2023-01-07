@@ -72,7 +72,6 @@
 (defn live-nodes
   "Get the list of live nodes from a random node in the cluster"
   [test]
-  (info (->> test get-shuffled-nodes (some #(get-jmx-status % :LiveNodes)) (dns-hostnames test)))
   (->> test get-shuffled-nodes
        (some #(get-jmx-status % :LiveNodes))
        (dns-hostnames test)))

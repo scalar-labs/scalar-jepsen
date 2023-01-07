@@ -14,7 +14,6 @@
 
 (def ^:dynamic contract-count (atom 0))
 (def ^:dynamic execute-count (atom 0))
-(def ^:dynamic test-records (atom []))
 
 (def mock-client-service
   (proxy [ClientService] [nil nil nil nil]

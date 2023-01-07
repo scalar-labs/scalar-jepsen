@@ -1,6 +1,5 @@
 (ns scalardl.transfer
-  (:require  [cassandra.conductors :as conductors]
-             [clojure.tools.logging :refer [debug info warn]]
+  (:require  [clojure.tools.logging :refer [info warn]]
              [clojure.core.reducers :as r]
              [jepsen
               [client :as client]
@@ -34,7 +33,6 @@
 (def ^:private ^:const ASSET_AMOUNT "amount")
 (def ^:private ^:const ASSET_BALANCE "balance")
 (def ^:private ^:const ASSET_AGE "age")
-(def ^:private ^:const NONCE "nonce")
 
 (defn- create-argument
   ([id]
@@ -68,7 +66,7 @@
           balance (-> (util/result->json result) (.getInt ASSET_BALANCE))
           age (-> (util/result->json result) (.getInt ASSET_AGE))]
       {:balance balance :age age})
-    (catch ClientException e
+    (catch ClientException _
       (warn "Failed to read a balance from id =" id))))
 
 (defn- read-with-retry
@@ -168,7 +166,7 @@
 (defn- asset-checker
   []
   (reify checker/Checker
-    (check [_ test history opts]
+    (check [_ _ history _]
       (let [read-results (->> history
                               (r/filter #(= :get-all (:f %)))
                               (r/filter identity)
@@ -204,18 +202,11 @@
          :bad-balance bad-balance
          :bad-age bad-age}))))
 
-(defn transfer-test
-  [opts]
-  (merge (dl/scalardl-test (str "transfer-" (:suffix opts))
-                           {:client     (->TransferClient (atom false)
-                                                          (atom nil)
-                                                          NUM_ACCOUNTS)
-                            :failures   (atom 0)
-                            :unknown-tx (atom #{})
-                            :generator  (gen/phases
-                                         (conductors/std-gen opts [diff-transfer])
-                                         (conductors/terminate-nemesis opts)
-                                         (gen/clients (gen/once get-all))
-                                         (gen/clients (gen/once check-tx)))
-                            :checker   (asset-checker)})
-         opts))
+(defn workload
+  [_]
+  {:client (->TransferClient (atom false) (atom nil) NUM_ACCOUNTS)
+   :generator [diff-transfer]
+   :final-generator (gen/phases
+                     (gen/once get-all)
+                     (gen/once check-tx))
+   :checker (asset-checker)})

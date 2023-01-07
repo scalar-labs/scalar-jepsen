@@ -251,6 +251,6 @@
   {:client (->TransferClient (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
    :generator [diff-transfer]
    :final-generator (gen/phases
-                     (gen/once check-tx)
-                     (gen/once get-all))
+                     (gen/once get-all)
+                     (gen/once check-tx))
    :checker (consistency-checker)})

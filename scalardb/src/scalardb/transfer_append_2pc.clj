@@ -216,7 +216,7 @@
 (defn- consistency-checker
   []
   (reify checker/Checker
-    (check [this test history opts]
+    (check [_ _ history _]
       (let [read-result (->> history
                              (r/filter #(= :get-all (:f %)))
                              (into [])
@@ -224,7 +224,7 @@
                              :value)
             actual-balance (->> (:balance read-result)
                                 (reduce +))
-            bad-balance (if-not (= actual-balance TOTAL_BALANCE)
+            bad-balance (when-not (= actual-balance TOTAL_BALANCE)
                           {:type     :wrong-balance
                            :expected TOTAL_BALANCE
                            :actual   actual-balance})
@@ -232,7 +232,7 @@
                             (reduce +))
             expected-age (->> (:num read-result)
                               (reduce +))
-            bad-age (if-not (= actual-age expected-age)
+            bad-age (when-not (= actual-age expected-age)
                       {:type     :wrong-age
                        :expected expected-age
                        :actual   actual-age})
@@ -254,6 +254,6 @@
   {:client (->TransferClient (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
    :generator [diff-transfer]
    :final-generator (gen/phases
-                     (gen/once check-tx)
-                     (gen/once get-all))
+                     (gen/once get-all)
+                     (gen/once check-tx))
    :checker (consistency-checker)})
