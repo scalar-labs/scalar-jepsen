@@ -1,38 +1,25 @@
 [![CircleCI](https://circleci.com/gh/scalar-labs/scalar-jepsen/tree/master.svg?style=svg)](https://circleci.com/gh/scalar-labs/scalar-jepsen/tree/master)
 
 # Run tests with Jepsen Docker
-1. Clone [Jepsen repository](https://github.com/jepsen-io/jepsen)
-    - Use 0.2.0 since 0.2.1+ uses newer debian version for DB nodes that does not have `openjdk-8-jre` package any more.
-2. Configure to mount `scalar-jepsen` directory by editing `${JEPSEN_ROOT}/docker/docker-compose.dev.yml` like the following
-
-```yaml
-   control:
-     volumes:
-       - ${JEPSEN_ROOT}:/jepsen # Mounts $JEPSEN_ROOT on host to /jepsen control container
-       - ${SCALAR_JEPSEN_ROOT}:/scalar-jepsen # $SCALAR_JEPSEN_ROOT is the path of this repository on host
-```
-
-3. Start docker with `--dev` option
-
+1. Move to the docker directory
 ```sh
-$ cd ${JEPSEN_ROOT}/docker
-$ ./up.sh --dev
+$ cd docker
 ```
-
-Note that you may need to update the `up.sh` script because there is an issue. See [this](https://github.com/jepsen-io/jepsen/issues/463) for more detail.
-
-4. Run tests in `jepsen-control`
-  - You can login `jepsen-control` by the following command
-  ```sh
-  $ docker exec -it jepsen-control bash
-  ```
-
+2. Run docker-compose
+```sh
+$ docker-compose up -d
+```
+3. Enter the control node
+```sh
+$ docker exec -it jepsen-control bash
+```
+4. Run a test
 ```
 # cd /scalar-jepsen/cassandra
-# lein run test --test lwt
+# lein run test --test lwt --ssh-private-key ~/.ssh/id_rsa
 ```
-
   - Check README in each test for more detail
+  - `--ssh-private-key` should be always set to specify the SSH key
 
 # Run tests without Docker
 1. Launch debian machines as a control machine and Cassandra nodes
