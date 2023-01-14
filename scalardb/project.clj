@@ -2,7 +2,7 @@
   :description "Jepsen testing for Scalar DB"
   :url "https://github.com/scalar-labs/scalar-jepsen"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [jepsen "0.3.0" :exclusions [net.java.dev.jna/jna
+                 [jepsen "0.3.1" :exclusions [net.java.dev.jna/jna
                                               net.java.dev.jna/jna-platform]]
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
