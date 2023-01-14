@@ -19,23 +19,23 @@
   "A map of test workload keys."
   {"transfer"            :transfer
    "transfer-append"     :transfer-append
-   "elle-append"         :elle-append-test
-   "elle-write-read"     :elle-write-read-test
-   "transfer-2pc"        :transfer-2pc-test
-   "transfer-append-2pc" :transfer-append-2pc-test
-   "elle-append-2pc"     :elle-append-2pc-test
-   "elle-write-read-2pc" :elle-write-read-2pc-test})
+   "elle-append"         :elle-append
+   "elle-write-read"     :elle-write-read
+   "transfer-2pc"        :transfer-2pc
+   "transfer-append-2pc" :transfer-append-2pc
+   "elle-append-2pc"     :elle-append-2pc
+   "elle-write-read-2pc" :elle-write-read-2pc})
 
 (def workloads
   "A map of workload to test constructors."
-  {:transfer                 scalardb.transfer/workload
-   :transfer-append          scalardb.transfer-append/workload
-   :elle-append-test         scalardb.elle-append/workload
-   :elle-write-read-test     scalardb.elle-write-read/workload
-   :transfer-2pc-test        scalardb.transfer-2pc/workload
-   :transfer-append-2pc-test scalardb.transfer-append-2pc/workload
-   :elle-append-2pc-test     scalardb.elle-append-2pc/workload
-   :elle-write-read-2pc-test scalardb.elle-write-read-2pc/workload})
+  {:transfer            scalardb.transfer/workload
+   :transfer-append     scalardb.transfer-append/workload
+   :elle-append         scalardb.elle-append/workload
+   :elle-write-read     scalardb.elle-write-read/workload
+   :transfer-2pc        scalardb.transfer-2pc/workload
+   :transfer-append-2pc scalardb.transfer-append-2pc/workload
+   :elle-append-2pc     scalardb.elle-append-2pc/workload
+   :elle-write-read-2pc scalardb.elle-write-read-2pc/workload})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
@@ -78,9 +78,11 @@
                                             :storage (atom nil)
                                             :transaction (atom nil)
                                             :2pc (atom nil)
-                                            :table-id INITIAL_TABLE_ID
+                                            :table-id (atom INITIAL_TABLE_ID)
                                             :unknown-tx (atom #{})
                                             :failures (atom 0))
+                                     (update :consistency-model
+                                             (fn [ms] (mapv keyword ms)))
                                      car/cassandra-test
                                      jepsen/run!)]
                         (when-not (:valid? (:results test))

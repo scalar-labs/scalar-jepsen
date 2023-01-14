@@ -95,7 +95,6 @@
             :pure-generators true
             :generator (gen/phases
                         (->> (:generator workload)
-                             gen/mix
                              (gen/nemesis
                               (gen/phases
                                (gen/sleep 5)
