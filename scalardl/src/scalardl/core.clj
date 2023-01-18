@@ -114,7 +114,7 @@
   []
   (retry-when-exception (fn [package]
                           (c/su (debian/install package)))
-                        [[:openjdk-8-jre]]
+                        [[:openjdk-11-jre]]
                         debian/update!))
 
 (defn- install-server!
