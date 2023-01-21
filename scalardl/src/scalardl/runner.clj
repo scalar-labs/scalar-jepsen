@@ -22,9 +22,6 @@
   {:cas      scalardl.cas/workload
    :transfer scalardl.transfer/workload})
 
-(def nemeses
-  {"crash" `(nemesis/crash)})
-
 (def opt-spec
   [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
 
@@ -76,7 +73,7 @@
                                             :admin admin
                                             :unknown-tx (atom #{})
                                             :failures (atom 0))
-                                     (car/cassandra-test workloads)
+                                     car/cassandra-test
                                      jepsen/run!)]
                         (when-not (:valid? (:results test))
                           (System/exit 1))))))}})

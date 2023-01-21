@@ -37,14 +37,12 @@
   {"none"      []
    "partition" [:partition]
    "clock"     [:clock]
-   "crash"     [:crash]
-   "mix"       [:crash :partition :clock]})
+   "crash"     [:crash]})
 
 (def admin
   {"none" []
    "join" [:join]
-   "flush" [:flush-compact]
-   "mix" [:member :flush-compact]})
+   "flush" [:flush-compact]})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)])
