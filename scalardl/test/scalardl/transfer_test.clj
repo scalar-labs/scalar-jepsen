@@ -136,7 +136,7 @@
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
                    (client/invoke! client nil (#'transfer/get-all {} nil))))
-      (is (spy/called-n-times? dl/exponential-backoff 8)))))
+      (is (spy/called-n-times? dl/exponential-backoff 9)))))
 
 (def correct-history
   [{:type :ok :f :transfer}

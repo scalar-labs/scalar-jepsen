@@ -16,7 +16,7 @@
            (java.util Optional)
            (java.util Properties)))
 
-(def ^:const RETRIES 9)
+(def ^:const RETRIES 10)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 
 (def ^:private ^:const LEDGER_INSTALL_DIR "/root/ledger")
