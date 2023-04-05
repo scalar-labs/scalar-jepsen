@@ -35,14 +35,14 @@ services:
     << : *default-node
     container_name: jepsen-n3
     hostname: n3
-  n4:
-    << : *default-node
-    container_name: jepsen-n4
-    hostname: n4
-  n5:
-    << : *default-node
-    container_name: jepsen-n5
-    hostname: n5
+  # n4:
+  #   << : *default-node
+  #   container_name: jepsen-n4
+  #   hostname: n4
+  # n5:
+  #   << : *default-node
+  #   container_name: jepsen-n5
+  #   hostname: n5
 
 networks:
   jepsen:

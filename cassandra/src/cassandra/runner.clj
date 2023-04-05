@@ -1,6 +1,7 @@
 (ns cassandra.runner
   (:gen-class)
   (:require [cassandra
+             [bank       :as bank]
              [batch      :as batch]
              [conductors :as conductors]
              [core       :as cassandra]
@@ -20,6 +21,7 @@
 (def tests
   "A map of test names to test constructors."
   {"batch"   batch/batch-test
+   "bank"    bank/bank-test
    "map"     map/map-test
    "set"     set/set-test
    "counter" counter/cnt-inc-test
