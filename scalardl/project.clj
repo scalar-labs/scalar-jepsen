@@ -3,8 +3,12 @@
   :url "https://github.com/scalar-labs/scalar-jepsen"
   :license {:name ""
             :url ""}
-  :dependencies [[org.clojure/clojure "1.10.1"]
-                 [jepsen "0.2.1"]
+  :dependencies [[org.clojure/clojure "1.11.1"]
+                 [jepsen "0.3.1" :exclusions [net.java.dev.jna/jna
+                                              net.java.dev.jna/jna-platform]]
+                 [net.java.dev.jna/jna "5.11.0"]
+                 [net.java.dev.jna/jna-platform "5.11.0"]
+                 [org.slf4j/slf4j-jdk14 "2.0.6"]
                  [cassandra "0.1.0-SNAPSHOT"]
                  [cc.qbits/alia "4.3.6"]
                  [cc.qbits/hayt "4.1.0"]]
@@ -13,8 +17,7 @@
                    :plugins [[lein-cloverage "1.1.2"]]}
              :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "4.0.0-SNAPSHOT"
                                             :exclusions [org.slf4j/slf4j-log4j12
-                                                         com.oracle.database.jdbc/ojdbc8
-                                                         software.amazon.awssdk/*]]]}
+                                                         com.scalar-labs/scalardb]]]}
              :use-jars {:dependencies [[org.bouncycastle/bcpkix-jdk15on "1.59"]
                                        [org.bouncycastle/bcprov-jdk15on "1.59"]
                                        [com.google.inject/guice "4.2.0"]
