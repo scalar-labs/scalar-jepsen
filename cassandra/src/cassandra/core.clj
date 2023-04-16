@@ -149,14 +149,12 @@
                       (str "\"s/rpc_address: .*/rpc_address: " (cn/ip node) "/g\"")
                       (str "\"s/hinted_handoff_enabled:.*/hinted_handoff_enabled: " (disable-hints?) "/g\"")
                       "\"s/commitlog_sync: .*/commitlog_sync: batch/g\""
-                      (str "\"s/# commitlog_sync_batch_window_in_ms: .*/"
-                           "commitlog_sync_batch_window_in_ms: 1.0/g\"")
-                      "\"s/commitlog_sync_period_in_ms: .*/#/g\""
+                      "\"s/# commitlog_sync_batch_window_in_ms: .*/commitlog_sync_batch_window_in_ms: 1.0/g\""
+                      "\"/commitlog_sync_period: .*/d\""
                       "\"/auto_bootstrap: .*/d\""
                       "\"s/# commitlog_compression.*/commitlog_compression:/g\""
                       "\"s/#hints_compression.*/hints_compression:/g\""
-                      (str "\"s/#   - class_name: LZ4Compressor/"
-                           "    - class_name: LZ4Compressor/g\"")])]
+                      "\"s/#   - class_name: LZ4Compressor/    - class_name: LZ4Compressor/g\""])]
      (c/exec :sed :-i (lit rep) (str (:cassandra-dir test) "/conf/cassandra.yaml")))
    (c/exec :sed :-i (lit "\"s/INFO/DEBUG/g\"") (str (:cassandra-dir test) "/conf/logback.xml"))))
 
