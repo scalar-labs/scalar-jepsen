@@ -1,6 +1,5 @@
 (ns cassandra.lwt
   (:require [cassandra.core :refer :all]
-            [cassandra.conductors :as conductors]
             [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [checker :as checker]
@@ -85,26 +84,21 @@
 
   (teardown! [_ _]))
 
-(defn lwt-test
+(defn workload
   [opts]
-  (merge (cassandra-test (str "lwt-" (:suffix opts))
-                         {:client    (->CasRegisterClient (atom false) nil nil)
-                          :checker   (independent/checker
-                                      (checker/compose
-                                       {:timeline (timeline/html)
-                                        :linear (checker/linearizable
-                                                 {:model (model/cas-register)})}))
-                          :generator (->> (independent/concurrent-generator
-                                           (:concurrency opts)
-                                           (range)
-                                           (fn [_]
-                                             (->> (gen/reserve
-                                                    (quot (:concurrency opts) 2)
-                                                    r
-                                                    (gen/mix [w cas cas]))
-                                                  (gen/limit 100)
-                                                  (gen/process-limit (:concurrency opts)))))
-                                          (gen/nemesis
-                                           (conductors/mix-failure-seq opts))
-                                          (gen/time-limit (:time-limit opts)))})
-         opts))
+  {:client (->CasRegisterClient (atom false) nil nil)
+   :generator (independent/concurrent-generator
+               (:concurrency opts)
+               (range)
+               (fn [_]
+                 (->> (gen/reserve
+                       (quot (:concurrency opts) 2)
+                       r
+                       (gen/mix [w cas cas]))
+                      (gen/limit 100)
+                      (gen/process-limit (:concurrency opts)))))
+   :checker (independent/checker
+             (checker/compose
+              {:timeline (timeline/html)
+               :linear (checker/linearizable
+                        {:model (model/cas-register)})}))})

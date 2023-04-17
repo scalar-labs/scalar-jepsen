@@ -16,10 +16,13 @@ $ docker exec -it jepsen-control bash
 4. Run a test
 ```
 # cd /scalar-jepsen/cassandra
-# lein run test --test lwt --ssh-private-key ~/.ssh/id_rsa
+# lein run test --workload lwt --ssh-private-key ~/.ssh/id_rsa
 ```
   - Check README in each test for more detail
   - `--ssh-private-key` should be always set to specify the SSH key
+  - `--workload` specifies a test workload. previously we used `--test`.
+  - `--nemesis` sets `none`, `partition`, `clock`, or `crash` (default: `none`)
+  - `--admin` sets `none`, `join` or `flush` (default: `none`)
 
 # Run tests without Docker
 1. Launch debian machines as a control machine and Cassandra nodes
@@ -54,5 +57,5 @@ EOF"
 
 ```sh
 $ cd ${SCALAR_JEPSEN}/cassandra
-$ lein run test --test lwt --ssh-private-key ~/.ssh/id_rsa
+$ lein run test --workload lwt --ssh-private-key ~/.ssh/id_rsa
 ```

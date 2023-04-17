@@ -22,7 +22,7 @@ You will probably need to increase the amount of memory that you make available 
 # in jepsen-control
 
 $ cd ${SCALAR_JEPSEN}/cassandra
-$ lein run test --test lwt --nemesis bridge --join bootstrap
+$ lein run test --workload lwt --nemesis partition --admin join
 ```
 
 - See `lein run test --help` for full options

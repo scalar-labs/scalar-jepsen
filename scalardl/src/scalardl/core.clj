@@ -127,8 +127,8 @@
   (c/upload (:server-key test) LEDGER_KEY)
   (create-server-properties test))
 
-(defn start-server!
-  [node test]
+(defn- start-server!
+  [node]
   (info node "starting DL server")
   (cu/start-daemon! {:logfile LEDGER_LOG :pidfile LEDGER_PID :chdir LEDGER_INSTALL_DIR}
                     LEDGER_EXE
@@ -149,7 +149,7 @@
           (install-server! node test)
           (info node "waiting for starting C* cluster")
           (Thread/sleep (* 1000 60 (count (:cass-nodes test))))
-          (start-server! node test))
+          (start-server! node))
         (cassandra/spinup-cassandra! node test)))
 
     (teardown! [_ test node]
@@ -157,15 +157,12 @@
         (stop-server! node)
         (cassandra/teardown-cassandra! node test)))
 
+    db/Primary
+    (primaries [_ test] (:cass-nodes test))
+    (setup-primary! [_ _ _])
+
     db/LogFiles
     (log-files [_ test node]
       (if (util/server? node test)
         [LEDGER_LOG]
         [(cassandra/cassandra-log test)]))))
-
-(defn scalardl-test
-  [name opts]
-  (merge tests/noop-test
-         {:name (str "scalardl-" name)
-          :db (db)}
-         opts))

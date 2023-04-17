@@ -1,10 +1,8 @@
 (ns scalardl.cas
   (:require [jepsen
              [checker :as checker]
-             [client :as client]
-             [generator :as gen]]
-            [clojure.tools.logging :refer [debug info warn]]
-            [cassandra.conductors :as conductors]
+             [client :as client]]
+            [clojure.tools.logging :refer [info]]
             [knossos.model :as model]
             [scalardl
              [cassandra :as cassandra]
@@ -97,14 +95,9 @@
 (defn w [_ _] {:type :invoke :f :write :value (rand-int 5)})
 (defn cas [_ _] {:type :invoke :f :cas :value [(rand-int 5) (rand-int 5)]})
 
-(defn cas-test
-  [opts]
-  (merge (dl/scalardl-test (str "cas-" (:suffix opts))
-                           {:client     (->CasRegisterClient (atom false) (atom nil))
-                            :failures   (atom 0)
-                            :generator  (gen/phases
-                                         (conductors/std-gen opts [r w cas cas cas])
-                                         (conductors/terminate-nemesis opts))
-                            :checker   (checker/linearizable {:model (model/cas-register)
-                                                              :algorithm :linear})})
-         opts))
+(defn workload
+  [_]
+  {:client (->CasRegisterClient (atom false) (atom nil))
+   :generator [r w cas cas cas]
+   :checker (checker/linearizable {:model (model/cas-register)
+                                   :algorithm :linear})})

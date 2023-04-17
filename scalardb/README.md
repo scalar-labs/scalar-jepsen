@@ -21,7 +21,7 @@ The current tests use [Cassandra test tools in Jepsen](https://github.com/scalar
     # in jepsen-control
 
     $ cd ${SCALAR_JEPSEN}/scalardb
-    $ lein run test --test transfer --nemesis crash --join decommission --time-limit 300
+    $ lein run test --workload transfer --nemesis crash --admin join --time-limit 300
     ```
 
   - For elle-* tests, `graphviz` package is required in jepsen-control. You can install it with `apt-get install graphviz`

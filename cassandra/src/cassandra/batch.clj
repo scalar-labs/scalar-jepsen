@@ -1,6 +1,5 @@
 (ns cassandra.batch
   (:require [cassandra.core :refer :all]
-            [cassandra.conductors :as conductors]
             [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [client :as client]
@@ -29,7 +28,7 @@
                                            :value       :int
                                            :primary-key [:pid :cid]}}))))
 
-  (invoke! [_ _ op]
+  (invoke! [_ test op]
     (try
       (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
@@ -43,20 +42,21 @@
                                   "APPLY BATCH;")
                              {:consistency :quorum})
                (assoc op :type :ok))
-        :read (let [results (alia/execute session
-                                          (select :bat)
-                                          {:consistency :all})
-                    value-a (->> results
-                                 (filter (fn [ret] (= (:cid ret) 0)))
-                                 (map :value)
-                                 (into (sorted-set)))
-                    value-b (->> results
-                                 (filter (fn [ret] (= (:cid ret) 1)))
-                                 (map :value)
-                                 (into (sorted-set)))]
-                (if (= value-a value-b)
-                  (assoc op :type :ok :value value-a)
-                  (assoc op :type :fail :value [value-a value-b]))))
+        :read (do (wait-rf-nodes test)
+                  (let [results (alia/execute session
+                                              (select :bat)
+                                              {:consistency :all})
+                        value-a (->> results
+                                     (filter (fn [ret] (= (:cid ret) 0)))
+                                     (map :value)
+                                     (into (sorted-set)))
+                        value-b (->> results
+                                     (filter (fn [ret] (= (:cid ret) 1)))
+                                     (map :value)
+                                     (into (sorted-set)))]
+                    (if (= value-a value-b)
+                      (assoc op :type :ok :value value-a)
+                      (assoc op :type :fail :value [value-a value-b])))))
 
       (catch ExceptionInfo e
         (handle-exception op e))))
@@ -66,16 +66,9 @@
 
   (teardown! [_ _]))
 
-(defn batch-test
-  [opts]
-  (merge (cassandra-test (str "batch-set-" (:suffix opts))
-                         {:client    (->BatchSetClient (atom false) nil nil)
-                          :checker   (checker/set)
-                          :generator (gen/phases
-                                      (->> [(adds)]
-                                           (conductors/std-gen opts))
-                                      (conductors/terminate-nemesis opts)
-                                      ; read after waiting for batchlog replay
-                                      (gen/sleep 60)
-                                      (read-once))})
-         opts))
+(defn workload
+  [_]
+  {:client (->BatchSetClient (atom false) nil nil)
+   :generator [(adds)]
+   :final-generator (read-once)
+   :checker (checker/set)})

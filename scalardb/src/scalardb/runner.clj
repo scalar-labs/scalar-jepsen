@@ -1,33 +1,44 @@
 (ns scalardb.runner
   (:gen-class)
-  (:require [cassandra
-             [core :as cassandra]
-             [runner :as car]]
+  (:require [cassandra.runner :as car]
             [jepsen
              [core :as jepsen]
              [cli :as cli]]
-            [scalardb.transfer]
-            [scalardb.transfer_append]
-            [scalardb.elle_append]
-            [scalardb.elle_write_read]
-            [scalardb.transfer_2pc]
-            [scalardb.transfer_append_2pc]
-            [scalardb.elle_append_2pc]
-            [scalardb.elle_write_read_2pc]))
+            [scalardb
+             [core :refer [INITIAL_TABLE_ID]]
+             [transfer]
+             [transfer-append]
+             [elle-append]
+             [elle-write-read]
+             [transfer-2pc]
+             [transfer-append-2pc]
+             [elle-append-2pc]
+             [elle-write-read-2pc]]))
 
-(def tests
-  "A map of test names to test constructors."
-  {"transfer"        scalardb.transfer/transfer-test
-   "transfer-append" scalardb.transfer-append/transfer-append-test
-   "elle-append"     scalardb.elle-append/elle-append-test
-   "elle-write-read" scalardb.elle-write-read/elle-write-read-test
-   "transfer-2pc" scalardb.transfer-2pc/transfer-2pc-test
-   "transfer-append-2pc" scalardb.transfer-append-2pc/transfer-append-2pc-test
-   "elle-append-2pc" scalardb.elle-append-2pc/elle-append-2pc-test
-   "elle-write-read-2pc" scalardb.elle-write-read-2pc/elle-write-read-2pc-test})
+(def workload-keys
+  "A map of test workload keys."
+  {"transfer"            :transfer
+   "transfer-append"     :transfer-append
+   "elle-append"         :elle-append
+   "elle-write-read"     :elle-write-read
+   "transfer-2pc"        :transfer-2pc
+   "transfer-append-2pc" :transfer-append-2pc
+   "elle-append-2pc"     :elle-append-2pc
+   "elle-write-read-2pc" :elle-write-read-2pc})
+
+(def workloads
+  "A map of workload to test constructors."
+  {:transfer            scalardb.transfer/workload
+   :transfer-append     scalardb.transfer-append/workload
+   :elle-append         scalardb.elle-append/workload
+   :elle-write-read     scalardb.elle-write-read/workload
+   :transfer-2pc        scalardb.transfer-2pc/workload
+   :transfer-append-2pc scalardb.transfer-append-2pc/workload
+   :elle-append-2pc     scalardb.elle-append-2pc/workload
+   :elle-write-read-2pc scalardb.elle-write-read-2pc/workload})
 
 (def test-opt-spec
-  [(cli/repeated-opt nil "--test NAME" "Test(s) to run" [] tests)
+  [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
 
    [nil "--isolation-level ISOLATION_LEVEL" "isolation level"
     :default :snapshot
@@ -51,26 +62,31 @@
   {"test" {:opt-spec (->> test-opt-spec
                           (into car/cassandra-opt-spec)
                           (into cli/test-opt-spec))
-           :opt-fn   (fn [parsed] (-> parsed cli/test-opt-fn))
-           :usage    (cli/test-usage)
-           :run      (fn [{:keys [options]}]
-                       (doseq [_ (range (:test-count options))
-                               test-fn (:test options)
-                               nemesis (:nemesis options)
-                               joining (:join options)
-                               clock (:clock options)]
-                         (let [test (-> options
-                                        (car/combine-nemesis nemesis joining clock)
-                                        (assoc :db (cassandra/db))
-                                        (assoc :pure-generators true)
-                                        (update :consistency-model
-                                                (fn [models]
-                                                  (mapv #(keyword %) models)))
-                                        (dissoc :test)
-                                        test-fn
-                                        jepsen/run!)]
-                           (when-not (:valid? (:results test))
-                             (System/exit 1)))))}})
+           :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
+           :usage (cli/test-usage)
+           :run (fn [{:keys [options]}]
+                  (with-redefs [car/workloads workloads]
+                    (doseq [_ (range (:test-count options))
+                            workload (:workload options)
+                            nemesis (:nemesis options)
+                            admin (:admin options)]
+                      (let [test (-> options
+                                     (assoc :target "scalardb"
+                                            :workload workload
+                                            :nemesis nemesis
+                                            :admin admin
+                                            :storage (atom nil)
+                                            :transaction (atom nil)
+                                            :2pc (atom nil)
+                                            :table-id (atom INITIAL_TABLE_ID)
+                                            :unknown-tx (atom #{})
+                                            :failures (atom 0))
+                                     (update :consistency-model
+                                             (fn [ms] (mapv keyword ms)))
+                                     car/cassandra-test
+                                     jepsen/run!)]
+                        (when-not (:valid? (:results test))
+                          (System/exit 1))))))}})
 
 (defn -main
   [& args]

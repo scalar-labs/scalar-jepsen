@@ -184,9 +184,9 @@
       (is (spy/called-once? cass/wipe!)))))
 
 (deftest db-log-files-test
-  (let [test {}
+  (let [test {:cassandra-dir "/cassandra"}
         cassandra (cass/db)]
-    (is (= [] (db/log-files cassandra test "n1")))))
+    (is (= ["/cassandra/logs/system.log"] (db/log-files cassandra test "n1")))))
 
 (deftest create-my-keyspace-test
   (with-redefs [alia/execute (spy/spy)]
