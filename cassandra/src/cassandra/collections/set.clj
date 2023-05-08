@@ -1,6 +1,5 @@
 (ns cassandra.collections.set
-  (:require [clojure.pprint :refer :all]
-            [clojure.tools.logging :refer [debug info warn]]
+  (:require [clojure.tools.logging :refer [debug info warn]]
             [jepsen
              [client :as client]
              [checker :as checker]
@@ -9,8 +8,7 @@
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all]
             [qbits.hayt.utils :refer [set-type]]
-            [cassandra.core :refer :all]
-            [cassandra.conductors :as conductors])
+            [cassandra.core :refer :all])
   (:import (clojure.lang ExceptionInfo)))
 
 (defrecord CQLSetClient [tbl-created? cluster session writec]
@@ -34,7 +32,7 @@
                                                [:elements #{}]])
                                       (if-exists false))))))
 
-  (invoke! [_ _ op]
+  (invoke! [_ test op]
     (try
       (alia/execute session (use-keyspace :jepsen_keyspace))
       (case (:f op)
@@ -44,13 +42,14 @@
                                        (where [[= :id 0]]))
                                {:consistency writec})
                  (assoc op :type :ok))
-        :read (let [value (->> (alia/execute session
-                                             (select :sets (where [[= :id 0]]))
-                                             {:consistency :all})
-                               first
-                               :elements
-                               (into (sorted-set)))]
-                (assoc op :type :ok, :value value)))
+        :read (do (wait-rf-nodes test)
+                  (let [value (->> (alia/execute session
+                                                 (select :sets (where [[= :id 0]]))
+                                                 {:consistency :all})
+                                   first
+                                   :elements
+                                   (into (sorted-set)))]
+                    (assoc op :type :ok, :value value))))
 
       (catch ExceptionInfo e
         (handle-exception op e))))
@@ -60,16 +59,9 @@
 
   (teardown! [_ _]))
 
-(defn set-test
-  [opts]
-  (merge (cassandra-test (str "set-" (:suffix opts))
-                         {:client    (->CQLSetClient (atom false)
-                                                     nil nil :quorum)
-                          :generator (gen/phases
-                                      (->> [(adds)]
-                                           (conductors/std-gen opts))
-                                      (conductors/terminate-nemesis opts)
-                                      (gen/sleep 60)
-                                      (read-once))
-                          :checker   (checker/set)})
-         opts))
+(defn workload
+  [_]
+  {:client (->CQLSetClient (atom false) nil nil :quorum)
+   :generator [(adds)]
+   :final-generator (read-once)
+   :checker (checker/set)})

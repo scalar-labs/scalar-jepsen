@@ -4,8 +4,8 @@
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
             [jepsen.tests.cycle.wr :as wr]
-            [cassandra.conductors :as cond]
-            [scalardb.core :as scalar])
+            [scalardb.core :as scalar :refer [INITIAL_TABLE_ID
+                                              DEFAULT_TABLE_COUNT]])
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
@@ -15,8 +15,6 @@
 
 (def ^:private ^:const KEYSPACE "jepsen")
 (def ^:private ^:const TABLE "txn")
-(def ^:private ^:const NUM_TABLE_ID_COUNT 2)
-(def ^:private ^:const DEFAULT_TABLE_COUNT 3)
 (def ^:private ^:const SCHEMA {:id                     :int
                                :val                    :int
                                :tx_id                  :text
@@ -96,7 +94,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (doseq [id (range NUM_TABLE_ID_COUNT)
+        (doseq [id (range (inc INITIAL_TABLE_ID))
                 i (range DEFAULT_TABLE_COUNT)]
           (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
                                                   :table (str TABLE id \_ i)
@@ -136,24 +134,15 @@
   [opts]
   (wr/checker {:consistency-models (:consistency-model opts)}))
 
-(defn elle-write-read-test
+(defn workload
   [opts]
-  (merge (scalar/scalardb-test
-          (str "elle-wr-" (:suffix opts))
-          {:table-id (atom (dec NUM_TABLE_ID_COUNT))
-           :unknown-tx (atom #{})
-           :failures (atom 0)
-           :generator (->> (independent/concurrent-generator
-                            (:concurrency opts)
-                            (range)
-                            (fn [_]
-                              (->> write-read-gen
-                                   (gen/limit 100)
-                                   (gen/process-limit
-                                    (:concurrency opts)))))
-                           (gen/nemesis
-                            (cond/mix-failure-seq opts))
-                           (gen/time-limit (:time-limit opts)))
-           :client (WriteReadClient. (atom false))
-           :checker (scalar/independent-checker (write-read-checker opts))})
-         opts))
+  {:client (->WriteReadClient (atom false))
+   :generator (independent/concurrent-generator
+               (:concurrency opts)
+               (range)
+               (fn [_]
+                 (->> write-read-gen
+                      (gen/limit 100)
+                      (gen/process-limit
+                       (:concurrency opts)))))
+   :checker (scalar/independent-checker (write-read-checker opts))})

@@ -1,13 +1,12 @@
 (ns cassandra.core
   (:require [clojure.java.jmx :as jmx]
             [clojure.set :as set]
-            [clojure.tools.logging :refer [debug info warn]]
+            [clojure.tools.logging :refer [info]]
             [jepsen
              [db :as db]
-             [util :as util :refer [meh timeout]]
-             [control :as c :refer [| lit]]
-             [generator :as gen]
-             [tests :as tests]]
+             [util :as util :refer [meh]]
+             [control :as c :refer [lit]]
+             [generator :as gen]]
             [jepsen.control
              [net :as cn]
              [util :as cu]]
@@ -16,21 +15,12 @@
             [qbits.hayt.dsl.clause :refer :all]
             [qbits.hayt.dsl.statement :refer :all])
   (:import (clojure.lang ExceptionInfo)
-           (com.datastax.driver.core ConsistencyLevel)
-           (com.datastax.driver.core Session)
-           (com.datastax.driver.core Cluster)
-           (com.datastax.driver.core Metadata)
-           (com.datastax.driver.core Host)
            (com.datastax.driver.core WriteType)
            (com.datastax.driver.core.exceptions NoHostAvailableException
                                                 ReadTimeoutException
                                                 TransportException
                                                 WriteTimeoutException
                                                 UnavailableException)
-           (com.datastax.driver.core.schemabuilder SchemaBuilder)
-           (com.datastax.driver.core.schemabuilder TableOptions)
-           (com.datastax.driver.core.policies RetryPolicy
-                                              RetryPolicy$RetryDecision)
            (java.net InetAddress)
            (java.util.concurrent TimeUnit)))
 
@@ -105,7 +95,10 @@
 (defn nodetool
   "Run a nodetool command"
   [test node & args]
-  (c/on node (apply c/exec (lit (str (:cassandra-dir test) "/bin/nodetool")) args)))
+  (c/on node (apply c/exec
+                    (lit (str (:cassandra-dir test) "/bin/nodetool"))
+                    :-Dcom.sun.jndi.rmiURLParsing=legacy
+                    args)))
 
 (defn- install-jdk-with-retry
   []
@@ -129,9 +122,9 @@
         tpath (if local-file "file:///tmp/cassandra.tar.gz" url)]
     (install-jdk-with-retry)
     (info node "installing Cassandra from" url)
-    (do (when local-file
-          (c/upload local-file "/tmp/cassandra.tar.gz"))
-        (cu/install-archive! tpath (:cassandra-dir test)))))
+    (when local-file
+      (c/upload local-file "/tmp/cassandra.tar.gz"))
+    (cu/install-archive! tpath (:cassandra-dir test))))
 
 (defn configure!
   "Uploads configuration files to the given node."
@@ -244,7 +237,8 @@
 (defn db
   "Setup Cassandra."
   []
-  (reify db/DB
+  (reify
+    db/DB
     (setup! [_ test node]
       (when (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
         (wipe! test node))
@@ -258,9 +252,12 @@
       (when-not (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
         (wipe! test node)))
 
+    db/Primary
+    (primaries [_ test] (or (:cass-nodes test) (:nodes test)))
+    (setup-primary! [_ _ _])
+
     db/LogFiles
-    (log-files [_ _ _]
-      [])))
+    (log-files [_ test _] [(cassandra-log test)])))
 
 (defn adds
   "Generator that emits :add operations for sequential integers."
@@ -271,7 +268,7 @@
 (defn read-once
   "A generator which reads exactly once."
   []
-  (gen/clients (gen/until-ok {:type :invoke :f :read})))
+  (gen/until-ok {:type :invoke :f :read}))
 
 (defn create-my-keyspace
   [session test {:keys [keyspace]}]
@@ -327,9 +324,3 @@
                                         :type :fail
                                         :error :no-host-available))
       (assoc op :type :fail :error (.getMessage ex)))))
-
-(defn cassandra-test
-  [name opts]
-  (merge tests/noop-test
-         {:name (str "cassandra-" name)}
-         opts))

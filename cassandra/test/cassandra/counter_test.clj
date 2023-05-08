@@ -3,7 +3,7 @@
             [jepsen.client :as client]
             [qbits.alia :as alia]
             [qbits.alia.policy.retry :as retry]
-            [cassandra.core :as cassandra]
+            [cassandra.core :as cass]
             [cassandra.counter :refer [->CQLCounterClient] :as counter]
             [spy.core :as spy])
   (:import (com.datastax.driver.core WriteType)
@@ -50,7 +50,8 @@
                 alia/connect (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
-                                           [{:id 0 :count 123}])))]
+                                           [{:id 0 :count 123}])))
+                cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
@@ -75,7 +76,8 @@
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Timed out"
                                                    {:type ::execute
-                                                    :exception (ReadTimeoutException. nil nil 0 0 false)})))))]
+                                                    :exception (ReadTimeoutException. nil nil 0 0 false)})))))
+                cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
@@ -106,14 +108,15 @@
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
-                                                    :exception (UnavailableException. nil nil 0 0)})))))]
+                                                    :exception (UnavailableException. nil nil 0 0)})))))
+                cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
       (is (= :unavailable (:error result))))))
 
-(deftest counter-client-unavailable-exception-test
+(deftest counter-client-no-host-available-exception-test
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/mock
@@ -121,7 +124,8 @@
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
-                                                    :exception (NoHostAvailableException. {})})))))]
+                                                    :exception (NoHostAvailableException. {})})))))
+                cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
