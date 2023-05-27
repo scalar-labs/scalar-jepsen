@@ -44,9 +44,9 @@ jobs:
 
     - name: Cassandra test
       run: |
-        docker exec -it jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
 
     - name: ScalarDB test
       run: |
-        docker exec -it jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
-        docker exec -it jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
