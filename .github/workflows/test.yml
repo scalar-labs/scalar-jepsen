@@ -1,0 +1,52 @@
+name: Test with Docker
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  testing:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build control
+      uses: docker/build-push-action@v4
+      with:
+        load: true
+        push: false
+        context: "{{defaultContext}}:docker/control"
+        cache-from: type=gha,scope=control
+        cache-to: type=gha,mode=max,scope=control
+
+    - name: Build node
+      uses: docker/build-push-action@v4
+      with:
+        load: true
+        push: false
+        context: "{{defaultContext}}:docker/node"
+        cache-from: type=gha,scope=node
+        cache-to: type=gha,mode=max,scope=node
+
+    - name: docker-compose up
+      run: |
+        cd docker
+        docker-compose build
+        docker-compose up -d
+
+    - name: Cassandra test
+      run: |
+        docker exec -it jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+
+    - name: ScalarDB test
+      run: |
+        docker exec -it jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
+        docker exec -it jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
