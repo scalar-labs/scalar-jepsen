@@ -1,0 +1,60 @@
+name: Format and Lint
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Cache m2 repository
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+
+    - name: Install clojure tools
+      uses: DeLaGuardo/setup-clojure@11.0
+      with:
+        lein: 2.9.8
+        clj-kondo: 2023.05.26
+        cljfmt: 0.10.4
+
+    - name: Format check for Cassandra
+      run: |
+        cd cassandra
+        cljfmt check
+
+    - name: Format check for ScalarDB
+      run: |
+        cd scalardb
+        cljfmt check
+
+    - name: Format check for ScalarDL
+      run: |
+        cd scalardl
+        cljfmt check
+
+    - name: Lint for Cassandra
+      run: clj-kondo cassandra
+
+    - name: Lint for ScalarDB
+      run: clj-kondo scalardb
+
+    - name: Lint for ScalarDL
+      run: clj-kondo scalardl
