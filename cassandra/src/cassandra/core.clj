@@ -1,6 +1,7 @@
 (ns cassandra.core
   (:require [clojure.java.jmx :as jmx]
             [clojure.set :as set]
+            [clojure.string :as str]
             [clojure.tools.logging :refer [info]]
             [jepsen
              [db :as db]
@@ -12,8 +13,8 @@
              [util :as cu]]
             [jepsen.os.debian :as debian]
             [qbits.alia :as alia]
-            [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all])
+            [qbits.hayt.dsl.clause :as clause]
+            [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)
            (com.datastax.driver.core WriteType)
            (com.datastax.driver.core.exceptions NoHostAvailableException
@@ -66,7 +67,7 @@
     (jmx/with-connection {:host node :port 7199}
       (jmx/read "org.apache.cassandra.db:type=StorageService"
                 attr))
-    (catch Exception e
+    (catch Exception _
       (info "Couldn't get status from node" node))))
 
 (defn live-nodes
@@ -144,7 +145,7 @@
      (c/exec :sed :-i (lit rep) (str (:cassandra-dir test) "/conf/cassandra-env.sh")))
    (doseq [rep (into ["\"s/cluster_name: .*/cluster_name: 'jepsen'/g\""
                       (str "\"s/seeds: .*/seeds: '"
-                           (clojure.string/join "," (seed-nodes test)) "'/g\"")
+                           (str/join "," (seed-nodes test)) "'/g\"")
                       (str "\"s/listen_address: .*/listen_address: " (cn/ip node) "/g\"")
                       (str "\"s/rpc_address: .*/rpc_address: " (cn/ip node) "/g\"")
                       (str "\"s/hinted_handoff_enabled:.*/hinted_handoff_enabled: " (disable-hints?) "/g\"")
@@ -272,20 +273,20 @@
 
 (defn create-my-keyspace
   [session test {:keys [keyspace]}]
-  (alia/execute session (create-keyspace (keyword keyspace)
-                                         (if-exists false)
-                                         (with {:replication {"class"              "SimpleStrategy"
-                                                              "replication_factor" (:rf test)}}))))
+  (alia/execute session (st/create-keyspace (keyword keyspace)
+                                            (clause/if-exists false)
+                                            (clause/with {:replication {"class"              "SimpleStrategy"
+                                                                        "replication_factor" (:rf test)}}))))
 
 (defn create-my-table
   [session {:keys [keyspace table schema compaction-strategy]
             :or {compaction-strategy :SizeTieredCompactionStrategy}}]
-  (alia/execute session (use-keyspace (keyword keyspace)))
-  (alia/execute session (create-table (keyword table)
-                                      (if-exists false)
-                                      (column-definitions schema)
-                                      (with {:compaction
-                                             {:class compaction-strategy}}))))
+  (alia/execute session (st/use-keyspace (keyword keyspace)))
+  (alia/execute session (st/create-table (keyword table)
+                                         (clause/if-exists false)
+                                         (clause/column-definitions schema)
+                                         (clause/with {:compaction
+                                                       {:class compaction-strategy}}))))
 
 (defn close-cassandra
   [cluster session]

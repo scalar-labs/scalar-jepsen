@@ -1,7 +1,6 @@
 (ns scalardl.cas-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
-            [jepsen.checker :as checker]
             [scalardl.cas :as cas]
             [scalardl.cassandra :as cassandra]
             [scalardl.core :as dl]

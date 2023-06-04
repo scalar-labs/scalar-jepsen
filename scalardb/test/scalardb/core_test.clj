@@ -1,5 +1,5 @@
 (ns scalardb.core-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [qbits.alia :as alia]
             [cassandra.core :as c]
             [scalardb.core :as scalar]
@@ -60,7 +60,7 @@
   [id]
   (reify
     Result
-    (getValue [this column]
+    (getValue [_ column]
       (condp = column
         "tx_id" (Optional/of (TextValue. column id))
         "tx_created_at" (Optional/of (BigIntValue. column (long 1566376246)))
@@ -69,34 +69,34 @@
 (def mock-storage
   (reify
     DistributedStorage
-    (^Optional get [this ^Get g] ;; only for coordinator
+    (^Optional get [_ ^Get g] ;; only for coordinator
       (let [k (->> g .getPartitionKey .get first .getString .get)]
         (Optional/of (mock-result k))))
-    (close [this])))
+    (close [_])))
 
 (def mock-transaction
   (reify
     DistributedTransaction
-    (commit [this])))
+    (commit [_])))
 
 (def mock-tx-manager
   (reify
     DistributedTransactionManager
-    (start [this] mock-transaction)
-    (close [this])))
+    (start [_] mock-transaction)
+    (close [_])))
 
 (def mock-2pc
   (reify
     TwoPhaseCommitTransaction
-    (prepare [this])
-    (commit [this])))
+    (prepare [_])
+    (commit [_])))
 
 (def mock-2pc-manager
   (reify
     TwoPhaseCommitTransactionManager
-    (start [this] mock-2pc)
-    (join [this tx-id] mock-2pc)
-    (close [this])))
+    (start [_] mock-2pc)
+    (join [_ _] mock-2pc)
+    (close [_])))
 
 (deftest close-all-test
   (let [test {:storage (atom mock-storage)

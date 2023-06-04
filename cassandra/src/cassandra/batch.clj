@@ -1,13 +1,10 @@
 (ns cassandra.batch
-  (:require [cassandra.core :refer :all]
-            [clojure.tools.logging :refer [debug info warn]]
+  (:require [cassandra.core :as cass]
             [jepsen
              [client :as client]
-             [checker :as checker]
-             [generator :as gen]]
+             [checker :as checker]]
             [qbits.alia :as alia]
-            [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all])
+            [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)))
 
 (defrecord BatchSetClient [tbl-created? cluster session]
@@ -20,17 +17,17 @@
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session {:keyspace "jepsen_keyspace"
-                                  :table "bat"
-                                  :schema {:pid         :int
-                                           :cid         :int
-                                           :value       :int
-                                           :primary-key [:pid :cid]}}))))
+        (cass/create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (cass/create-my-table session {:keyspace "jepsen_keyspace"
+                                       :table "bat"
+                                       :schema {:pid         :int
+                                                :cid         :int
+                                                :value       :int
+                                                :primary-key [:pid :cid]}}))))
 
   (invoke! [_ test op]
     (try
-      (alia/execute session (use-keyspace :jepsen_keyspace))
+      (alia/execute session (st/use-keyspace :jepsen_keyspace))
       (case (:f op)
         :add (let [value (:value op)]
                (alia/execute session
@@ -42,9 +39,9 @@
                                   "APPLY BATCH;")
                              {:consistency :quorum})
                (assoc op :type :ok))
-        :read (do (wait-rf-nodes test)
+        :read (do (cass/wait-rf-nodes test)
                   (let [results (alia/execute session
-                                              (select :bat)
+                                              (st/select :bat)
                                               {:consistency :all})
                         value-a (->> results
                                      (filter (fn [ret] (= (:cid ret) 0)))
@@ -59,16 +56,16 @@
                       (assoc op :type :fail :value [value-a value-b])))))
 
       (catch ExceptionInfo e
-        (handle-exception op e))))
+        (cass/handle-exception op e))))
 
   (close! [_ _]
-    (close-cassandra cluster session))
+    (cass/close-cassandra cluster session))
 
   (teardown! [_ _]))
 
 (defn workload
   [_]
   {:client (->BatchSetClient (atom false) nil nil)
-   :generator [(adds)]
-   :final-generator (read-once)
+   :generator [(cass/adds)]
+   :final-generator (cass/read-once)
    :checker (checker/set)})

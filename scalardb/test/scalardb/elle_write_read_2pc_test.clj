@@ -1,5 +1,5 @@
 (ns scalardb.elle-write-read-2pc-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [scalardb.core :as scalar]
             [scalardb.elle-write-read-2pc :as elle-wr]
@@ -34,7 +34,7 @@
   [id]
   (reify
     Result
-    (getValue [this column]
+    (getValue [_ column]
       (if-let [v (get (@test-records id) (keyword column))]
         (->> v (IntValue. column) Optional/of)
         (Optional/empty)))))
@@ -57,35 +57,35 @@
 (def mock-2pc
   (reify
     TwoPhaseCommitTransaction
-    (getId [this] "dummy-id")
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))
-    (^void prepare [this] (swap! prepare-count inc))
-    (^void validate [this] (swap! validate-count inc))
-    (^void commit [this] (swap! commit-count inc))
-    (^void rollback [this] (swap! rollback-count inc))))
+    (getId [_] "dummy-id")
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void prepare [_] (swap! prepare-count inc))
+    (^void validate [_] (swap! validate-count inc))
+    (^void commit [_] (swap! commit-count inc))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-2pc-throws-exception
   (reify
     TwoPhaseCommitTransaction
-    (getId [this] "dummy-id")
-    (^Optional get [this ^Get g] (throw (CrudException. "get failed")))
-    (^void put [this ^Put p] (throw (CrudException. "put failed")))
-    (^void prepare [this] (throw (PreparationException. "preparation failed")))
-    (^void validate [this] (throw (ValidationException. "validation failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))
-    (^void rollback [this] (swap! rollback-count inc))))
+    (getId [_] "dummy-id")
+    (^Optional get [_ ^Get _] (throw (CrudException. "get failed")))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
+    (^void prepare [_] (throw (PreparationException. "preparation failed")))
+    (^void validate [_] (throw (ValidationException. "validation failed")))
+    (^void commit [_] (throw (CommitException. "commit failed")))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-2pc-throws-unknown
   (reify
     TwoPhaseCommitTransaction
-    (getId [this] "unknown-state-tx")
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))
-    (^void prepare [this] (swap! prepare-count inc))
-    (^void validate [this] (swap! validate-count inc))
-    (^void commit [this] (throw (UnknownTransactionStatusException. "unknown state")))
-    (^void rollback [this] (swap! rollback-count inc))))
+    (getId [_] "unknown-state-tx")
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void prepare [_] (swap! prepare-count inc))
+    (^void validate [_] (swap! validate-count inc))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (deftest write-read-client-init-test
   (with-redefs [scalar/setup-transaction-tables (spy/spy)

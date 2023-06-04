@@ -1,9 +1,6 @@
 (ns scalardl.util
-  (:require [clojure.tools.logging :refer [debug info warn]])
   (:import (com.scalar.dl.client.exception ClientException)
-           (com.scalar.dl.ledger.service StatusCode)
-           (javax.json Json)
-           (java.io StringReader)))
+           (com.scalar.dl.ledger.service StatusCode)))
 
 (defn server?
   [node test]

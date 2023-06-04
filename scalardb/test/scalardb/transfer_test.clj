@@ -1,5 +1,5 @@
 (ns scalardb.transfer-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [jepsen.checker :as checker]
             [cassandra.core :as cass]
@@ -31,7 +31,7 @@
 (defn- mock-result [id]
   (reify
     Result
-    (getValue [this column]
+    (getValue [_ column]
       (->> (@test-records id)
            (IntValue. column)
            Optional/of))))
@@ -52,30 +52,30 @@
 (def mock-transaction
   (reify
     DistributedTransaction
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (swap! commit-count inc))))
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (swap! commit-count inc))))
 
 (def mock-storage
   (reify
     DistributedStorage
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))))
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))))
 
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
-    (^Optional get [this ^Get g] (throw (CrudException. "get failed")))
-    (^void put [this ^Put p] (throw (CrudException. "put failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))))
+    (^Optional get [_ ^Get _] (throw (CrudException. "get failed")))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
+    (^void commit [_] (throw (CommitException. "commit failed")))))
 
 (def mock-transaction-throws-unknown
   (reify
     DistributedTransaction
-    (getId [this] "unknown-state-tx")
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (throw (UnknownTransactionStatusException. "unknown state")))))
+    (getId [_] "unknown-state-tx")
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))))
 
 (deftest transfer-client-init-test
   (binding [test-records (atom {0 0 1 0 2 0 3 0 4 0})
@@ -267,7 +267,7 @@
                                   :version [2 3 2 3 1 2 2 4 2 3]}}
    {:type :fail :f :check-tx}])
 
-(deftest consistency-checker-test
+(deftest consistency-checker-fail-test
   (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
                              nil nil)
         checker (#'transfer/consistency-checker)

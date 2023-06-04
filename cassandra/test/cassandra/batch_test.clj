@@ -1,6 +1,5 @@
 (ns cassandra.batch-test
-  (:require [clojure.test :refer :all]
-            [clojure.java.jmx :as jmx]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [qbits.alia :as alia]
             [cassandra.core :as cass]
@@ -8,7 +7,6 @@
             [spy.core :as spy])
   (:import (com.datastax.driver.core WriteType)
            (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))
 

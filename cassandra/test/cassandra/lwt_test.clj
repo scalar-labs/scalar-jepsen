@@ -1,13 +1,12 @@
 (ns cassandra.lwt-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [jepsen.independent :as independent]
             [qbits.alia :as alia]
             [cassandra.lwt :refer [->CasRegisterClient] :as lwt]
             [spy.core :as spy])
   (:import (com.datastax.driver.core WriteType)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
+           (com.datastax.driver.core.exceptions ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))
 

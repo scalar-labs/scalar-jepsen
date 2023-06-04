@@ -1,5 +1,5 @@
 (ns scalardb.elle-write-read-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [scalardb.core :as scalar]
             [scalardb.elle-write-read :as elle-wr]
@@ -29,7 +29,7 @@
   [id]
   (reify
     Result
-    (getValue [this column]
+    (getValue [_ column]
       (if-let [v (get (@test-records id) (keyword column))]
         (->> v (IntValue. column) Optional/of)
         (Optional/empty)))))
@@ -52,24 +52,24 @@
 (def mock-transaction
   (reify
     DistributedTransaction
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (swap! commit-count inc))))
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (swap! commit-count inc))))
 
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
-    (^Optional get [this ^Get g] (throw (CrudException. "get failed")))
-    (^void put [this ^Put p] (throw (CrudException. "put failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))))
+    (^Optional get [_ ^Get _] (throw (CrudException. "get failed")))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
+    (^void commit [_] (throw (CommitException. "commit failed")))))
 
 (def mock-transaction-throws-unknown
   (reify
     DistributedTransaction
-    (getId [this] "unknown-state-tx")
-    (^Optional get [this ^Get g] (mock-get g))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (throw (UnknownTransactionStatusException. "unknown state")))))
+    (getId [_] "unknown-state-tx")
+    (^Optional get [_ ^Get g] (mock-get g))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))))
 
 (deftest write-read-client-init-test
   (with-redefs [scalar/setup-transaction-tables (spy/spy)

@@ -1,12 +1,11 @@
 (ns cassandra.map-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [qbits.alia :as alia]
             [cassandra.core :as cass]
             [cassandra.collections.map :refer [->CQLMapClient] :as map]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core WriteType)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
+  (:import (com.datastax.driver.core.exceptions NoHostAvailableException
                                                 ReadTimeoutException
                                                 WriteTimeoutException
                                                 UnavailableException)))

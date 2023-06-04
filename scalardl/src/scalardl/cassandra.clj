@@ -1,9 +1,9 @@
 (ns scalardl.cassandra
-  (:require [clojure.tools.logging :refer [debug info warn]]
+  (:require [clojure.tools.logging :refer [info]]
             [cassandra.core :as cassandra]
             [qbits.alia :as alia]
-            [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all]))
+            [qbits.hayt.dsl.clause :as clause]
+            [qbits.hayt.dsl.statement :as st]))
 
 (def ^:private ^:const TX_COMMITTED 3)
 
@@ -20,12 +20,12 @@
   [txid {:keys [cass-nodes]}]
   (let [cluster (alia/cluster {:contact-points cass-nodes})
         rows (try (alia/execute (alia/connect cluster)
-                                (select :coordinator.state
-                                        (where {:tx_id txid}))
+                                (st/select :coordinator.state
+                                           (clause/where {:tx_id txid}))
                                 {:consistency :serial})
                   (catch Exception e (throw e))
                   (finally (alia/shutdown cluster)))]
-    (and (not (empty? rows)) (= (-> rows first :tx_state) TX_COMMITTED))))
+    (and (seq rows) (= (-> rows first :tx_state) TX_COMMITTED))))
 
 (defn spinup-cassandra!
   [node test]
@@ -104,8 +104,12 @@
                                            :properties     :text
                                            :registered_at  :bigint
                                            :signature      :blob
-                                           :primary-key    [:cert_holder_id :cert_version :id]}})
-      (alia/execute (create-index :scalar.contract :id (if-exists false)))
+                                           :primary-key    [:cert_holder_id
+                                                            :cert_version
+                                                            :id]}})
+      (alia/execute (st/create-index :scalar.contract
+                                     :id
+                                     (clause/if-exists false)))
       (cassandra/create-my-table {:keyspace "scalar"
                                   :table "contract_class"
                                   :schema {:binary_name :text
@@ -118,7 +122,8 @@
                                            :version       :int
                                            :pem           :text
                                            :registered_at :bigint
-                                           :primary-key   [:holder_id :version]}})
+                                           :primary-key   [:holder_id
+                                                           :version]}})
 
       (cassandra/create-my-keyspace test {:keyspace "coordinator"})
       (cassandra/create-my-table {:keyspace "coordinator"

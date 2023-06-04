@@ -1,5 +1,5 @@
 (ns cassandra.nemesis-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen
              [control :as c]
              [nemesis :as n]]
