@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  check:
 
     runs-on: ubuntu-latest
 
@@ -51,10 +51,10 @@ jobs:
         cljfmt check
 
     - name: Lint for Cassandra
-      run: clj-kondo cassandra
+      run: clj-kondo --lint cassandra
 
     - name: Lint for ScalarDB
-      run: clj-kondo scalardb
+      run: clj-kondo --lint scalardb
 
     - name: Lint for ScalarDL
-      run: clj-kondo scalardl
+      run: clj-kondo --lint scalardl
