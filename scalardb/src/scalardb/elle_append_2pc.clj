@@ -6,7 +6,8 @@
             [jepsen.independent :as independent]
             [jepsen.tests.cycle.append :as append]
             [scalardb.core :as scalar :refer [INITIAL_TABLE_ID
-                                              DEFAULT_TABLE_COUNT]])
+                                              DEFAULT_TABLE_COUNT
+                                              DEFAULT_KEY_COUNT]])
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
@@ -138,7 +139,7 @@
 
 (defn- append-test
   [opts]
-  (append/test {:key-count 10
+  (append/test {:key-count DEFAULT_KEY_COUNT
                 :min-txn-length 1
                 :max-txn-length 10
                 :max-writes-per-key 10

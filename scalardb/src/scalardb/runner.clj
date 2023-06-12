@@ -55,7 +55,10 @@
 
    (cli/repeated-opt nil "--consistency-model CONSISTENCY_MODEL"
                      "consistency model to be checked"
-                     ["snapshot-isolation"])])
+                     ["snapshot-isolation"])
+
+   [nil "--use-null-tx-metadata" "Use null transaction metadata to test with existing tables."
+    :default false]])
 
 (defn test-cmd
   []

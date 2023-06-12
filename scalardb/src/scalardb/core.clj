@@ -20,6 +20,7 @@
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 (def ^:const INITIAL_TABLE_ID 1)
 (def ^:const DEFAULT_TABLE_COUNT 3)
+(def ^:const DEFAULT_KEY_COUNT 10)
 
 (def ^:private ^:const COORDINATOR "coordinator")
 (def ^:private ^:const STATE_TABLE "state")
@@ -264,3 +265,13 @@
     {:stats (independent-stats-checker)
      :exceptions (checker/unhandled-exceptions)
      :workload (independent-workload-checker workload-checker)})))
+
+(defn setup-records-without-tx-metadata
+  [test keyspace table]
+  (let [cluster (alia/cluster {:contact-points (:nodes test)})
+        session (alia/connect cluster)]
+    (doseq [i (range DEFAULT_KEY_COUNT)]
+      (retry-when-exception
+        (fn [n] (c/insert-record session {:keyspace keyspace
+                                          :table table
+                                          :columns [[:id n] [:val 999]]}))[i]))))
