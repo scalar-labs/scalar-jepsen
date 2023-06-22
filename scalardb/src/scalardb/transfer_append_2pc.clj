@@ -1,6 +1,7 @@
 (ns scalardb.transfer-append-2pc
   (:require [cassandra.core :as cassandra]
             [clojure.core.reducers :as r]
+            [clojure.tools.logging :refer [info]]
             [jepsen
              [client :as client]
              [checker :as checker]
@@ -108,10 +109,12 @@
   (try
     (let [^Result from-result (scan-for-latest tx1 (prepare-scan-for-latest from))
           ^Result to-result (scan-for-latest tx2 (prepare-scan-for-latest to))]
+      (info "fromID:" from "the latest age:" (get-age from-result))
       (->> (prepare-put from
                         (calc-new-age from-result)
                         (calc-new-balance from-result (- amount)))
            (.put tx1))
+      (info "toID:" to "the latest age:" (get-age to-result))
       (->> (prepare-put to
                         (calc-new-age to-result)
                         (calc-new-balance to-result amount))
