@@ -1,5 +1,5 @@
 (ns scalardb.transfer-append-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [jepsen.checker :as checker]
             [cassandra.core :as cass]
@@ -34,7 +34,7 @@
 (defn- mock-result [id age]
   (reify
     Result
-    (getValue [this column]
+    (getValue [_ column]
       (let [r (->> (@test-records id) (filter #(= age (:age %))) first)]
         (->> (r (keyword column))
              (IntValue. column)
@@ -61,24 +61,24 @@
 (def mock-transaction
   (reify
     DistributedTransaction
-    (^java.util.List scan [this ^Scan s] (mock-scan s))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (swap! commit-count inc))))
+    (^java.util.List scan [_ ^Scan s] (mock-scan s))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (swap! commit-count inc))))
 
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
-    (^java.util.List scan [this ^Scan s] (throw (CrudException. "scan failed")))
-    (^void put [this ^Put p] (throw (CrudException. "put failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))))
+    (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed")))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
+    (^void commit [_] (throw (CommitException. "commit failed")))))
 
 (def mock-transaction-throws-unknown
   (reify
     DistributedTransaction
-    (getId [this] "unknown-state-tx")
-    (^java.util.List scan [this ^Scan s] (mock-scan s))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (throw (UnknownTransactionStatusException. "unknown state")))))
+    (getId [_] "unknown-state-tx")
+    (^java.util.List scan [_ ^Scan s] (mock-scan s))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))))
 
 (deftest transfer-client-init-test
   (binding [test-records (atom {})
@@ -281,7 +281,7 @@
                                   :num [2 2 2 3 1 2 2 3 2 3]}}
    {:type :fail :f :check-tx}])
 
-(deftest consistency-checker-test
+(deftest consistency-checker-fail-test
   (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
                              nil nil)
         checker (#'transfer/consistency-checker)

@@ -1,0 +1,49 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Cache m2 repository
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+
+    - name: Install dependencies
+      run: |
+        cd cassandra
+        lein install
+
+    - name: Run test for Cassandra
+      run: |
+        cd cassandra
+        lein cloverage
+
+    - name: Run test for ScalarDB
+      run: |
+        cd scalardb
+        lein cloverage
+
+    - name: Run test for ScalarDL
+      run: |
+        cd scalardl
+        lein cloverage

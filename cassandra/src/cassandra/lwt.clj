@@ -1,6 +1,5 @@
 (ns cassandra.lwt
-  (:require [cassandra.core :refer :all]
-            [clojure.tools.logging :refer [debug info warn]]
+  (:require [cassandra.core :as cass]
             [jepsen
              [checker :as checker]
              [client :as client]
@@ -9,8 +8,8 @@
             [jepsen.checker.timeline :as timeline]
             [knossos.model :as model]
             [qbits.alia :as alia]
-            [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all])
+            [qbits.hayt.dsl.clause :as clause]
+            [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)))
 
 (def ak (keyword "[applied]"))  ; this is the name C* returns, define now because
@@ -31,56 +30,64 @@
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session {:keyspace "jepsen_keyspace"
-                                  :table "lwt"
-                                  :schema {:id          :int
-                                           :value       :int
-                                           :primary-key [:id]}}))))
+        (cass/create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (cass/create-my-table session {:keyspace "jepsen_keyspace"
+                                       :table "lwt"
+                                       :schema {:id          :int
+                                                :value       :int
+                                                :primary-key [:id]}}))))
 
   (invoke! [_ _ op]
     (try
-      (alia/execute session (use-keyspace :jepsen_keyspace))
+      (alia/execute session (st/use-keyspace :jepsen_keyspace))
       (case (:f op)
         :cas (let [id (key (:value op))
                    [old new] (val (:value op))
-                   result (alia/execute session
-                                        (update :lwt
-                                                (set-columns {:value new})
-                                                (where [[= :id id]])
-                                                (only-if [[:value old]])))]
+                   result (alia/execute
+                           session
+                           (st/update :lwt
+                                      (clause/set-columns {:value new})
+                                      (clause/where [[= :id id]])
+                                      (clause/only-if [[:value old]])))]
                (assoc op :type (if (-> result first ak) :ok :fail)))
 
         :write (let [id (key (:value op))
                      v (val (:value op))
-                     result (alia/execute session (update :lwt
-                                                          (set-columns {:value v})
-                                                          (only-if [[:in :value (range 5)]])
-                                                          (where [[= :id id]])))]
+                     result (alia/execute
+                             session (st/update
+                                      :lwt
+                                      (clause/set-columns {:value v})
+                                      (clause/only-if [[:in
+                                                        :value
+                                                        (range 5)]])
+                                      (clause/where [[= :id id]])))]
                  (if (-> result first ak)
                    (assoc op :type :ok)
-                   (let [result' (alia/execute session (insert :lwt
-                                                               (values [[:id id]
-                                                                        [:value v]])
-                                                               (if-exists false)))]
+                   (let [result' (alia/execute
+                                  session
+                                  (st/insert :lwt
+                                             (clause/values [[:id id]
+                                                             [:value v]])
+                                             (clause/if-exists false)))]
                      (if (-> result' first ak)
                        (assoc op :type :ok)
                        (assoc op :type :fail)))))
 
         :read (let [id (key (:value op))
-                    v (->> (alia/execute session
-                                         (select :lwt (where [[= :id id]]))
-                                         {:consistency :serial})
+                    v (->> (alia/execute
+                            session
+                            (st/select :lwt (clause/where [[= :id id]]))
+                            {:consistency :serial})
                            first
                            :value)]
                 (assoc op :type :ok
                        :value (independent/tuple id v))))
 
       (catch ExceptionInfo e
-        (handle-exception op e true))))
+        (cass/handle-exception op e true))))
 
   (close! [_ _]
-    (close-cassandra cluster session))
+    (cass/close-cassandra cluster session))
 
   (teardown! [_ _]))
 

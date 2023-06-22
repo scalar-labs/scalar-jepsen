@@ -64,12 +64,12 @@
   (let [nodes (atom nil)]
     (reify
       nemesis/Reflection
-      (fs [this] #{:start :kill})
+      (fs [_] #{:start :kill})
 
       nemesis/Nemesis
       (setup! [this _] this)
 
-      (invoke! [this test op]
+      (invoke! [_ test op]
         (locking nodes
           (assoc op :type :info, :value
                  (case (:f op)
@@ -88,7 +88,7 @@
                               restarted)
                             :not-started)))))
 
-      (teardown! [this test]
+      (teardown! [_ test]
         (when-let [ns @nodes]
           (for [node (reorder-restarting-nodes ns test)]
             (c/on node (stop! test node)))

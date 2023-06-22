@@ -1,5 +1,5 @@
 (ns scalardb.transfer-append-2pc-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [jepsen.checker :as checker]
             [cassandra.core :as cass]
@@ -40,7 +40,7 @@
 (defn- mock-result [id age]
   (reify
     Result
-    (getValue [this column]
+    (getValue [_ column]
       (let [r (->> (@test-records id) (filter #(= age (:age %))) first)]
         (->> (r (keyword column))
              (IntValue. column)
@@ -67,49 +67,49 @@
 (def mock-transaction
   (reify
     DistributedTransaction
-    (^java.util.List scan [this ^Scan s] (mock-scan s))
-    (^void put [this ^Put p] (mock-put p))
-    (^void commit [this] (swap! commit-count inc))))
+    (^java.util.List scan [_ ^Scan s] (mock-scan s))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void commit [_] (swap! commit-count inc))))
 
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
-    (^java.util.List scan [this ^Scan s] (throw (CrudException. "scan failed")))
-    (^void put [this ^Put p] (throw (CrudException. "put failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))))
+    (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed")))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
+    (^void commit [_] (throw (CommitException. "commit failed")))))
 
 (def mock-2pc
   (reify
     TwoPhaseCommitTransaction
-    (getId [this] "dummy-id")
-    (^java.util.List scan [this ^Scan s] (mock-scan s))
-    (^void put [this ^Put p] (mock-put p))
-    (^void prepare [this] (swap! prepare-count inc))
-    (^void validate [this] (swap! validate-count inc))
-    (^void commit [this] (swap! commit-count inc))
-    (^void rollback [this] (swap! rollback-count inc))))
+    (getId [_] "dummy-id")
+    (^java.util.List scan [_ ^Scan s] (mock-scan s))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void prepare [_] (swap! prepare-count inc))
+    (^void validate [_] (swap! validate-count inc))
+    (^void commit [_] (swap! commit-count inc))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-2pc-throws-exception
   (reify
     TwoPhaseCommitTransaction
-    (getId [this] "dummy-id")
-    (^java.util.List scan [this ^Scan s] (throw (CrudException. "scan failed")))
-    (^void put [this ^Put p] (throw (CrudException. "put failed")))
-    (^void prepare [this] (throw (PreparationException. "preparation failed")))
-    (^void validate [this] (throw (ValidationException. "validation failed")))
-    (^void commit [this] (throw (CommitException. "commit failed")))
-    (^void rollback [this] (swap! rollback-count inc))))
+    (getId [_] "dummy-id")
+    (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed")))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
+    (^void prepare [_] (throw (PreparationException. "preparation failed")))
+    (^void validate [_] (throw (ValidationException. "validation failed")))
+    (^void commit [_] (throw (CommitException. "commit failed")))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-2pc-throws-unknown
   (reify
     TwoPhaseCommitTransaction
-    (getId [this] "unknown-state-tx")
-    (^java.util.List scan [this ^Scan s] (mock-scan s))
-    (^void put [this ^Put p] (mock-put p))
-    (^void prepare [this] (swap! prepare-count inc))
-    (^void validate [this] (swap! validate-count inc))
-    (^void commit [this] (throw (UnknownTransactionStatusException. "unknown state")))
-    (^void rollback [this] (swap! rollback-count inc))))
+    (getId [_] "unknown-state-tx")
+    (^java.util.List scan [_ ^Scan s] (mock-scan s))
+    (^void put [_ ^Put p] (mock-put p))
+    (^void prepare [_] (swap! prepare-count inc))
+    (^void validate [_] (swap! validate-count inc))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (deftest transfer-client-init-test
   (binding [test-records (atom {})
@@ -309,7 +309,7 @@
                                   :num [2 2 2 3 1 2 2 3 2 3]}}
    {:type :fail :f :check-tx}])
 
-(deftest consistency-checker-test
+(deftest consistency-checker-fail-test
   (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
                              nil nil)
         checker (#'transfer/consistency-checker)

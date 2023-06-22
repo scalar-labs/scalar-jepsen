@@ -1,5 +1,5 @@
 (ns cassandra.counter-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [qbits.alia :as alia]
             [qbits.alia.policy.retry :as retry]

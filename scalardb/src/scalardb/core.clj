@@ -4,12 +4,8 @@
             [clojure.tools.logging :refer [info warn]]
             [jepsen.checker :as checker]
             [jepsen.independent :as independent]
-            [jepsen.tests :as tests]
-            [qbits.alia :as alia]
-            [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all])
+            [qbits.alia :as alia])
   (:import (com.scalar.db.api TransactionState)
-           (com.scalar.db.config DatabaseConfig)
            (com.scalar.db.service TransactionFactory
                                   StorageFactory)
            (com.scalar.db.transaction.consensuscommit Coordinator)

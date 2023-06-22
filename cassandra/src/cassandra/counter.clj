@@ -1,13 +1,12 @@
 (ns cassandra.counter
-  (:require [cassandra.core :refer :all]
-            [clojure.tools.logging :refer [debug info warn]]
+  (:require [cassandra.core :as cass]
             [jepsen
              [client :as client]
              [checker :as checker]]
             [qbits.alia :as alia]
             [qbits.hayt]
-            [qbits.hayt.dsl.clause :refer :all]
-            [qbits.hayt.dsl.statement :refer :all]
+            [qbits.hayt.dsl.clause :as clause]
+            [qbits.hayt.dsl.statement :as st]
             [qbits.alia.policy.retry :as retry])
   (:import (clojure.lang ExceptionInfo)))
 
@@ -23,30 +22,32 @@
   (setup! [_ test]
     (locking tbl-created?
       (when (compare-and-set! tbl-created? false true)
-        (create-my-keyspace session test {:keyspace "jepsen_keyspace"})
-        (create-my-table session {:keyspace "jepsen_keyspace"
-                                  :table "counters"
-                                  :schema {:id          :int
-                                           :count       :counter
-                                           :primary-key [:id]}})
-        (alia/execute session (update :counters
-                                      (set-columns :count [+ 0])
-                                      (where [[= :id 0]]))))))
+        (cass/create-my-keyspace session test {:keyspace "jepsen_keyspace"})
+        (cass/create-my-table session {:keyspace "jepsen_keyspace"
+                                       :table "counters"
+                                       :schema {:id          :int
+                                                :count       :counter
+                                                :primary-key [:id]}})
+        (alia/execute session (st/update :counters
+                                         (clause/set-columns :count [+ 0])
+                                         (clause/where [[= :id 0]]))))))
 
   (invoke! [_ _ op]
     (try
-      (alia/execute session (use-keyspace :jepsen_keyspace))
+      (alia/execute session (st/use-keyspace :jepsen_keyspace))
       (case (:f op)
         :add (do (alia/execute session
-                               (update :counters
-                                       (set-columns {:count [+ (:value op)]})
-                                       (where [[= :id 0]]))
+                               (st/update :counters
+                                          (clause/set-columns
+                                           {:count [+ (:value op)]})
+                                          (clause/where [[= :id 0]]))
                                {:consistency  writec})
                  (assoc op :type :ok))
-        :read (do (wait-rf-nodes test)
+        :read (do (cass/wait-rf-nodes test)
                   (let [value (->> (alia/execute
                                     session
-                                    (select :counters (where [[= :id 0]]))
+                                    (st/select :counters
+                                               (clause/where [[= :id 0]]))
                                     {:consistency  :all
                                      :retry-policy (retry/fallthrough-retry-policy)})
                                    first
@@ -54,10 +55,10 @@
                     (assoc op :type :ok, :value value))))
 
       (catch ExceptionInfo e
-        (handle-exception op e))))
+        (cass/handle-exception op e))))
 
   (close! [_ _]
-    (close-cassandra cluster session))
+    (cass/close-cassandra cluster session))
 
   (teardown! [_ _]))
 
@@ -65,5 +66,5 @@
   [_]
   {:client (->CQLCounterClient (atom false) nil nil :quorum)
    :generator [add]
-   :final-generator (read-once)
+   :final-generator (cass/read-once)
    :checker (checker/counter)})

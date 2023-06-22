@@ -1,17 +1,15 @@
 (ns scalardl.core
-  (:require [clojure.tools.logging :refer [debug info warn]]
+  (:require [clojure.string :as str]
+            [clojure.tools.logging :refer [info warn]]
             [jepsen
              [control :as c]
-             [db :as db]
-             [tests :as tests]]
+             [db :as db]]
             [jepsen.control.util :as cu]
             [jepsen.os.debian :as debian]
             [scalardl
              [cassandra :as cassandra]
              [util :as util]])
   (:import (com.scalar.dl.client.config ClientConfig)
-           (com.scalar.dl.client.exception ClientException)
-           (com.scalar.dl.client.service ClientService)
            (com.scalar.dl.client.service ClientServiceFactory)
            (java.util Optional)
            (java.util Properties)))
@@ -105,7 +103,7 @@
   [test]
   (c/exec :echo (str "scalar.dl.ledger.nonce_txid.enabled=true\n"
                      "scalar.db.contact_points="
-                     (clojure.string/join "," (:cass-nodes test)) "\n"
+                     (str/join "," (:cass-nodes test)) "\n"
                      "scalar.db.username=cassandra\n"
                      "scalar.db.password=cassandra")
           :> LEDGER_PROPERTIES))

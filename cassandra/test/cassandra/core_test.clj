@@ -1,9 +1,8 @@
 (ns cassandra.core-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.control :as c]
             [jepsen.db :as db]
             [jepsen.control.util :as cu]
-            [jepsen.generator :as gen]
             [jepsen.os.debian :as debian]
             [cassandra.core :as cass]
             [qbits.alia :as alia]

@@ -1,5 +1,5 @@
 (ns cassandra.runner-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [cassandra.runner :as runner]))
 
 (deftest name-test

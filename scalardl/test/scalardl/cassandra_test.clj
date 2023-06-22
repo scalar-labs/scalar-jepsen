@@ -1,5 +1,5 @@
 (ns scalardl.cassandra-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [qbits.alia :as alia]
             [scalardl.cassandra :as cassandra]
             [spy.core :as spy]))

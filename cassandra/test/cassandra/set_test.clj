@@ -1,14 +1,12 @@
 (ns cassandra.set-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [qbits.alia :as alia]
             [cassandra.core :as cass]
             [cassandra.collections.set :refer [->CQLSetClient] :as set]
             [spy.core :as spy])
   (:import (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
-                                                WriteTimeoutException
-                                                UnavailableException)))
+                                                WriteTimeoutException)))
 
 (deftest set-client-init-test
   (with-redefs [alia/cluster (spy/spy)
