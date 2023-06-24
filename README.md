@@ -1,4 +1,5 @@
-[![CircleCI](https://circleci.com/gh/scalar-labs/scalar-jepsen/tree/master.svg?style=svg)](https://circleci.com/gh/scalar-labs/scalar-jepsen/tree/master)
+![Build and Test](https://github.com/scalar-labs/scalar-jepsen/actions/workflows/build-test.yml/badge.svg)
+![Test with Docker](https://github.com/scalar-labs/scalar-jepsen/actions/workflows/test.yml/badge.svg)
 
 # Run tests with Jepsen Docker
 1. Move to the docker directory
