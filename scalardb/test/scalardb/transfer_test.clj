@@ -65,9 +65,9 @@
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
-    (^Optional get [_ ^Get _] (throw (CrudException. "get failed")))
-    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
-    (^void commit [_] (throw (CommitException. "commit failed")))))
+    (^Optional get [_ ^Get _] (throw (CrudException. "get failed" nil)))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
+    (^void commit [_] (throw (CommitException. "commit failed" nil)))))
 
 (def mock-transaction-throws-unknown
   (reify
@@ -75,7 +75,7 @@
     (getId [_] "unknown-state-tx")
     (^Optional get [_ ^Get g] (mock-get g))
     (^void put [_ ^Put p] (mock-put p))
-    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))))
 
 (deftest transfer-client-init-test
   (binding [test-records (atom {0 0 1 0 2 0 3 0 4 0})

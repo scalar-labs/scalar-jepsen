@@ -69,11 +69,11 @@
   (reify
     TwoPhaseCommitTransaction
     (getId [_] "dummy-id")
-    (^Optional get [_ ^Get _] (throw (CrudException. "get failed")))
-    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
-    (^void prepare [_] (throw (PreparationException. "preparation failed")))
-    (^void validate [_] (throw (ValidationException. "validation failed")))
-    (^void commit [_] (throw (CommitException. "commit failed")))
+    (^Optional get [_ ^Get _] (throw (CrudException. "get failed" nil)))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
+    (^void prepare [_] (throw (PreparationException. "preparation failed" nil)))
+    (^void validate [_] (throw (ValidationException. "validation failed" nil)))
+    (^void commit [_] (throw (CommitException. "commit failed" nil)))
     (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-2pc-throws-unknown
@@ -84,7 +84,7 @@
     (^void put [_ ^Put p] (mock-put p))
     (^void prepare [_] (swap! prepare-count inc))
     (^void validate [_] (swap! validate-count inc))
-    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))
     (^void rollback [_] (swap! rollback-count inc))))
 
 (deftest append-client-init-test
