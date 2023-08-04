@@ -68,9 +68,9 @@
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
-    (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed")))
-    (^void put [_ ^Put _] (throw (CrudException. "put failed")))
-    (^void commit [_] (throw (CommitException. "commit failed")))))
+    (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed" nil)))
+    (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
+    (^void commit [_] (throw (CommitException. "commit failed" nil)))))
 
 (def mock-transaction-throws-unknown
   (reify
@@ -78,7 +78,7 @@
     (getId [_] "unknown-state-tx")
     (^java.util.List scan [_ ^Scan s] (mock-scan s))
     (^void put [_ ^Put p] (mock-put p))
-    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state")))))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))))
 
 (deftest transfer-client-init-test
   (binding [test-records (atom {})
