@@ -288,6 +288,13 @@
                                          (clause/with {:compaction
                                                        {:class compaction-strategy}}))))
 
+(defn insert-record
+  [session {:keys [keyspace table columns]}]
+  (alia/execute session (use-keyspace (keyword keyspace)))
+  (alia/execute session (insert (keyword table)
+                                (values columns)
+                                (if-exists false))))
+
 (defn close-cassandra
   [cluster session]
   (some-> session alia/shutdown (.get 10 TimeUnit/SECONDS))

@@ -5,7 +5,8 @@
             [jepsen.independent :as independent]
             [jepsen.tests.cycle.wr :as wr]
             [scalardb.core :as scalar :refer [INITIAL_TABLE_ID
-                                              DEFAULT_TABLE_COUNT]])
+                                              DEFAULT_TABLE_COUNT
+                                              DEFAULT_KEY_COUNT]])
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
@@ -74,12 +75,12 @@
         (when (compare-and-set! (:table-id test) current-id next-id)
           (info (str "Creating new tables for " next-id))
           (doseq [i (range DEFAULT_TABLE_COUNT)]
-            (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                    :table (str TABLE
-                                                                next-id
-                                                                \_
-                                                                i)
-                                                    :schema SCHEMA}])))))))
+            (let [table (str TABLE next-id \_ i)]
+              (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                                      :table table
+                                                      :schema SCHEMA}])
+              (if (:use-null-tx-metadata test)
+                (scalar/setup-records-without-tx-metadata test KEYSPACE table)))))))))
 
 (defrecord WriteReadClient [initialized?]
   client/Client
@@ -91,9 +92,12 @@
       (when (compare-and-set! initialized? false true)
         (doseq [id (range (inc INITIAL_TABLE_ID))
                 i (range DEFAULT_TABLE_COUNT)]
-          (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                  :table (str TABLE id \_ i)
-                                                  :schema SCHEMA}]))
+          (let [table (str TABLE id \_ i)]
+            (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                                    :table table
+                                                    :schema SCHEMA}])
+            (if (:use-null-tx-metadata test)
+              (scalar/setup-records-without-tx-metadata test KEYSPACE table))))
         (scalar/prepare-2pc-service! test))))
 
   (invoke! [_ test op]
@@ -128,7 +132,7 @@
 
 (defn- write-read-gen
   []
-  (wr/gen {:key-count 10
+  (wr/gen {:key-count DEFAULT_KEY_COUNT
            :min-txn-length 1
            :max-txn-length 10
            :max-writes-per-key 10}))
