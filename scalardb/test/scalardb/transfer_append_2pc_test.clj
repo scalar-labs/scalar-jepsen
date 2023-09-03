@@ -4,7 +4,8 @@
             [jepsen.checker :as checker]
             [cassandra.core :as cass]
             [scalardb.core :as scalar]
-            [scalardb.transfer-append-2pc :as transfer]
+            [scalardb.transfer-append :as transfer]
+            [scalardb.transfer-append-2pc :as t-append-2pc]
             [spy.core :as spy])
   (:import (com.scalar.db.api DistributedTransaction
                               TwoPhaseCommitTransaction
@@ -119,7 +120,7 @@
                   scalar/prepare-2pc-service! (spy/spy)
                   scalar/prepare-transaction-service! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                  nil nil)]
         (client/setup! client nil)
         (is (true? @(:initialized? client)))
@@ -150,7 +151,7 @@
             commit-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc)
                   scalar/join-2pc (spy/stub mock-2pc)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 2 100)
+      (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 2 100)
                                  nil nil)
             result (client/invoke! client
                                    nil
@@ -174,7 +175,7 @@
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-exception)
                   scalar/join-2pc (spy/stub mock-2pc)
                   scalar/try-reconnection-for-2pc! (spy/spy)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                  nil nil)
             result (client/invoke! client
                                    nil
@@ -195,7 +196,7 @@
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
                   scalar/join-2pc (spy/stub mock-2pc)
                   scalar/try-reconnection-for-2pc! (spy/spy)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                  nil nil)
             result (client/invoke! client
                                    {:unknown-tx (atom #{})}
@@ -223,7 +224,7 @@
     (with-redefs [cass/wait-rf-nodes (spy/spy)
                   scalar/check-transaction-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 3 100)
+      (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 3 100)
                                  nil nil)
             result (client/invoke! client {}
                                    (#'transfer/get-all {:client client}
@@ -240,7 +241,7 @@
                 scalar/check-transaction-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
                    (client/invoke! client {}
@@ -251,7 +252,7 @@
 
 (deftest transfer-client-check-tx-test
   (with-redefs [scalar/check-transaction-states (spy/stub 1)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                nil nil)
           result (client/invoke! client {:unknown-tx (atom #{"tx1"})}
                                  (#'transfer/check-tx {:client client}
@@ -262,7 +263,7 @@
 
 (deftest transfer-client-check-tx-fail-test
   (with-redefs [scalar/check-transaction-states (spy/stub nil)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                nil nil)
           result (client/invoke! client {:unknown-tx (atom #{"tx1"})}
                                  (#'transfer/check-tx {:client client}
@@ -285,7 +286,7 @@
    {:type :ok :f :check-tx :value 1}])
 
 (deftest consistency-checker-test
-  (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
+  (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 10 10000)
                              nil nil)
         checker (#'transfer/consistency-checker)
         result (checker/check checker {:client client} correct-history nil)]
@@ -310,7 +311,7 @@
    {:type :fail :f :check-tx}])
 
 (deftest consistency-checker-fail-test
-  (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
+  (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 10 10000)
                              nil nil)
         checker (#'transfer/consistency-checker)
         result (checker/check checker {:client client} bad-history nil)]

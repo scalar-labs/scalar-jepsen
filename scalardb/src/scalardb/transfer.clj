@@ -6,8 +6,7 @@
              [checker :as checker]
              [generator :as gen]]
             [knossos.op :as op]
-            [scalardb.core :as scalar
-                           :refer [KEYSPACE]])
+            [scalardb.core :as scalar :refer [KEYSPACE]])
   (:import (com.scalar.db.api Consistency
                               Get
                               Put
@@ -27,19 +26,19 @@
 (def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
 
 (def ^:const SCHEMA {:account_id             :int
-                               :balance                :int
-                               :tx_id                  :text
-                               :tx_version             :int
-                               :tx_state               :int
-                               :tx_prepared_at         :bigint
-                               :tx_committed_at        :bigint
-                               :before_balance         :int
-                               :before_tx_id           :text
-                               :before_tx_version      :int
-                               :before_tx_state        :int
-                               :before_tx_prepared_at  :bigint
-                               :before_tx_committed_at :bigint
-                               :primary-key            [:account_id]})
+                     :balance                :int
+                     :tx_id                  :text
+                     :tx_version             :int
+                     :tx_state               :int
+                     :tx_prepared_at         :bigint
+                     :tx_committed_at        :bigint
+                     :before_balance         :int
+                     :before_tx_id           :text
+                     :before_tx_version      :int
+                     :before_tx_state        :int
+                     :before_tx_prepared_at  :bigint
+                     :before_tx_committed_at :bigint
+                     :primary-key            [:account_id]})
 
 (defn setup-tables
   [test]

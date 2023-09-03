@@ -6,7 +6,7 @@
              [client :as client]
              [checker :as checker]
              [generator :as gen]]
-            [scalardb.core :as scalar])
+            [scalardb.core :as scalar :refer [KEYSPACE]])
   (:import (com.scalar.db.api Put
                               Scan
                               Scan$Ordering
@@ -17,13 +17,12 @@
            (com.scalar.db.io IntValue
                              Key)))
 
-(def ^:private ^:const KEYSPACE "jepsen_keyspace")
 (def ^:private ^:const TABLE "transfer")
 (def ^:private ^:const ACCOUNT_ID "account_id")
 (def ^:private ^:const BALANCE "balance")
 (def ^:private ^:const AGE "age")
-(def ^:private ^:const INITIAL_BALANCE 10000)
-(def ^:private ^:const NUM_ACCOUNTS 10)
+(def ^:const INITIAL_BALANCE 10000)
+(def ^:const NUM_ACCOUNTS 10)
 (def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
 (def ^:private ^:const SCHEMA {:account_id             :int
                                :age                    :int
@@ -41,6 +40,12 @@
                                :before_tx_version      :int
                                :primary-key            [:account_id :age]})
 
+(defn setup-tables
+  [test]
+  (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                          :table TABLE
+                                          :schema SCHEMA}]))
+
 (defn- prepare-scan
   [id]
   (-> (Key. [(IntValue. ACCOUNT_ID id)])
@@ -49,22 +54,22 @@
       (.forTable TABLE)
       (.withOrdering (Scan$Ordering. AGE Scan$Ordering$Order/DESC))))
 
-(defn- prepare-scan-for-latest
+(defn prepare-scan-for-latest
   [id]
   (-> id prepare-scan (.withLimit 1)))
 
-(defn- scan-for-latest
+(defn scan-for-latest
   [tx scan]
   (first (.scan tx scan)))
 
-(defn- prepare-put
+(defn prepare-put
   [id age balance]
   (-> (Put. (Key. [(IntValue. ACCOUNT_ID id)]) (Key. [(IntValue. AGE age)]))
       (.forNamespace KEYSPACE)
       (.forTable TABLE)
       (.withValue (IntValue. BALANCE balance))))
 
-(defn- populate-accounts
+(defn populate-accounts
   "Insert initial records with transaction.
   This method assumes that n is small (< 100)"
   [test n balance]
@@ -80,27 +85,27 @@
   [^Result result]
   (-> result (.getValue BALANCE) .get .get))
 
-(defn- get-age
+(defn get-age
   [^Result result]
   (-> result (.getValue AGE) .get .get))
 
-(defn- get-balances
+(defn get-balances
   [results]
   (mapv #(get-balance (first %)) results))
 
-(defn- get-ages
+(defn get-ages
   [results]
   (mapv #(get-age (first %)) results))
 
-(defn- get-nums
+(defn get-nums
   [results]
   (mapv count results))
 
-(defn- calc-new-balance
+(defn calc-new-balance
   [^Result r amount]
   (-> r get-balance (+ amount)))
 
-(defn- calc-new-age
+(defn calc-new-age
   [^Result r]
   (-> r get-age inc))
 
@@ -126,7 +131,7 @@
     (.scan tx (prepare-scan id))
     (catch CrudException _ nil)))
 
-(defn- scan-all-records-with-retry
+(defn scan-all-records-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
   (scalar/with-retry scalar/prepare-transaction-service! test
@@ -142,9 +147,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                :table TABLE
-                                                :schema SCHEMA}])
+        (setup-tables test)
         (scalar/prepare-transaction-service! test)
         (populate-accounts test n initial-balance))))
 
@@ -194,18 +197,18 @@
                              (-> op :value :to)))
               transfer))
 
-(defn- get-all
+(defn get-all
   [test _]
   {:type :invoke
    :f    :get-all
    :num  (-> test :client :n)})
 
-(defn- check-tx
+(defn check-tx
   [_ _]
   {:type :invoke
    :f    :check-tx})
 
-(defn- consistency-checker
+(defn consistency-checker
   []
   (reify checker/Checker
     (check [_ _ history _]
