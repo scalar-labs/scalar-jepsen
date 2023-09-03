@@ -39,9 +39,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (scalar/setup-transaction-tables test [{:keyspace transfer/KEYSPACE
-                                                :table transfer/TABLE
-                                                :schema transfer/SCHEMA}])
+        (transfer/setup-tables test)
         (scalar/prepare-2pc-service! test)
         (scalar/prepare-transaction-service! test)
         (transfer/populate-accounts test n initial-balance))))

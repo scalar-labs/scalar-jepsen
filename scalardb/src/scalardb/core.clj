@@ -17,6 +17,7 @@
 (def ^:const INITIAL_TABLE_ID 1)
 (def ^:const DEFAULT_TABLE_COUNT 3)
 
+(def ^:const KEYSPACE "jepsen")
 (def ^:private ^:const COORDINATOR "coordinator")
 (def ^:private ^:const STATE_TABLE "state")
 (def ^:const VERSION "tx_version")

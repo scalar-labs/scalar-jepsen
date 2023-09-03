@@ -6,7 +6,8 @@
              [checker :as checker]
              [generator :as gen]]
             [knossos.op :as op]
-            [scalardb.core :as scalar])
+            [scalardb.core :as scalar
+                           :refer [KEYSPACE]])
   (:import (com.scalar.db.api Consistency
                               Get
                               Put
@@ -17,8 +18,7 @@
            (com.scalar.db.exception.transaction CrudException
                                                 UnknownTransactionStatusException)))
 
-(def ^:const KEYSPACE "jepsen")
-(def ^:const TABLE "transfer")
+(def ^:private ^:const TABLE "transfer")
 (def ^:private ^:const ACCOUNT_ID "account_id")
 (def ^:private ^:const BALANCE "balance")
 
@@ -40,6 +40,12 @@
                                :before_tx_prepared_at  :bigint
                                :before_tx_committed_at :bigint
                                :primary-key            [:account_id]})
+
+(defn setup-tables
+  [test]
+  (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                          :table TABLE
+                                          :schema SCHEMA}]))
 
 (defn prepare-get
   [id]
@@ -128,9 +134,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                :table TABLE
-                                                :schema SCHEMA}])
+        (setup-tables test)
         (scalar/prepare-transaction-service! test)
         (populate-accounts test n initial-balance))))
 
