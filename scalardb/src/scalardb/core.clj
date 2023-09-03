@@ -172,6 +172,19 @@
   ; use the second transaction manager to join a transaction
   (some-> test :2pc deref second (.join tx-id)))
 
+(defn prepare-validate-commit-txs
+  "Given transactions as a vector are prepared, validated,
+  then committed for 2pc."
+  [txs]
+  (doseq [f [#(.prepare %) #(.validate %) #(.commit %)]
+          tx txs]
+    (f tx)))
+
+(defn rollback-txs
+  "Given transactions as a vector are rollbacked."
+  [txs]
+  (doseq [tx txs] (.rollback tx)))
+
 (defmacro with-retry
   "If the result of the body is nil, it retries it"
   [connect-fn test & body]

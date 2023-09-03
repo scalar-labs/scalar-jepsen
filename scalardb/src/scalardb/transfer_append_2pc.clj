@@ -27,17 +27,11 @@
                                  (t-append/calc-new-age to-result)
                                  (t-append/calc-new-balance to-result amount))
            (.put tx2)))
-    (.prepare tx1)
-    (.prepare tx2)
-    (.validate tx1)
-    (.validate tx2)
-    (.commit tx1)
-    (.commit tx2)
+    (scalar/prepare-validate-commit-txs [tx1 tx2])
     (catch UnknownTransactionStatusException e
       (throw e))
     (catch Exception e
-      (.rollback tx1)
-      (.rollback tx2)
+      (scalar/rollback-txs [tx1 tx2])
       (throw e))))
 
 (defrecord TransferClient [initialized? n initial-balance]

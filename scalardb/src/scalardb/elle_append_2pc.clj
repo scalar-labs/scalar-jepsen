@@ -45,19 +45,13 @@
           ;; add tables for the next sequence
           (append/add-tables test (inc seq-id)))
         (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
-          (.prepare tx1)
-          (.prepare tx2)
-          (.validate tx1)
-          (.validate tx2)
-          (.commit tx1)
-          (.commit tx2)
+          (scalar/prepare-validate-commit-txs [tx1 tx2])
           (assoc op :type :ok :value (independent/tuple seq-id txn')))
         (catch UnknownTransactionStatusException _
           (swap! (:unknown-tx test) conj (.getId tx1))
           (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
         (catch Exception e
-          (.rollback tx1)
-          (.rollback tx2)
+          (scalar/rollback-txs [tx1 tx2])
           (scalar/try-reconnection-for-2pc! test)
           (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
 
