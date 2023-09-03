@@ -4,7 +4,8 @@
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
             [jepsen.tests.cycle.wr :as wr]
-            [scalardb.core :as scalar :refer [INITIAL_TABLE_ID
+            [scalardb.core :as scalar :refer [KEYSPACE
+                                              INITIAL_TABLE_ID
                                               DEFAULT_TABLE_COUNT]])
   (:import (com.scalar.db.api Get
                               Put)
@@ -13,8 +14,7 @@
            (com.scalar.db.exception.transaction
             UnknownTransactionStatusException)))
 
-(def ^:private ^:const KEYSPACE "jepsen")
-(def ^:private ^:const TABLE "txn")
+(def ^:const TABLE "txn")
 (def ^:private ^:const SCHEMA {:id                     :int
                                :val                    :int
                                :tx_id                  :text
@@ -32,7 +32,7 @@
 (def ^:private ^:const ID "id")
 (def ^:private ^:const VALUE "val")
 
-(defn- prepare-get
+(defn prepare-get
   [table id]
   (-> (Key. [(IntValue. ID id)])
       (Get.)
@@ -47,7 +47,7 @@
       (.forTable table)
       (.withValue (IntValue. VALUE value))))
 
-(defn- get-value
+(defn get-value
   [r]
   (some-> r .get (.getValue VALUE) .get .get long))
 
@@ -57,7 +57,7 @@
     (when (.isPresent result)
       (get-value result))))
 
-(defn- tx-write
+(defn tx-write
   [tx table id value]
   (.put tx (prepare-put table id value))
   value)
@@ -71,7 +71,15 @@
                 (tx-read tx table k)
                 (tx-write tx table k v)))]))
 
-(defn- add-tables
+(defn setup-tables
+  [test]
+  (doseq [id (range (inc INITIAL_TABLE_ID))
+          i (range DEFAULT_TABLE_COUNT)]
+    (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                            :table (str TABLE id \_ i)
+                                            :schema SCHEMA}])))
+
+(defn add-tables
   [test next-id]
   (let [current-id @(:table-id test)]
     (when (< current-id next-id)
@@ -94,11 +102,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (doseq [id (range (inc INITIAL_TABLE_ID))
-                i (range DEFAULT_TABLE_COUNT)]
-          (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                  :table (str TABLE id \_ i)
-                                                  :schema SCHEMA}]))
+        (setup-tables test)
         (scalar/prepare-transaction-service! test))))
 
   (invoke! [_ test op]
@@ -123,14 +127,14 @@
   (teardown! [_ test]
     (scalar/close-all! test)))
 
-(defn- write-read-gen
+(defn write-read-gen
   []
   (wr/gen {:key-count 10
            :min-txn-length 1
            :max-txn-length 10
            :max-writes-per-key 10}))
 
-(defn- write-read-checker
+(defn write-read-checker
   [opts]
   (wr/checker {:consistency-models (:consistency-model opts)}))
 
