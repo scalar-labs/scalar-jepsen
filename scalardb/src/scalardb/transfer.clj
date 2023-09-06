@@ -6,7 +6,7 @@
              [checker :as checker]
              [generator :as gen]]
             [knossos.op :as op]
-            [scalardb.core :as scalar])
+            [scalardb.core :as scalar :refer [KEYSPACE]])
   (:import (com.scalar.db.api Consistency
                               Get
                               Put
@@ -17,31 +17,36 @@
            (com.scalar.db.exception.transaction CrudException
                                                 UnknownTransactionStatusException)))
 
-(def ^:private ^:const KEYSPACE "jepsen")
 (def ^:private ^:const TABLE "transfer")
 (def ^:private ^:const ACCOUNT_ID "account_id")
 (def ^:private ^:const BALANCE "balance")
 
-(def ^:private ^:const INITIAL_BALANCE 10000)
-(def ^:private ^:const NUM_ACCOUNTS 10)
+(def ^:const INITIAL_BALANCE 10000)
+(def ^:const NUM_ACCOUNTS 10)
 (def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
 
-(def ^:private ^:const SCHEMA {:account_id             :int
-                               :balance                :int
-                               :tx_id                  :text
-                               :tx_version             :int
-                               :tx_state               :int
-                               :tx_prepared_at         :bigint
-                               :tx_committed_at        :bigint
-                               :before_balance         :int
-                               :before_tx_id           :text
-                               :before_tx_version      :int
-                               :before_tx_state        :int
-                               :before_tx_prepared_at  :bigint
-                               :before_tx_committed_at :bigint
-                               :primary-key            [:account_id]})
+(def ^:const SCHEMA {:account_id             :int
+                     :balance                :int
+                     :tx_id                  :text
+                     :tx_version             :int
+                     :tx_state               :int
+                     :tx_prepared_at         :bigint
+                     :tx_committed_at        :bigint
+                     :before_balance         :int
+                     :before_tx_id           :text
+                     :before_tx_version      :int
+                     :before_tx_state        :int
+                     :before_tx_prepared_at  :bigint
+                     :before_tx_committed_at :bigint
+                     :primary-key            [:account_id]})
 
-(defn- prepare-get
+(defn setup-tables
+  [test]
+  (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                          :table TABLE
+                                          :schema SCHEMA}]))
+
+(defn prepare-get
   [id]
   (-> (Key. [(IntValue. ACCOUNT_ID id)])
       (Get.)
@@ -49,7 +54,7 @@
       (.forTable TABLE)
       (.withConsistency Consistency/LINEARIZABLE)))
 
-(defn- prepare-put
+(defn prepare-put
   [id balance]
   (-> (Key. [(IntValue. ACCOUNT_ID id)])
       (Put.)
@@ -58,7 +63,7 @@
       (.withValue (IntValue. BALANCE balance))
       (.withConsistency Consistency/LINEARIZABLE)))
 
-(defn- populate-accounts
+(defn populate-accounts
   "Insert initial records with transaction.
   This method assumes that n is small (< 100)"
   [test n balance]
@@ -70,23 +75,23 @@
        (.commit tx)))
    [n]))
 
-(defn- get-balance
+(defn get-balance
   [^Result r]
   (-> r .get (.getValue BALANCE) .get .get))
 
-(defn- get-version
+(defn get-version
   [^Result r]
   (-> r .get (.getValue scalar/VERSION) .get .get))
 
-(defn- get-balances
+(defn get-balances
   [results]
   (mapv get-balance results))
 
-(defn- get-versions
+(defn get-versions
   [results]
   (mapv get-version results))
 
-(defn- calc-new-balance
+(defn calc-new-balance
   [^Result r ^long amount]
   (-> r get-balance (+ amount)))
 
@@ -111,7 +116,7 @@
     (catch CrudException _ nil)
     (catch ExecutionException _ nil)))
 
-(defn- read-all-with-retry
+(defn read-all-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
   (scalar/check-storage-connection! test)
@@ -128,9 +133,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                :table TABLE
-                                                :schema SCHEMA}])
+        (setup-tables test)
         (scalar/prepare-transaction-service! test)
         (populate-accounts test n initial-balance))))
 
@@ -155,8 +158,9 @@
                    (assoc op :type :ok :value {:balance (get-balances results)
                                                :version (get-versions results)})
                    (assoc op :type :fail :error "Failed to get balances")))
-      :check-tx (if-let [num-committed (scalar/check-transaction-states test
-                                                                        @(:unknown-tx test))]
+      :check-tx (if-let [num-committed
+                         (scalar/check-transaction-states test
+                                                          @(:unknown-tx test))]
                   (assoc op :type :ok, :value num-committed)
                   (assoc op :type :fail, :error "Failed to check status"))))
 
@@ -179,18 +183,18 @@
                              (-> op :value :to)))
               transfer))
 
-(defn- get-all
+(defn get-all
   [test _]
   {:type :invoke
    :f    :get-all
    :num  (-> test :client :n)})
 
-(defn- check-tx
+(defn check-tx
   [_ _]
   {:type :invoke
    :f    :check-tx})
 
-(defn- consistency-checker
+(defn consistency-checker
   []
   (reify checker/Checker
     (check [_ test history _]

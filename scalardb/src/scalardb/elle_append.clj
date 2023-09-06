@@ -5,7 +5,8 @@
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
             [jepsen.tests.cycle.append :as append]
-            [scalardb.core :as scalar :refer [INITIAL_TABLE_ID
+            [scalardb.core :as scalar :refer [KEYSPACE
+                                              INITIAL_TABLE_ID
                                               DEFAULT_TABLE_COUNT]])
   (:import (com.scalar.db.api Get
                               Put)
@@ -15,33 +16,32 @@
            (com.scalar.db.exception.transaction
             UnknownTransactionStatusException)))
 
-(def ^:private ^:const KEYSPACE "jepsen")
-(def ^:private ^:const TABLE "txn")
-(def ^:private ^:const SCHEMA {:id                     :int
-                               :val                    :text
-                               :tx_id                  :text
-                               :tx_version             :int
-                               :tx_state               :int
-                               :tx_prepared_at         :bigint
-                               :tx_committed_at        :bigint
-                               :before_val             :text
-                               :before_tx_id           :text
-                               :before_tx_version      :int
-                               :before_tx_state        :int
-                               :before_tx_prepared_at  :bigint
-                               :before_tx_committed_at :bigint
-                               :primary-key [:id]})
+(def ^:const TABLE "txn")
+(def ^:const SCHEMA {:id                     :int
+                     :val                    :text
+                     :tx_id                  :text
+                     :tx_version             :int
+                     :tx_state               :int
+                     :tx_prepared_at         :bigint
+                     :tx_committed_at        :bigint
+                     :before_val             :text
+                     :before_tx_id           :text
+                     :before_tx_version      :int
+                     :before_tx_state        :int
+                     :before_tx_prepared_at  :bigint
+                     :before_tx_committed_at :bigint
+                     :primary-key [:id]})
 (def ^:private ^:const ID "id")
 (def ^:private ^:const VALUE "val")
 
-(defn- prepare-get
+(defn prepare-get
   [table id]
   (-> (Key. [(IntValue. ID id)])
       (Get.)
       (.forNamespace KEYSPACE)
       (.forTable table)))
 
-(defn- prepare-put
+(defn prepare-put
   [table id value]
   (-> (Key. [(IntValue. ID id)])
       (Put.)
@@ -49,15 +49,15 @@
       (.forTable table)
       (.withValue (TextValue. VALUE value))))
 
-(defn- get-value
+(defn get-value
   [r]
   (some-> r .get (.getValue VALUE) .get .getString .get))
 
-(defn- tx-insert
+(defn tx-insert
   [tx table id value]
   (.put tx (prepare-put table id value)))
 
-(defn- tx-update
+(defn tx-update
   [tx table id prev value]
   (.put tx (prepare-put table id (str prev "," value))))
 
@@ -76,7 +76,15 @@
                        (tx-insert tx table k v'))
                      v))]))
 
-(defn- add-tables
+(defn setup-tables
+  [test]
+  (doseq [id (range (inc INITIAL_TABLE_ID))
+          i (range DEFAULT_TABLE_COUNT)]
+    (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
+                                            :table (str TABLE id \_ i)
+                                            :schema SCHEMA}])))
+
+(defn add-tables
   [test next-id]
   (let [current-id @(:table-id test)]
     (when (< current-id next-id)
@@ -99,11 +107,7 @@
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
-        (doseq [id (range (inc INITIAL_TABLE_ID))
-                i (range DEFAULT_TABLE_COUNT)]
-          (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                  :table (str TABLE id \_ i)
-                                                  :schema SCHEMA}]))
+        (setup-tables test)
         (scalar/prepare-transaction-service! test))))
 
   (invoke! [_ test op]
@@ -128,7 +132,7 @@
   (teardown! [_ test]
     (scalar/close-all! test)))
 
-(defn- append-test
+(defn append-test
   [opts]
   (append/test {:key-count 10
                 :min-txn-length 1
