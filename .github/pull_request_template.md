@@ -24,11 +24,3 @@
 ## Additional notes (optional)
 
 > Provide any additional information or notes that may be relevant to the reviewers or stakeholders.
-
-## Release notes
-
-> Provide release note text for this PR based on the guidelines at [Guidelines for Writing Release Notes](https://developers.scalar-labs.com/docs/style-guide/release-notes/).
-> 
-> For example:
-> 
-> Added validation for the Consensus Commit mutation operation.
