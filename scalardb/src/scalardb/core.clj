@@ -1,15 +1,14 @@
 (ns scalardb.core
-  (:require [cassandra.core :as c]
-            [clojure.string :as string]
+  (:require [cheshire.core :as cheshire]
             [clojure.tools.logging :refer [info warn]]
             [jepsen.checker :as checker]
             [jepsen.independent :as independent]
-            [qbits.alia :as alia])
+            [scalardb.db-extend :as ext])
   (:import (com.scalar.db.api TransactionState)
+           (com.scalar.db.schemaloader SchemaLoader)
            (com.scalar.db.service TransactionFactory
                                   StorageFactory)
-           (com.scalar.db.transaction.consensuscommit Coordinator)
-           (java.util Properties)))
+           (com.scalar.db.transaction.consensuscommit Coordinator)))
 
 (def ^:const RETRIES 8)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
@@ -18,43 +17,21 @@
 (def ^:const DEFAULT_TABLE_COUNT 3)
 
 (def ^:const KEYSPACE "jepsen")
-(def ^:private ^:const COORDINATOR "coordinator")
-(def ^:private ^:const STATE_TABLE "state")
 (def ^:const VERSION "tx_version")
 
-(def ^:private ISOLATION_LEVELS {:snapshot "SNAPSHOT"
-                                 :serializable "SERIALIZABLE"})
-
-(def ^:private SERIALIZABLE_STRATEGIES {:extra-read "EXTRA_READ"
-                                        :extra-write "EXTRA_WRITE"})
+(defn- exponential-backoff
+  [r]
+  (Thread/sleep (reduce * 1000 (repeat r 2))))
 
 (defn setup-transaction-tables
   [test schemata]
-  (let [cluster (alia/cluster {:contact-points (:nodes test)})
-        session (alia/connect cluster)]
+  (let [properties (ext/create-properties (:db test) test)
+        options (ext/create-table-opts (:db test) test)]
     (doseq [schema schemata]
-      (c/create-my-keyspace session test schema)
-      (c/create-my-table session schema))
-
-    (c/create-my-keyspace session test {:keyspace COORDINATOR})
-    (c/create-my-table session {:keyspace COORDINATOR
-                                :table    STATE_TABLE
-                                :schema   {:tx_id         :text
-                                           :tx_state      :int
-                                           :tx_created_at :bigint
-                                           :primary-key   [:tx_id]}})
-    (c/close-cassandra cluster session)))
-
-(defn- create-properties
-  [test nodes]
-  (doto (Properties.)
-    (.setProperty "scalar.db.contact_points" (string/join "," nodes))
-    (.setProperty "scalar.db.username" "cassandra")
-    (.setProperty "scalar.db.password" "cassandra")
-    (.setProperty "scalar.db.isolation_level"
-                  ((:isolation-level test) ISOLATION_LEVELS))
-    (.setProperty "scalar.db.consensus_commit.serializable_strategy"
-                  ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))
+      (SchemaLoader/load properties
+                         (cheshire/generate-string schema)
+                         options
+                         true))))
 
 (defn- close-storage!
   [test]
@@ -90,9 +67,7 @@
 
 (defn- create-service-instance
   [test mode]
-  (when-let [properties (some->> (c/live-nodes test)
-                                 not-empty
-                                 (create-properties test))]
+  (when-let [properties (ext/create-properties (:db test) test)]
     (try
       (condp = mode
         :storage (.getStorage (StorageFactory/create properties))
@@ -110,7 +85,7 @@
   (info "reconnecting to the cluster")
   (loop [tries RETRIES]
     (when (< tries RETRIES)
-      (c/exponential-backoff (- RETRIES tries)))
+      (exponential-backoff (- RETRIES tries)))
     (if-not (pos? tries)
       (warn "Failed to connect to the cluster")
       (if-let [instance (create-service-instance test mode)]
@@ -190,7 +165,7 @@
   [connect-fn test & body]
   `(loop [tries# RETRIES]
      (when (< tries# RETRIES)
-       (c/exponential-backoff (- RETRIES tries#)))
+       (exponential-backoff (- RETRIES tries#)))
      (when (zero? (mod tries# RETRIES_FOR_RECONNECTION))
        (~connect-fn ~test))
      (if-let [results# ~@body]
@@ -212,7 +187,7 @@
         (do
           (warn e)
           (when fallback (fallback))
-          (c/exponential-backoff (- RETRIES tries))
+          (exponential-backoff (- RETRIES tries))
           (recur (dec tries) f args fallback))
         (:value res)))))
 

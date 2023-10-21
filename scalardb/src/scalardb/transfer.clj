@@ -25,26 +25,16 @@
 (def ^:const NUM_ACCOUNTS 10)
 (def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
 
-(def ^:const SCHEMA {:account_id             :int
-                     :balance                :int
-                     :tx_id                  :text
-                     :tx_version             :int
-                     :tx_state               :int
-                     :tx_prepared_at         :bigint
-                     :tx_committed_at        :bigint
-                     :before_balance         :int
-                     :before_tx_id           :text
-                     :before_tx_version      :int
-                     :before_tx_state        :int
-                     :before_tx_prepared_at  :bigint
-                     :before_tx_committed_at :bigint
-                     :primary-key            [:account_id]})
+(def ^:const SCHEMA {(keyword (str KEYSPACE \. TABLE))
+                     {:transaction true
+                      :partition-key [ACCOUNT_ID]
+                      :clustering-key []
+                      :columns {(keyword ACCOUNT_ID) "INT"
+                                (keyword BALANCE) "INT"}}})
 
 (defn setup-tables
   [test]
-  (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                          :table TABLE
-                                          :schema SCHEMA}]))
+  (scalar/setup-transaction-tables test [SCHEMA]))
 
 (defn prepare-get
   [id]

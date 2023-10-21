@@ -13,7 +13,8 @@
              [transfer-2pc]
              [transfer-append-2pc]
              [elle-append-2pc]
-             [elle-write-read-2pc]]))
+             [elle-write-read-2pc]
+             [db-extend :refer [extend-db]]]))
 
 (def workload-keys
   "A map of test workload keys."
@@ -57,6 +58,22 @@
                      "consistency model to be checked"
                      ["snapshot-isolation"])])
 
+(defn- init-scalardb-test
+  [opts workload nemesis admin]
+  (-> opts
+      (assoc :target "scalardb"
+             :workload workload
+             :nemesis nemesis
+             :admin admin
+             :storage (atom nil)
+             :transaction (atom nil)
+             :2pc (atom nil)
+             :table-id (atom INITIAL_TABLE_ID)
+             :unknown-tx (atom #{})
+             :failures (atom 0))
+      (update :consistency-model
+              (fn [ms] (mapv keyword ms)))))
+
 (defn test-cmd
   []
   {"test" {:opt-spec (->> test-opt-spec
@@ -70,21 +87,15 @@
                             workload (:workload options)
                             nemesis (:nemesis options)
                             admin (:admin options)]
-                      (let [test (-> options
-                                     (assoc :target "scalardb"
-                                            :workload workload
-                                            :nemesis nemesis
-                                            :admin admin
-                                            :storage (atom nil)
-                                            :transaction (atom nil)
-                                            :2pc (atom nil)
-                                            :table-id (atom INITIAL_TABLE_ID)
-                                            :unknown-tx (atom #{})
-                                            :failures (atom 0))
-                                     (update :consistency-model
-                                             (fn [ms] (mapv keyword ms)))
-                                     car/cassandra-test
-                                     jepsen/run!)]
+                      (let [opts (init-scalardb-test options
+                                                     workload
+                                                     nemesis
+                                                     admin)
+                            updated-opts (-> opts
+                                             car/cassandra-test
+                                             (update :db
+                                                     #(extend-db % :cassandra)))
+                            test (jepsen/run! updated-opts)]
                         (when-not (:valid? (:results test))
                           (System/exit 1))))))}})
 
