@@ -1,9 +1,14 @@
 (ns scalardb.runner
   (:gen-class)
   (:require [cassandra.runner :as car]
+            [cassandra.core :as cassandra]
+            [cassandra.nemesis :as cn]
+            [clojure.string :as string]
             [jepsen
              [core :as jepsen]
-             [cli :as cli]]
+             [cli :as cli]
+             [generator :as gen]
+             [tests :as tests]]
             [scalardb
              [core :refer [INITIAL_TABLE_ID]]
              [transfer]
@@ -15,6 +20,26 @@
              [elle-append-2pc]
              [elle-write-read-2pc]
              [db-extend :refer [extend-db]]]))
+
+(def db-keys
+  "The map of test DBs."
+  {"cassandra" :cassandra})
+
+(defn- gen-db
+  [db-key faults admin]
+  (case db-key
+    :cassandra (let [db (extend-db (cassandra/db) :cassandra)]
+                 [db
+                  (cn/nemesis-package
+                   {:db db
+                    :faults faults
+                    :admin admin
+                    :partition {:targets [:one
+                                          :primaries
+                                          :majority
+                                          :majorities-ring
+                                          :minority-third]}})])
+    (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
   "A map of test workload keys."
@@ -39,7 +64,10 @@
    :elle-write-read-2pc scalardb.elle-write-read-2pc/workload})
 
 (def test-opt-spec
-  [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
+  [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"
+                     ["cassandra"] db-keys)
+
+   (cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
 
    [nil "--isolation-level ISOLATION_LEVEL" "isolation level"
     :default :snapshot
@@ -58,21 +86,47 @@
                      "consistency model to be checked"
                      ["snapshot-isolation"])])
 
-(defn- init-scalardb-test
-  [opts workload nemesis admin]
-  (-> opts
-      (assoc :target "scalardb"
-             :workload workload
-             :nemesis nemesis
-             :admin admin
-             :storage (atom nil)
-             :transaction (atom nil)
-             :2pc (atom nil)
-             :table-id (atom INITIAL_TABLE_ID)
-             :unknown-tx (atom #{})
-             :failures (atom 0))
-      (update :consistency-model
-              (fn [ms] (mapv keyword ms)))))
+(defn- test-name
+  [workload-key faults admin]
+  (-> ["scalardb" (name workload-key)]
+      (into (map name faults))
+      (into (map name admin))
+      (->> (remove nil?) (string/join "-"))))
+
+(def ^:private scalardb-opts
+  {:storage (atom nil)
+   :transaction (atom nil)
+   :2pc (atom nil)
+   :table-id (atom INITIAL_TABLE_ID)
+   :unknown-tx (atom #{})
+   :failures (atom 0)
+   :decommissioned (atom #{})})
+
+(defn scalardb-test
+  [base-opts db-key workload-key faults admin]
+  (let [workload ((workload-key workloads) base-opts)
+        [db nemesis] (gen-db db-key faults admin)
+        consistency-model (->> base-opts :consistency-model (mapv keyword))]
+    (merge tests/noop-test
+           base-opts
+           scalardb-opts
+           {:consistency-model consistency-model}
+           {:name (test-name workload-key faults admin)
+            :client (:client workload)
+            :db db
+            :pure-generators true
+            :generator (gen/phases
+                        (->> (:generator workload)
+                             gen/mix
+                             (gen/nemesis
+                              (gen/phases
+                               (gen/sleep 5)
+                               (:generator nemesis)))
+                             (gen/time-limit (:time-limit base-opts)))
+                        (gen/nemesis (:final-generator nemesis))
+                        (gen/clients (:final-generator workload)))
+            :nemesis (:nemesis nemesis)
+            :checker (:checker workload)})))
 
 (defn test-cmd
   []
@@ -82,22 +136,19 @@
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
-                  (with-redefs [car/workloads workloads]
-                    (doseq [_ (range (:test-count options))
-                            workload (:workload options)
-                            nemesis (:nemesis options)
-                            admin (:admin options)]
-                      (let [opts (init-scalardb-test options
-                                                     workload
-                                                     nemesis
-                                                     admin)
-                            updated-opts (-> opts
-                                             car/cassandra-test
-                                             (update :db
-                                                     #(extend-db % :cassandra)))
-                            test (jepsen/run! updated-opts)]
-                        (when-not (:valid? (:results test))
-                          (System/exit 1))))))}})
+                  (doseq [_ (range (:test-count options))
+                          db-key (:db options)
+                          workload-key (:workload options)
+                          faults (:nemesis options)
+                          admin (:admin options)]
+                    (let [test (-> options
+                                   (scalardb-test db-key
+                                                  workload-key
+                                                  faults
+                                                  admin)
+                                   jepsen/run!)]
+                      (when-not (:valid? (:results test))
+                        (System/exit 1)))))}})
 
 (defn -main
   [& args]
