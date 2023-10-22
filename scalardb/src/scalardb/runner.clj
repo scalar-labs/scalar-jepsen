@@ -65,7 +65,7 @@
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"
-                     ["cassandra"] db-keys)
+                     [:cassandra] db-keys)
 
    (cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
 
