@@ -104,13 +104,14 @@
 
 (defn scalardb-test
   [base-opts db-key workload-key faults admin]
-  (let [workload ((workload-key workloads) base-opts)
-        [db nemesis] (gen-db db-key faults admin)
-        consistency-model (->> base-opts :consistency-model (mapv keyword))]
+  (let [[db nemesis] (gen-db db-key faults admin)
+        consistency-model (->> base-opts :consistency-model (mapv keyword))
+        workload-opts (merge base-opts
+                             scalardb-opts
+                             {:consistency-model consistency-model})
+        workload ((workload-key workloads) workload-opts)]
     (merge tests/noop-test
-           base-opts
-           scalardb-opts
-           {:consistency-model consistency-model}
+           workload-opts
            {:name (test-name workload-key faults admin)
             :client (:client workload)
             :db db

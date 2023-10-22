@@ -17,7 +17,9 @@
       (is (= "cassandra"
              (.getProperty properties "scalar.db.password")))
       (is (= "SERIALIZABLE"
-             (.getProperty properties "scalar.db.isolation_level")))
+             (.getProperty
+              properties
+              "scalar.db.consensus_commit.isolation_level")))
       (is (= "EXTRA_WRITE"
              (.getProperty
               properties
