@@ -1,8 +1,8 @@
 (ns scalardb.runner
   (:gen-class)
-  (:require [cassandra.runner :as car]
-            [cassandra.core :as cassandra]
+  (:require [cassandra.core :as cassandra]
             [cassandra.nemesis :as cn]
+            [cassandra.runner :as car]
             [clojure.string :as string]
             [jepsen
              [core :as jepsen]

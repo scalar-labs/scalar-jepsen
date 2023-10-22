@@ -1,10 +1,10 @@
 (ns scalardb.transfer-append-2pc
-  (:require [cassandra.core :as cassandra]
-            [clojure.tools.logging :refer [info]]
+  (:require [clojure.tools.logging :refer [info]]
             [jepsen
              [client :as client]
              [generator :as gen]]
             [scalardb.core :as scalar]
+            [scalardb.db-extend :refer [wait-for-recovery]]
             [scalardb.transfer-append :as t-append])
   (:import (com.scalar.db.api Result)
            (com.scalar.db.exception.transaction UnknownTransactionStatusException)))
@@ -63,7 +63,7 @@
                       (scalar/try-reconnection-for-2pc! test)
                       (assoc op :type :fail :error (.getMessage e)))))
       :get-all (do
-                 (cassandra/wait-rf-nodes test)
+                 (wait-for-recovery (:db test) test)
                  (if-let [results (t-append/scan-all-records-with-retry
                                    test (:num op))]
                    (assoc op :type :ok

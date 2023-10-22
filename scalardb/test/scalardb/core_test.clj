@@ -1,8 +1,8 @@
 (ns scalardb.core-test
   (:require [clojure.test :refer [deftest is]]
-            [qbits.alia :as alia]
-            [cassandra.core :as c]
+            [jepsen.db :as db]
             [scalardb.core :as scalar]
+            [scalardb.db-extend :as ext]
             [spy.core :as spy])
   (:import (com.scalar.db.api DistributedStorage
                               DistributedTransaction
@@ -16,45 +16,6 @@
                              TextValue)
            (java.util Optional)))
 
-(deftest setup-transaction-tables-test
-  (with-redefs [alia/cluster (spy/stub "cluster")
-                alia/connect (spy/stub "session")
-                alia/shutdown (spy/spy)
-                c/create-my-keyspace (spy/spy)
-                c/create-my-table (spy/spy)]
-    (scalar/setup-transaction-tables {:nodes ["n1" "n2" "n3"]}
-                                     [{:keyspace "test-keyspace1"
-                                       :table "test-table2"
-                                       :schema {:id :text
-                                                :val :int
-                                                :primary-key [:id]}}
-                                      {:keyspace "test-keyspace2"
-                                       :table "test-table2"
-                                       :schema {:id :text
-                                                :val :int
-                                                :val2 :int
-                                                :primary-key [:id]}}])
-    (is (spy/called-once? alia/connect))
-    (is (spy/called-n-times? alia/shutdown 2))
-    (is (spy/called-n-times? c/create-my-keyspace 3))
-    (is (spy/called-n-times? c/create-my-table 3))))
-
-(deftest create-properties-test
-  (let [nodes ["n1" "n2" "n3"]
-        properties (#'scalar/create-properties
-                    {:isolation-level :serializable
-                     :serializable-strategy :extra-write} nodes)]
-    (is (= "n1,n2,n3"
-           (.getProperty properties "scalar.db.contact_points")))
-    (is (= "cassandra"
-           (.getProperty properties "scalar.db.username")))
-    (is (= "cassandra"
-           (.getProperty properties "scalar.db.password")))
-    (is (= "SERIALIZABLE"
-           (.getProperty properties "scalar.db.isolation_level")))
-    (is (= "EXTRA_WRITE"
-           (.getProperty properties "scalar.db.consensus_commit.serializable_strategy")))))
-
 (defn- mock-result
   "This is only for Coordinator/get and this returns ID as `tx_state`"
   [id]
@@ -65,6 +26,22 @@
         "tx_id" (Optional/of (TextValue. column id))
         "tx_created_at" (Optional/of (BigIntValue. column (long 1566376246)))
         "tx_state" (Optional/of (IntValue. column (Integer/parseInt id)))))))
+
+(def mock-db
+  (reify
+    db/DB
+    (setup! [_ _ _])
+    (teardown! [_ _ _])
+    db/Primary
+    (primaries [_ _])
+    (setup-primary! [_ _ _])
+    db/LogFiles
+    (log-files [_ _ _])
+    ext/DbExtension
+    (live-nodes [_ _] ["n1" "n2" "n3"])
+    (wait-for-recovery [_ _])
+    (create-table-opts [_ _])
+    (create-properties [_ _])))
 
 (def mock-storage
   (reify
@@ -108,26 +85,23 @@
     (is (nil? @(:2pc test)))))
 
 (deftest prepare-storage-service-test
-  (with-redefs [c/live-nodes (spy/stub ["n1" "n2" "n3"])
-                scalar/create-service-instance (spy/stub mock-storage)]
-    (let [test {:storage (atom nil)}]
+  (with-redefs [scalar/create-service-instance (spy/stub mock-storage)]
+    (let [test {:db mock-db :storage (atom nil)}]
       (scalar/prepare-storage-service! test)
       (is (= mock-storage @(:storage test))))))
 
 (deftest prepare-transaction-service-test
-  (with-redefs [c/live-nodes (spy/stub ["n1" "n2" "n3"])
-                scalar/create-service-instance (spy/stub mock-tx-manager)]
-    (let [test {:transaction (atom nil)}]
+  (with-redefs [scalar/create-service-instance (spy/stub mock-tx-manager)]
+    (let [test {:db mock-db :transaction (atom nil)}]
       (scalar/prepare-transaction-service! test)
       (is (= mock-tx-manager @(:transaction test))))))
 
 (deftest prepare-service-fail-test
-  (with-redefs [c/live-nodes (spy/stub ["n1" "n2" "n3"])
-                c/exponential-backoff (spy/spy)
+  (with-redefs [scalar/exponential-backoff (spy/spy)
                 scalar/create-service-instance (spy/stub nil)]
-    (let [test {:storage (atom nil)}]
+    (let [test {:db mock-db :storage (atom nil)}]
       (scalar/prepare-storage-service! test)
-      (is (spy/called-n-times? c/exponential-backoff 8))
+      (is (spy/called-n-times? scalar/exponential-backoff 8))
       (is (nil? @(:storage test))))))
 
 (deftest check-connection-test
@@ -169,10 +143,10 @@
       (is (= 1 (scalar/check-transaction-states test #{"3" "4"}))))))
 
 (deftest check-transaction-states-fail-test
-  (with-redefs [c/exponential-backoff (spy/spy)
+  (with-redefs [scalar/exponential-backoff (spy/spy)
                 scalar/prepare-storage-service! (spy/spy)]
     (let [test {:storage (atom mock-storage)}]
       (is (thrown? clojure.lang.ExceptionInfo
                    (scalar/check-transaction-states test #{"tx"})))
-      (is (spy/called-n-times? c/exponential-backoff 8))
+      (is (spy/called-n-times? scalar/exponential-backoff 8))
       (is (spy/called-n-times? scalar/prepare-storage-service! 3)))))

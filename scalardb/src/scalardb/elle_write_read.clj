@@ -15,22 +15,12 @@
             UnknownTransactionStatusException)))
 
 (def ^:const TABLE "txn")
-(def ^:private ^:const SCHEMA {:id                     :int
-                               :val                    :int
-                               :tx_id                  :text
-                               :tx_version             :int
-                               :tx_state               :int
-                               :tx_prepared_at         :bigint
-                               :tx_committed_at        :bigint
-                               :before_val             :int
-                               :before_tx_id           :text
-                               :before_tx_version      :int
-                               :before_tx_state        :int
-                               :before_tx_prepared_at  :bigint
-                               :before_tx_committed_at :bigint
-                               :primary-key [:id]})
 (def ^:private ^:const ID "id")
 (def ^:private ^:const VALUE "val")
+(def ^:const SCHEMA {:transaction true
+                     :partition-key [ID]
+                     :clustering-key []
+                     :columns {(keyword ID) "INT" (keyword VALUE) "INT"}})
 
 (defn prepare-get
   [table id]
@@ -75,9 +65,8 @@
   [test]
   (doseq [id (range (inc INITIAL_TABLE_ID))
           i (range DEFAULT_TABLE_COUNT)]
-    (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                            :table (str TABLE id \_ i)
-                                            :schema SCHEMA}])))
+    (scalar/setup-transaction-tables
+     test [{(keyword (str KEYSPACE \. TABLE id \_ i)) SCHEMA}])))
 
 (defn add-tables
   [test next-id]
@@ -87,12 +76,9 @@
         (when (compare-and-set! (:table-id test) current-id next-id)
           (info (str "Creating new tables for " next-id))
           (doseq [i (range DEFAULT_TABLE_COUNT)]
-            (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                                    :table (str TABLE
-                                                                next-id
-                                                                \_
-                                                                i)
-                                                    :schema SCHEMA}])))))))
+            (scalar/setup-transaction-tables
+             test
+             [{(keyword (str KEYSPACE \. TABLE next-id \_ i)) SCHEMA}])))))))
 
 (defrecord WriteReadClient [initialized?]
   client/Client

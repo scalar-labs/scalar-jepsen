@@ -1,12 +1,12 @@
 (ns scalardb.transfer
-  (:require [cassandra.core :as cassandra]
-            [clojure.core.reducers :as r]
+  (:require [clojure.core.reducers :as r]
             [jepsen
              [client :as client]
              [checker :as checker]
              [generator :as gen]]
             [knossos.op :as op]
-            [scalardb.core :as scalar :refer [KEYSPACE]])
+            [scalardb.core :as scalar :refer [KEYSPACE]]
+            [scalardb.db-extend :refer [wait-for-recovery]])
   (:import (com.scalar.db.api Consistency
                               Get
                               Put
@@ -143,7 +143,7 @@
                     (scalar/try-reconnection-for-transaction! test)
                     (assoc op :type :fail :error "Skipped due to no connection")))
       :get-all (do
-                 (cassandra/wait-rf-nodes test)
+                 (wait-for-recovery (:db test) test)
                  (if-let [results (read-all-with-retry test (:num op))]
                    (assoc op :type :ok :value {:balance (get-balances results)
                                                :version (get-versions results)})

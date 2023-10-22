@@ -19,7 +19,7 @@
 (def ^:const KEYSPACE "jepsen")
 (def ^:const VERSION "tx_version")
 
-(defn- exponential-backoff
+(defn exponential-backoff
   [r]
   (Thread/sleep (reduce * 1000 (repeat r 2))))
 

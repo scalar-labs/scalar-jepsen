@@ -2,8 +2,8 @@
   (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [jepsen.checker :as checker]
-            [cassandra.core :as cass]
             [scalardb.core :as scalar]
+            [scalardb.core-test :refer [mock-db]]
             [scalardb.transfer :as transfer]
             [scalardb.transfer-2pc :as transfer-2pc]
             [spy.core :as spy])
@@ -205,13 +205,13 @@
 
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 1000 1 100 2 10 3 1 4 0})]
-    (with-redefs [cass/wait-rf-nodes (spy/spy)
-                  scalar/check-transaction-connection! (spy/spy)
+    (with-redefs [scalar/check-transaction-connection! (spy/spy)
                   scalar/check-storage-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
       (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
                                  nil nil)
-            result (client/invoke! client {:storage (ref mock-storage)}
+            result (client/invoke! client {:db mock-db
+                                           :storage (ref mock-storage)}
                                    (#'transfer/get-all {:client client}
                                                        nil))]
         (is (spy/called-once? scalar/check-transaction-connection!))
@@ -221,8 +221,7 @@
         (is (= [1000 100 10 1 0] (get-in result [:value :version])))))))
 
 (deftest transfer-client-get-all-fail-test
-  (with-redefs [cass/wait-rf-nodes (spy/spy)
-                cass/exponential-backoff (spy/spy)
+  (with-redefs [scalar/exponential-backoff (spy/spy)
                 scalar/check-transaction-connection! (spy/spy)
                 scalar/check-storage-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
@@ -231,10 +230,11 @@
     (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
-                   (client/invoke! client {:storage (ref mock-storage)}
+                   (client/invoke! client {:db mock-db
+                                           :storage (ref mock-storage)}
                                    (#'transfer/get-all {:client client}
                                                        nil))))
-      (is (spy/called-n-times? cass/exponential-backoff scalar/RETRIES))
+      (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
       (is (spy/called-n-times? scalar/prepare-transaction-service! scalar/RETRIES_FOR_RECONNECTION))
       (is (spy/called-n-times? scalar/prepare-storage-service! scalar/RETRIES_FOR_RECONNECTION)))))
 
