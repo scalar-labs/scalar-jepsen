@@ -28,10 +28,20 @@
   (let [properties (ext/create-properties (:db test) test)
         options (ext/create-table-opts (:db test) test)]
     (doseq [schema schemata]
-      (SchemaLoader/load properties
-                         (cheshire/generate-string schema)
-                         options
-                         true))))
+      (loop [retries RETRIES]
+        (when (zero? retries)
+          (throw (ex-info "Failed to set up tables" {:schema schema})))
+        (let [result (try
+                       (SchemaLoader/load properties
+                                          (cheshire/generate-string schema)
+                                          options
+                                          true)
+                       :success
+                       (catch Exception e
+                         (warn (.getMessage e))
+                         :fail))]
+          (when (= result :fail)
+            (recur (dec retries))))))))
 
 (defn- close-storage!
   [test]
