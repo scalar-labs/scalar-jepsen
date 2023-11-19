@@ -9,6 +9,7 @@
              [cli :as cli]
              [generator :as gen]
              [tests :as tests]]
+            [jepsen.nemesis [combined :as jn]]
             [scalardb
              [core :refer [INITIAL_TABLE_ID]]
              [transfer]
@@ -19,7 +20,9 @@
              [transfer-append-2pc]
              [elle-append-2pc]
              [elle-write-read-2pc]
-             [db-extend :refer [extend-db]]]))
+             [db-extend :refer [extend-db]]]
+            [scalardb.db
+             [postgre :as postgre]]))
 
 (def db-keys
   "The map of test DBs."
@@ -39,6 +42,15 @@
                                           :majority
                                           :majorities-ring
                                           :minority-third]}})])
+    :postgre (let [db (extend-db (postgre/db) :postgre)]
+               [db
+                (jn/nemesis-package
+                  {:db db
+                   :interval 60
+                   :faults faults
+                   :partition {:targets [:one]}
+                   :kill {:targets [:one]}
+                   :pause {:targets [:one]}})])
     (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
