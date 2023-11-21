@@ -1,12 +1,12 @@
 (ns scalardb.transfer-append
-  (:require [cassandra.core :as cassandra]
-            [clojure.core.reducers :as r]
+  (:require [clojure.core.reducers :as r]
             [clojure.tools.logging :refer [info]]
             [jepsen
              [client :as client]
              [checker :as checker]
              [generator :as gen]]
-            [scalardb.core :as scalar :refer [KEYSPACE]])
+            [scalardb.core :as scalar :refer [KEYSPACE]]
+            [scalardb.db-extend :refer [wait-for-recovery]])
   (:import (com.scalar.db.api Put
                               Scan
                               Scan$Ordering
@@ -24,27 +24,17 @@
 (def ^:const INITIAL_BALANCE 10000)
 (def ^:const NUM_ACCOUNTS 10)
 (def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
-(def ^:private ^:const SCHEMA {:account_id             :int
-                               :age                    :int
-                               :balance                :int
-                               :tx_id                  :text
-                               :tx_prepared_at         :bigint
-                               :tx_committed_at        :bigint
-                               :tx_state               :int
-                               :tx_version             :int
-                               :before_balance         :int
-                               :before_tx_committed_at :bigint
-                               :before_tx_id           :text
-                               :before_tx_prepared_at  :bigint
-                               :before_tx_state        :int
-                               :before_tx_version      :int
-                               :primary-key            [:account_id :age]})
+(def ^:const SCHEMA {(keyword (str KEYSPACE \. TABLE))
+                     {:transaction true
+                      :partition-key [ACCOUNT_ID]
+                      :clustering-key [AGE]
+                      :columns {(keyword ACCOUNT_ID) "INT"
+                                (keyword AGE) "INT"
+                                (keyword BALANCE) "INT"}}})
 
 (defn setup-tables
   [test]
-  (scalar/setup-transaction-tables test [{:keyspace KEYSPACE
-                                          :table TABLE
-                                          :schema SCHEMA}]))
+  (scalar/setup-transaction-tables test [SCHEMA]))
 
 (defn- prepare-scan
   [id]
@@ -167,7 +157,7 @@
                     (scalar/try-reconnection-for-transaction! test)
                     (assoc op :type :fail, :error "Skipped due to no connection")))
       :get-all (do
-                 (cassandra/wait-rf-nodes test)
+                 (wait-for-recovery (:db test) test)
                  (if-let [results (scan-all-records-with-retry test (:num op))]
                    (assoc op :type, :ok :value {:balance (get-balances results)
                                                 :age (get-ages results)

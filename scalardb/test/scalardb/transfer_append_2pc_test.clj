@@ -2,8 +2,8 @@
   (:require [clojure.test :refer [deftest is]]
             [jepsen.client :as client]
             [jepsen.checker :as checker]
-            [cassandra.core :as cass]
             [scalardb.core :as scalar]
+            [scalardb.core-test :refer [mock-db]]
             [scalardb.transfer-append :as transfer]
             [scalardb.transfer-append-2pc :as t-append-2pc]
             [spy.core :as spy])
@@ -221,12 +221,11 @@
                                    {:age 2 :balance 100}
                                    {:age 3 :balance 10}]
                                 2 [{:age 1 :balance 1}]})]
-    (with-redefs [cass/wait-rf-nodes (spy/spy)
-                  scalar/check-transaction-connection! (spy/spy)
+    (with-redefs [scalar/check-transaction-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
       (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 3 100)
                                  nil nil)
-            result (client/invoke! client {}
+            result (client/invoke! client {:db mock-db}
                                    (#'transfer/get-all {:client client}
                                                        nil))]
         (is (spy/called-once? scalar/check-transaction-connection!))
@@ -236,18 +235,17 @@
         (is (= [2 3 1] (get-in result [:value :num])))))))
 
 (deftest transfer-client-get-all-fail-test
-  (with-redefs [cass/wait-rf-nodes (spy/spy)
-                cass/exponential-backoff (spy/spy)
+  (with-redefs [scalar/exponential-backoff (spy/spy)
                 scalar/check-transaction-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
     (let [client (client/open! (t-append-2pc/->TransferClient (atom false) 5 100)
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
-                   (client/invoke! client {}
+                   (client/invoke! client {:db mock-db}
                                    (#'transfer/get-all {:client client}
                                                        nil))))
-      (is (spy/called-n-times? cass/exponential-backoff scalar/RETRIES))
+      (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
       (is (spy/called-n-times? scalar/prepare-transaction-service! scalar/RETRIES_FOR_RECONNECTION)))))
 
 (deftest transfer-client-check-tx-test

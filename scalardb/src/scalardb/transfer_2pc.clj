@@ -1,10 +1,10 @@
 (ns scalardb.transfer-2pc
-  (:require [cassandra.core :as cassandra]
-            [jepsen
+  (:require [jepsen
              [client :as client]
              [generator :as gen]]
             [scalardb.core :as scalar]
-            [scalardb.transfer :as transfer])
+            [scalardb.transfer :as transfer]
+            [scalardb.db-extend :refer [wait-for-recovery]])
   (:import (com.scalar.db.exception.transaction UnknownTransactionStatusException)))
 
 (defn- tx-transfer
@@ -54,7 +54,7 @@
                       (scalar/try-reconnection-for-2pc! test)
                       (assoc op :type :fail :error (.getMessage e)))))
       :get-all (do
-                 (cassandra/wait-rf-nodes test)
+                 (wait-for-recovery (:db test) test)
                  (if-let [results (transfer/read-all-with-retry test (:num op))]
                    (assoc op :type :ok :value {:balance
                                                (transfer/get-balances results)
