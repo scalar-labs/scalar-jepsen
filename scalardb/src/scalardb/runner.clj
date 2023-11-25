@@ -2,7 +2,8 @@
   (:gen-class)
   (:require [cassandra.core :as cassandra]
             [cassandra.nemesis :as cn]
-            [cassandra.runner :as car]
+            [cassandra.runner :as cr]
+            [clojure.tools.logging :refer [warn]]
             [clojure.string :as string]
             [jepsen
              [core :as jepsen]
@@ -22,13 +23,15 @@
              [elle-write-read-2pc]
              [db-extend :refer [extend-db]]]
             [scalardb.db
-             [postgre :as postgre]]))
+             [postgres :as postgres]]))
 
 (def db-keys
   "The map of test DBs."
-  {"cassandra" :cassandra})
+  {"cassandra" :cassandra
+   "postgres" :postgres})
 
 (defn- gen-db
+  "Returns [extended-db constructed-nemesis num-max-nodes]."
   [db-key faults admin]
   (case db-key
     :cassandra (let [db (extend-db (cassandra/db) :cassandra)]
@@ -41,16 +44,18 @@
                                           :primaries
                                           :majority
                                           :majorities-ring
-                                          :minority-third]}})])
-    :postgre (let [db (extend-db (postgre/db) :postgre)]
-               [db
-                (jn/nemesis-package
+                                          :minority-third]}})
+                  Integer/MAX_VALUE])
+    :postgres (let [db (extend-db (postgres/db) :postgres)]
+                [db
+                 (jn/nemesis-package
                   {:db db
                    :interval 60
                    :faults faults
                    :partition {:targets [:one]}
                    :kill {:targets [:one]}
-                   :pause {:targets [:one]}})])
+                   :pause {:targets [:one]}})
+                 1])
     (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
@@ -75,11 +80,25 @@
    :elle-append-2pc     scalardb.elle-append-2pc/workload
    :elle-write-read-2pc scalardb.elle-write-read-2pc/workload})
 
+(def nemeses
+  "A map of nemeses."
+  {"none" []
+   "partition" [:partition]
+   "packet"    [:packet]
+   "clock"     [:clock]
+   "crash"     [:kill]
+   "pause"     [:pause]
+   "mix"       [:kill :partition :clock]})
+
 (def test-opt-spec
   [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"
                      [:cassandra] db-keys)
 
    (cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
+
+   (cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
+                     [[]]
+                     nemeses)
 
    [nil "--isolation-level ISOLATION_LEVEL" "isolation level"
     :default :snapshot
@@ -105,6 +124,18 @@
       (into (map name admin))
       (->> (remove nil?) (string/join "-"))))
 
+(defn- validate-options
+  "Check if the given faults are valid for the tested DB."
+  [db nemesis admin]
+  (when (= db :cassandra)
+    (when-not (every? #(some? (% cr/nemeses)) nemesis)
+      (throw (ex-info (str "Invalid nemesis for Cassandra: " nemesis) {})))
+    (when-not (every? #(some? (% cr/admin)) admin)
+      (throw (ex-info (str "Invalid admin for Cassandra: " admin) {}))))
+  (when (not= db :cassandra)
+    (when (seq admin)
+      (warn "The admin operations are ignored:" admin))))
+
 (def ^:private scalardb-opts
   {:storage (atom nil)
    :transaction (atom nil)
@@ -116,11 +147,12 @@
 
 (defn scalardb-test
   [base-opts db-key workload-key faults admin]
-  (let [[db nemesis] (gen-db db-key faults admin)
+  (let [[db nemesis max-nodes] (gen-db db-key faults admin)
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
                              scalardb-opts
-                             {:consistency-model consistency-model})
+                             {:nodes (take max-nodes (:nodes base-opts))
+                              :consistency-model consistency-model})
         workload ((workload-key workloads) workload-opts)]
     (merge tests/noop-test
            workload-opts
@@ -143,7 +175,8 @@
 (defn test-cmd
   []
   {"test" {:opt-spec (->> test-opt-spec
-                          (into car/cassandra-opt-spec)
+                          (into cr/cassandra-opt-spec)
+                          (into cr/admin-opt-spec)
                           (into cli/test-opt-spec))
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
@@ -153,6 +186,7 @@
                           workload-key (:workload options)
                           faults (:nemesis options)
                           admin (:admin options)]
+                    (validate-options db-key faults admin)
                     (let [test (-> options
                                    (scalardb-test db-key
                                                   workload-key

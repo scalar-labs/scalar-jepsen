@@ -36,6 +36,7 @@
       (when (nil? nodes)
         (throw (ex-info "No living node" {:test test})))
       (doto (Properties.)
+        (.setProperty "scalar.db.storage" "cassandra")
         (.setProperty "scalar.db.contact_points" (string/join "," nodes))
         (.setProperty "scalar.db.username" "cassandra")
         (.setProperty "scalar.db.password" "cassandra")
@@ -44,8 +45,30 @@
         (.setProperty "scalar.db.consensus_commit.serializable_strategy"
                       ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))))
 
+(defrecord ExtPostgres []
+  DbExtension
+  ;; TODO: check the liveness
+  (live-nodes [_ test] (:nodes test))
+  (wait-for-recovery [_ _])
+  (create-table-opts [_ _] {})
+  (create-properties
+    [this test]
+    (let [nodes (live-nodes this test)]
+      (when (nil? nodes)
+        (throw (ex-info "No living node" {:test test})))
+      (doto (Properties.)
+        (.setProperty "scalar.db.storage" "jdbc")
+        (.setProperty "scalar.db.contact_points" (string/join "," nodes))
+        (.setProperty "scalar.db.username" "postgres")
+        (.setProperty "scalar.db.password" "postgres")
+        (.setProperty "scalar.db.consensus_commit.isolation_level"
+                      ((:isolation-level test) ISOLATION_LEVELS))
+        (.setProperty "scalar.db.consensus_commit.serializable_strategy"
+                      ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))))
+
 (def ^:private ext-dbs
-  {:cassandra (->ExtCassandra)})
+  {:cassandra (->ExtCassandra)
+   :postgres (->ExtPostgres)})
 
 (defn extend-db
   [db db-type]

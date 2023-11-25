@@ -48,15 +48,7 @@
   [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)])
 
 (def cassandra-opt-spec
-  [(cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
-                     [[]]
-                     nemeses)
-
-   (cli/repeated-opt nil "--admin NAME" "Which admin operations to use"
-                     [[]]
-                     admin)
-
-   [nil "--rf REPLICATION_FACTOR" "Replication factor"
+  [[nil "--rf REPLICATION_FACTOR" "Replication factor"
     :default 3
     :parse-fn #(Long/parseLong %)
     :validate [pos? "Must be positive"]]
@@ -65,6 +57,16 @@
     :default "/root/cassandra"]
 
    (cli/tarball-opt link-to-tarball)])
+
+(def nemesis-opt-spec
+  [(cli/repeated-opt nil "--nemesis NAME" "Which nemeses to use"
+                     [[]]
+                     nemeses)])
+
+(def admin-opt-spec
+  [(cli/repeated-opt nil "--admin NAME" "Which admin operations to use"
+                     [[]]
+                     admin)])
 
 (defn cassandra-test
   [opts]
@@ -108,6 +110,8 @@
   []
   {"test" {:opt-spec (->> test-opt-spec
                           (into cassandra-opt-spec)
+                          (into nemesis-opt-spec)
+                          (into admin-opt-spec)
                           (into cli/test-opt-spec))
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
