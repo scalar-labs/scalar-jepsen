@@ -26,6 +26,14 @@
                          (str "deb http://apt.postgresql.org/pub/repos/apt/ "
                               release "-pgdg main")))
      (debian/install [postgre client])
+     (c/su (c/exec :sed :-i
+                   (c/lit "\"s/#listen_addresses = 'localhost'/listen_addresses = '*'/g\"")
+                   (str "/etc/postgresql/" version "/main/postgresql.conf")))
+     (c/su (c/exec :echo
+                   (c/lit "host all all 0.0.0.0/0 trust")
+                   c/| :tee :-a
+                   (str "/etc/postgresql/" version "/main/pg_hba.conf")
+                   :> "/dev/null"))
      (c/su (meh (c/exec :service :postgresql :stop)))
      (c/exec "update-rc.d" :postgresql :disable))))
 
@@ -39,9 +47,9 @@
 
 (defn- configure!
   [{:keys [version] :or {version DEFAULT_VERSION}}]
-    (c/sudo "postgres"
-            (c/exec (str (get-bin-dir version) "/initdb")
-                    :-D (get-main-dir version))))
+  (c/sudo "postgres"
+          (c/exec (str (get-bin-dir version) "/initdb")
+                  :-D (get-main-dir version))))
 
 (defn- get-log-path
   [{:keys [version] :or {version DEFAULT_VERSION}}]

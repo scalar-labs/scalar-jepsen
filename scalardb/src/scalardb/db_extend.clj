@@ -53,12 +53,13 @@
   (create-table-opts [_ _] {})
   (create-properties
     [this test]
-    (let [nodes (live-nodes this test)]
-      (when (nil? nodes)
+    (let [node (first (live-nodes this test))]
+      (when (nil? node)
         (throw (ex-info "No living node" {:test test})))
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
-        (.setProperty "scalar.db.contact_points" (string/join "," nodes))
+        (.setProperty "scalar.db.contact_points"
+                      (str "jdbc:postgresql://" node ":5432/"))
         (.setProperty "scalar.db.username" "postgres")
         (.setProperty "scalar.db.password" "postgres")
         (.setProperty "scalar.db.consensus_commit.isolation_level"
