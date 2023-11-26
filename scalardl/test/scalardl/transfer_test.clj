@@ -16,7 +16,7 @@
 (def ^:dynamic execute-count (atom 0))
 
 (def mock-client-service
-  (proxy [ClientService] [nil nil nil nil]
+  (proxy [ClientService] [nil nil nil]
     (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
@@ -31,7 +31,7 @@
                                 nil))))
 
 (def mock-failure-client-service
-  (proxy [ClientService] [nil nil nil nil]
+  (proxy [ClientService] [nil nil nil]
     (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)

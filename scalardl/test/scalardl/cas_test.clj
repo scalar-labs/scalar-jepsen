@@ -15,7 +15,7 @@
 (def ^:dynamic execute-count (atom 0))
 
 (def mock-client-service
-  (proxy [ClientService] [nil nil nil nil]
+  (proxy [ClientService] [nil nil nil]
     (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
@@ -29,7 +29,7 @@
                                 nil))))
 
 (def mock-client-service-throws-unknown-status
-  (proxy [ClientService] [nil nil nil nil]
+  (proxy [ClientService] [nil nil nil]
     (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
@@ -41,7 +41,7 @@
                                StatusCode/UNKNOWN_TRANSACTION_STATUS)))))
 
 (def mock-client-service-throws-database-error
-  (proxy [ClientService] [nil nil nil nil]
+  (proxy [ClientService] [nil nil nil]
     (registerCertificate [])
     (registerContract [_ _ _ _]
       (swap! contract-count inc)
