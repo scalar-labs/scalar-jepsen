@@ -32,7 +32,7 @@
      (keyword CassandraAdmin/REPLICATION_FACTOR) (:rf test)})
   (create-properties
     [_ test]
-    (let [nodes (cassandra/live-nodes test)]
+    (let [nodes (:nodes test)]
       (when (nil? nodes)
         (throw (ex-info "No living node" {:test test})))
       (doto (Properties.)
