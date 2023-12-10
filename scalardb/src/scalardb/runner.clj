@@ -34,7 +34,13 @@
   "Returns [extended-db constructed-nemesis num-max-nodes]."
   [db-key faults admin]
   (case db-key
-    :cassandra (let [db (extend-db (cassandra/db) :cassandra)]
+    :cassandra (let [db (extend-db (cassandra/db) :cassandra)
+                     ;; replace :kill nemesis with :crash for Cassandra
+                     faults (mapv #(if (= % :kill) :crash %) faults)]
+                 (when-not (every? #(some? (get cr/nemeses (name %))) faults)
+                   (throw
+                    (ex-info
+                     (str "Invalid nemesis for Cassandra: " faults) {})))
                  [db
                   (cn/nemesis-package
                    {:db db
@@ -47,6 +53,8 @@
                                           :minority-third]}})
                   Integer/MAX_VALUE])
     :postgres (let [db (extend-db (postgres/db) :postgres)]
+                (when (seq admin)
+                  (warn "The admin operations are ignored:" admin))
                 [db
                  (jn/nemesis-package
                   {:db db
@@ -87,8 +95,7 @@
    "packet"    [:packet]
    "clock"     [:clock]
    "crash"     [:kill]
-   "pause"     [:pause]
-   "mix"       [:kill :partition :clock]})
+   "pause"     [:pause]})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"
@@ -124,18 +131,6 @@
       (into (map name admin))
       (->> (remove nil?) (string/join "-"))))
 
-(defn- validate-options
-  "Check if the given faults are valid for the tested DB."
-  [db nemesis admin]
-  (when (= db :cassandra)
-    (when-not (every? #(some? (% cr/nemeses)) nemesis)
-      (throw (ex-info (str "Invalid nemesis for Cassandra: " nemesis) {})))
-    (when-not (every? #(some? (% cr/admin)) admin)
-      (throw (ex-info (str "Invalid admin for Cassandra: " admin) {}))))
-  (when (not= db :cassandra)
-    (when (seq admin)
-      (warn "The admin operations are ignored:" admin))))
-
 (def ^:private scalardb-opts
   {:storage (atom nil)
    :transaction (atom nil)
@@ -151,7 +146,7 @@
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
                              scalardb-opts
-                             {:nodes (take max-nodes (:nodes base-opts))
+                             {:nodes (vec (take max-nodes (:nodes base-opts)))
                               :consistency-model consistency-model})
         workload ((workload-key workloads) workload-opts)]
     (merge tests/noop-test
@@ -186,7 +181,6 @@
                           workload-key (:workload options)
                           faults (:nemesis options)
                           admin (:admin options)]
-                    (validate-options db-key faults admin)
                     (let [test (-> options
                                    (scalardb-test db-key
                                                   workload-key

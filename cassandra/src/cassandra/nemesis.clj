@@ -199,7 +199,7 @@
 
 (defn flush-generator
   [opts]
-  (when (contains? (:admin opts) :flush-compact)
+  (when (contains? (:admin opts) :flush)
     (->> (gen/mix [(repeat {:type :info, :f :flush})
                    (repeat {:type :info, :f :compact})])
          (gen/stagger default-interval))))
@@ -207,7 +207,7 @@
 (defn flush-package
   "A combined nemesis package for flush and compaction."
   [opts]
-  (when (contains? (:admin opts) :flush-compact)
+  (when (contains? (:admin opts) :flush)
     {:nemesis   (flush-nemesis)
      :generator (flush-generator opts)
      :perf      #{{:name  "flush"

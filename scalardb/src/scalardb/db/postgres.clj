@@ -8,6 +8,8 @@
             [jepsen.os.debian :as debian]))
 
 (def ^:private ^:const DEFAULT_VERSION "15")
+(def ^:private ^:const TIMEOUT_SEC 600)
+(def ^:private ^:const INTERVAL_SEC 10)
 
 (defn- install!
   "Installs PostgreSQL."
@@ -68,6 +70,28 @@
   (stop!)
   (c/su (meh (c/exec :rm :-r (get-main-dir version))))
   (c/su (meh (c/exec :rm (get-log-path version)))))
+
+(defn live-node?
+  [test]
+  (let [node (-> test :nodes first)]
+    (try
+      (c/on node (c/sudo "postgres" (c/exec :pg_isready)))
+      true
+      (catch Exception _
+        (info node "is down")
+        false))))
+
+(defn wait-for-recovery
+  "Wait for the node bootstrapping."
+  ([test]
+   (wait-for-recovery TIMEOUT_SEC INTERVAL_SEC test))
+  ([timeout-sec interval-sec test]
+   (when-not (live-node? test)
+     (Thread/sleep (* interval-sec 1000))
+     (if (>= timeout-sec interval-sec)
+       (wait-for-recovery (- timeout-sec interval-sec) interval-sec test)
+       (throw (ex-info "Timed out waiting for the postgres node"
+                       {:cause "The node couldn't start"}))))))
 
 (defn db
   "Setup PostgreSQL."

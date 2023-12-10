@@ -42,7 +42,7 @@
 (def admin
   {"none" []
    "join" [:join]
-   "flush" [:flush-compact]})
+   "flush" [:flush]})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)])

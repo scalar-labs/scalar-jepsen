@@ -1,7 +1,8 @@
 (ns scalardb.db-extend
   (:require [cassandra.core :as cassandra]
             [clojure.string :as string]
-            [jepsen.db :as db])
+            [jepsen.db :as db]
+            [scalardb.db.postgres :as postgres])
   (:import (com.scalar.db.storage.cassandra CassandraAdmin
                                             CassandraAdmin$ReplicationStrategy
                                             CassandraAdmin$CompactionStrategy)
@@ -47,15 +48,13 @@
 
 (defrecord ExtPostgres []
   DbExtension
-  ;; TODO: check the liveness
-  (live-nodes [_ test] (:nodes test))
-  (wait-for-recovery [_ _])
+  (live-nodes [_ test] (postgres/live-node? test))
+  (wait-for-recovery [_ test] (postgres/wait-for-recovery test))
   (create-table-opts [_ _] {})
   (create-properties
-    [this test]
-    (let [node (first (live-nodes this test))]
-      (when (nil? node)
-        (throw (ex-info "No living node" {:test test})))
+    [_ test]
+    (let [node (-> test :nodes first)]
+      ;; We have only one node in this test
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

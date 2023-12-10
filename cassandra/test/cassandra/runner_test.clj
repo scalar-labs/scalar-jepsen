@@ -6,7 +6,7 @@
   (let [opts {:target "cassandra"
               :workload :batch
               :nemesis [:crash]
-              :admin [:flush-compact]
+              :admin [:flush]
               :time-limit 60}
         test (runner/cassandra-test opts)]
-    (is (= "cassandra-batch-crash-flush-compact" (:name test)))))
+    (is (= "cassandra-batch-crash-flush" (:name test)))))
