@@ -31,21 +31,17 @@
       (loop [retries RETRIES]
         (when (zero? retries)
           (throw (ex-info "Failed to set up tables" {:schema schema})))
+        (when (< retries RETRIES)
+          (try
+            (SchemaLoader/unload properties schema true)
+            (catch Exception e (warn (.getMessage e))))
+          (exponential-backoff (- RETRIES retries)))
         (let [schema (cheshire/generate-string schema)
               result (try
-                       (SchemaLoader/load properties
-                                          schema
-                                          options
-                                          true)
+                       (SchemaLoader/load properties schema options true)
                        :success
                        (catch Exception e
                          (warn (.getMessage e))
-                         (try
-                           (SchemaLoader/unload properties
-                                                schema
-                                                true)
-                           (catch Exception e
-                             (warn (.getMessage e))))
                          :fail))]
           (when (= result :fail)
             (recur (dec retries))))))))
