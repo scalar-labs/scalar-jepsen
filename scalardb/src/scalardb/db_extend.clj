@@ -80,6 +80,12 @@
       db/Primary
       (primaries [_ test] (db/primaries db test))
       (setup-primary! [_ test node] (db/setup-primary! db test node))
+      db/Pause
+      (pause! [_ test node] (db/pause! db test node))
+      (resume! [_ test node] (db/resume! db test node))
+      db/Kill
+      (start! [_ test node] (db/start! db test node))
+      (kill! [_ test node] (db/kill! db test node))
       db/LogFiles
       (log-files [_ test node] (db/log-files db test node))
       DbExtension
