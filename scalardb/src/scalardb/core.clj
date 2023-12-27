@@ -27,7 +27,7 @@
   [test schemata]
   (let [properties (ext/create-properties (:db test) test)
         options (ext/create-table-opts (:db test) test)]
-    (doseq [schema schemata]
+    (doseq [schema (map cheshire/generate-string schemata)]
       (loop [retries RETRIES]
         (when (zero? retries)
           (throw (ex-info "Failed to set up tables" {:schema schema})))
@@ -36,8 +36,7 @@
             (SchemaLoader/unload properties schema true)
             (catch Exception e (warn (.getMessage e))))
           (exponential-backoff (- RETRIES retries)))
-        (let [schema (cheshire/generate-string schema)
-              result (try
+        (let [result (try
                        (SchemaLoader/load properties schema options true)
                        :success
                        (catch Exception e
