@@ -32,6 +32,7 @@
         (when (zero? retries)
           (throw (ex-info "Failed to set up tables" {:schema schema})))
         (when (< retries RETRIES)
+          (exponential-backoff (- RETRIES retries))
           (try
             (SchemaLoader/unload properties schema true)
             (catch Exception e (warn (.getMessage e))))
