@@ -8,8 +8,7 @@
   (:import (com.scalar.dl.client.exception ClientException)
            (com.scalar.dl.client.service ClientService)
            (com.scalar.dl.ledger.model ContractExecutionResult)
-           (com.scalar.dl.ledger.service StatusCode)
-           (javax.json Json)))
+           (com.scalar.dl.ledger.service StatusCode)))
 
 (def ^:dynamic contract-count (atom 0))
 (def ^:dynamic execute-count (atom 0))
@@ -22,9 +21,8 @@
       nil)
     (executeContract [& _]
       (swap! execute-count inc)
-      (ContractExecutionResult. (-> (Json/createObjectBuilder)
-                                    (.add "value" 3)
-                                    .build)
+      (ContractExecutionResult. "{\"value\": 3}"
+                                nil
                                 nil
                                 nil))))
 
