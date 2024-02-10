@@ -67,7 +67,6 @@
   (let [[cluster session] (cassandra/open-cassandra test)
         schemata (map get-cassandra-schema schemata)]
     (doseq [schema schemata]
-      (println "DEBUG:" schema)
       (cassandra/create-my-keyspace session test schema)
       (cassandra/create-my-table session schema))
     (cassandra/create-my-keyspace session test {:keyspace "coordinator"})
