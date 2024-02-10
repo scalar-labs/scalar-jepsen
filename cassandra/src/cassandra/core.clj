@@ -288,6 +288,12 @@
                                          (clause/with {:compaction
                                                        {:class compaction-strategy}}))))
 
+(defn open-cassandra
+  [test]
+  (let [cluster (alia/cluster {:contact-points (:nodes test)})
+        session (alia/connect cluster)]
+    [cluster session]))
+
 (defn close-cassandra
   [cluster session]
   (some-> session alia/shutdown (.get 10 TimeUnit/SECONDS))
