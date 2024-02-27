@@ -11,7 +11,6 @@
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
-                             TextValue
                              Key)
            (com.scalar.db.exception.transaction
             UnknownTransactionStatusException)))
