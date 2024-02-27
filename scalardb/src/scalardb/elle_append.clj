@@ -11,6 +11,7 @@
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
+                             TextValue
                              Key)
            (com.scalar.db.exception.transaction
             UnknownTransactionStatusException)))
@@ -21,7 +22,7 @@
 (def ^:const SCHEMA {:transaction true
                      :partition-key [ID]
                      :clustering-key []
-                     :columns {(keyword ID) "INT" (keyword VALUE) "INT"}})
+                     :columns {(keyword ID) "INT" (keyword VALUE) "TEXT"}})
 
 (defn prepare-get
   [table id]
@@ -36,7 +37,7 @@
       (Put.)
       (.forNamespace KEYSPACE)
       (.forTable table)
-      (.withValue (IntValue. VALUE value))))
+      (.withValue (TextValue. VALUE value))))
 
 (defn get-value
   [r]
