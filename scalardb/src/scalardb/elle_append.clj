@@ -37,7 +37,7 @@
       (Put.)
       (.forNamespace KEYSPACE)
       (.forTable table)
-      (.withValue (TextValue. VALUE value))))
+      (.withValue (IntValue. VALUE value))))
 
 (defn get-value
   [r]
