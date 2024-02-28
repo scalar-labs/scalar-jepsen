@@ -22,7 +22,7 @@
 (def ^:const SCHEMA {:transaction true
                      :partition-key [ID]
                      :clustering-key []
-                     :columns {(keyword ID) "INT" (keyword VALUE) "INT"}})
+                     :columns {(keyword ID) "INT" (keyword VALUE) "TEXT"}})
 
 (defn prepare-get
   [table id]
