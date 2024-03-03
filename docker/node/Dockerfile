@@ -7,6 +7,7 @@ RUN apt-get -y -q update && \
     psmisc \
     python \
     ntpdate \
+    gnupg \
     iproute2 \
     iptables
 
