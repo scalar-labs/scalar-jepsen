@@ -1,7 +1,8 @@
 (ns scalardb.db-extend
   (:require [cassandra.core :as cassandra]
             [clojure.string :as string]
-            [jepsen.db :as db])
+            [jepsen.db :as db]
+            [scalardb.db.postgres :as postgres])
   (:import (com.scalar.db.storage.cassandra CassandraAdmin
                                             CassandraAdmin$ReplicationStrategy
                                             CassandraAdmin$CompactionStrategy)
@@ -36,6 +37,7 @@
       (when (nil? nodes)
         (throw (ex-info "No living node" {:test test})))
       (doto (Properties.)
+        (.setProperty "scalar.db.storage" "cassandra")
         (.setProperty "scalar.db.contact_points" (string/join "," nodes))
         (.setProperty "scalar.db.username" "cassandra")
         (.setProperty "scalar.db.password" "cassandra")
@@ -44,8 +46,29 @@
         (.setProperty "scalar.db.consensus_commit.serializable_strategy"
                       ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))))
 
+(defrecord ExtPostgres []
+  DbExtension
+  (live-nodes [_ test] (postgres/live-node? test))
+  (wait-for-recovery [_ test] (postgres/wait-for-recovery test))
+  (create-table-opts [_ _] {})
+  (create-properties
+    [_ test]
+    (let [node (-> test :nodes first)]
+      ;; We have only one node in this test
+      (doto (Properties.)
+        (.setProperty "scalar.db.storage" "jdbc")
+        (.setProperty "scalar.db.contact_points"
+                      (str "jdbc:postgresql://" node ":5432/"))
+        (.setProperty "scalar.db.username" "postgres")
+        (.setProperty "scalar.db.password" "postgres")
+        (.setProperty "scalar.db.consensus_commit.isolation_level"
+                      ((:isolation-level test) ISOLATION_LEVELS))
+        (.setProperty "scalar.db.consensus_commit.serializable_strategy"
+                      ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))))))
+
 (def ^:private ext-dbs
-  {:cassandra (->ExtCassandra)})
+  {:cassandra (->ExtCassandra)
+   :postgres (->ExtPostgres)})
 
 (defn extend-db
   [db db-type]
@@ -57,6 +80,12 @@
       db/Primary
       (primaries [_ test] (db/primaries db test))
       (setup-primary! [_ test node] (db/setup-primary! db test node))
+      db/Pause
+      (pause! [_ test node] (db/pause! db test node))
+      (resume! [_ test node] (db/resume! db test node))
+      db/Kill
+      (start! [_ test node] (db/start! db test node))
+      (kill! [_ test node] (db/kill! db test node))
       db/LogFiles
       (log-files [_ test node] (db/log-files db test node))
       DbExtension
