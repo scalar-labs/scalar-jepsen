@@ -5,3 +5,7 @@ pom.xml
 */report/**
 */resources/ledger*
 docker/keys/
+.DS_Store
+*/.clj-kondo
+*/.lein-*
+*/.lsp

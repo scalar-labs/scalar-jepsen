@@ -56,6 +56,8 @@
   []
   {"test" {:opt-spec (->> opt-spec
                           (into car/cassandra-opt-spec)
+                          (into car/nemesis-opt-spec)
+                          (into car/admin-opt-spec)
                           (into cli/test-opt-spec))
            :opt-fn   (fn [parsed] (-> parsed parse-nodes cli/test-opt-fn))
            :usage    (cli/test-usage)
