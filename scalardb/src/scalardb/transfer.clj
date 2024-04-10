@@ -1,5 +1,6 @@
 (ns scalardb.transfer
   (:require [clojure.core.reducers :as r]
+            [clojure.tools.logging :refer [warn]]
             [jepsen
              [client :as client]
              [checker :as checker]
@@ -23,6 +24,7 @@
 
 (def ^:const INITIAL_BALANCE 10000)
 (def ^:const NUM_ACCOUNTS 10)
+(def ^:const MAX_NUM_TXS 8)
 (def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
 
 (def ^:const SCHEMA {(keyword (str KEYSPACE \. TABLE))
@@ -86,7 +88,7 @@
   (-> r get-balance (+ amount)))
 
 (defn- tx-transfer
-  [tx {:keys [from to amount]}]
+  [tx from to amount]
   (let [fromResult (.get tx (prepare-get from))
         toResult (.get tx (prepare-get to))]
     (->> (calc-new-balance fromResult (- amount))
@@ -96,6 +98,34 @@
          (prepare-put to)
          (.put tx))
     (.commit tx)))
+
+(defn- try-tx-transfer
+  [test {:keys [from to amount]}]
+  (if-let [tx (scalar/start-transaction test)]
+    (try
+      (tx-transfer tx from to amount)
+      :commit
+      (catch UnknownTransactionStatusException _
+        (swap! (:unknown-tx test) conj (.getId tx))
+        (warn "Unknown transaction: " (.getId tx))
+        :unknown-tx-status)
+      (catch Exception e
+        (warn (.getMessage e))
+        :fail))
+    :start-fail))
+
+(defn exec-transfers
+  "Execute transfers in parallel. Give the transfer function."
+  [test op transfer-fn]
+  (let [results (pmap #(transfer-fn test %) (:value op))]
+    (when (every? :start-fail results)
+      (scalar/try-reconnection-for-transaction! test))
+    (if (some #{:commit} results)
+      ;; return :ok when at least 1 transaction is committed
+      (assoc op :type :ok :value {:results results})
+      ;; :info type could be better in some cases
+      ;; However, our checker doesn't care about the type for now
+      (assoc op :type :fail :error {:results results}))))
 
 (defn- read-record
   "Read a record with a transaction. If read fails, this function returns nil."
@@ -110,41 +140,33 @@
   [test n]
   (scalar/check-transaction-connection! test)
   (scalar/check-storage-connection! test)
-  (scalar/with-retry (fn [test] (scalar/prepare-transaction-service! test) (scalar/prepare-storage-service! test)) test
+  (scalar/with-retry
+    (fn [test]
+      (scalar/prepare-transaction-service! test)
+      (scalar/prepare-storage-service! test))
+    test
     (let [tx (scalar/start-transaction test)
           results (map #(read-record tx @(:storage test) %) (range n))]
       (if (some nil? results) nil results))))
 
-(defrecord TransferClient [initialized? n initial-balance]
+(defrecord TransferClient [initialized?]
   client/Client
   (open! [_ _ _]
-    (TransferClient. initialized? n initial-balance))
+    (TransferClient. initialized?))
 
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
         (setup-tables test)
         (scalar/prepare-transaction-service! test)
-        (populate-accounts test n initial-balance))))
+        (populate-accounts test NUM_ACCOUNTS INITIAL_BALANCE))))
 
   (invoke! [_ test op]
     (case (:f op)
-      :transfer (if-let [tx (scalar/start-transaction test)]
-                  (try
-                    (tx-transfer tx (:value op))
-                    (assoc op :type :ok)
-                    (catch UnknownTransactionStatusException _
-                      (swap! (:unknown-tx test) conj (.getId tx))
-                      (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
-                    (catch Exception e
-                      (scalar/try-reconnection-for-transaction! test)
-                      (assoc op :type :fail :error (.getMessage e))))
-                  (do
-                    (scalar/try-reconnection-for-transaction! test)
-                    (assoc op :type :fail :error "Skipped due to no connection")))
+      :transfer (exec-transfers test op try-tx-transfer)
       :get-all (do
                  (wait-for-recovery (:db test) test)
-                 (if-let [results (read-all-with-retry test (:num op))]
+                 (if-let [results (read-all-with-retry test NUM_ACCOUNTS)]
                    (assoc op :type :ok :value {:balance (get-balances results)
                                                :version (get-versions results)})
                    (assoc op :type :fail :error "Failed to get balances")))
@@ -159,25 +181,29 @@
   (teardown! [_ test]
     (scalar/close-all! test)))
 
-(defn- transfer
-  [test _]
-  (let [n (-> test :client :n)]
+(defn- generate-acc-pair
+  [n]
+  (loop []
+    (let [from (rand-int n)
+          to (rand-int n)]
+      (if-not (= from to) [from to] (recur)))))
+
+(defn transfer
+  [_ _]
+  (let [num-txs (inc (rand-int MAX_NUM_TXS))]
     {:type  :invoke
      :f     :transfer
-     :value {:from   (rand-int n)
-             :to     (rand-int n)
-             :amount (+ 1 (rand-int 1000))}}))
-
-(def diff-transfer
-  (gen/filter (fn [op] (not= (-> op :value :from)
-                             (-> op :value :to)))
-              transfer))
+     :value (repeatedly num-txs
+                        (fn []
+                          (let [[from to] (generate-acc-pair NUM_ACCOUNTS)]
+                            {:from from
+                             :to   to
+                             :amount (+ 1 (rand-int 1000))})))}))
 
 (defn get-all
-  [test _]
+  [_ _]
   {:type :invoke
-   :f    :get-all
-   :num  (-> test :client :n)})
+   :f    :get-all})
 
 (defn check-tx
   [_ _]
@@ -187,7 +213,7 @@
 (defn consistency-checker
   []
   (reify checker/Checker
-    (check [_ test history _]
+    (check [_ _ history _]
       (let [read-result (->> history
                              (r/filter #(= :get-all (:f %)))
                              (r/filter identity)
@@ -209,16 +235,18 @@
                                    last
                                    ((fn [x]
                                       (if (= (:type x) :ok) (:value x) 0))))
-            total-ok (->> history
-                          (r/filter op/ok?)
-                          (r/filter #(= :transfer (:f %)))
-                          (r/filter identity)
-                          (into [])
-                          count
-                          (+ checked-committed))
-            expected-version (-> total-ok
-                                 (* 2)                      ; update 2 records per a transfer
-                                 (+ (-> test :client :n)))  ; initial insertions
+            total-commits (->> history
+                               (r/filter op/ok?)
+                               (r/filter #(= :transfer (:f %)))
+                               (r/reduce (fn [cnt op]
+                                           (->> op :value :results
+                                                (filter #{:commit})
+                                                count
+                                                (+ cnt)))
+                                         checked-committed))
+            expected-version (-> total-commits
+                                 (* 2)              ; update 2 records per transfer
+                                 (+ NUM_ACCOUNTS))  ; initial insertions
             bad-version (when-not (= actual-version expected-version)
                           {:type     :wrong-version
                            :expected expected-version
@@ -231,8 +259,8 @@
 
 (defn workload
   [_]
-  {:client (->TransferClient (atom false) NUM_ACCOUNTS INITIAL_BALANCE)
-   :generator [diff-transfer]
+  {:client (->TransferClient (atom false))
+   :generator [transfer]
    :final-generator (gen/phases
                      (gen/once get-all)
                      (gen/once check-tx))
