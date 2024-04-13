@@ -164,8 +164,9 @@
                                                 :age (get-ages results)
                                                 :num (get-nums results)})
                    (assoc op :type, :fail, :error "Failed to get all records")))
-      :check-tx (if-let [num-committed (scalar/check-transaction-states test
-                                                                        @(:unknown-tx test))]
+      :check-tx (if-let [num-committed (scalar/check-transaction-states
+                                        test
+                                        @(:unknown-tx test))]
                   (assoc op :type :ok, :value num-committed)
                   (assoc op :type :fail, :error "Failed to check status"))))
 

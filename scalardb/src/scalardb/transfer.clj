@@ -117,8 +117,6 @@
   "Execute transfers in parallel. Give the transfer function."
   [test op transfer-fn]
   (let [results (pmap #(transfer-fn test %) (:value op))]
-    (when (every? :start-fail results)
-      (scalar/try-reconnection! test scalar/prepare-transaction-service!))
     (if (some #{:commit} results)
       ;; return :ok when at least 1 transaction is committed
       (assoc op :type :ok :value {:results results})
@@ -192,7 +190,7 @@
 (defn transfer
   [test _]
   (let [num-accs (-> test :client :n)
-        num-txs (inc (rand-int (-> test :client :max-txs)))]
+        num-txs (-> test :client :max-txs rand-int inc)]
     {:type  :invoke
      :f     :transfer
      :value (repeatedly num-txs
