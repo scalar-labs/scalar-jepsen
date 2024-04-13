@@ -38,7 +38,7 @@
         (warn "Unknown transaction: " (.getId tx1))
         :unknown-tx-status)
       (catch Exception e
-        (warn "transaction" (.getId tx1) "failed:" (.getMessage e))
+        (warn (.getMessage e))
         :fail))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]

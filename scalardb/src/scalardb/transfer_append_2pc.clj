@@ -1,16 +1,17 @@
 (ns scalardb.transfer-append-2pc
-  (:require [clojure.tools.logging :refer [info]]
+  (:require [clojure.tools.logging :refer [info warn]]
             [jepsen
              [client :as client]
              [generator :as gen]]
             [scalardb.core :as scalar]
             [scalardb.db-extend :refer [wait-for-recovery]]
+            [scalardb.transfer :as transfer]
             [scalardb.transfer-append :as t-append])
   (:import (com.scalar.db.api Result)
            (com.scalar.db.exception.transaction UnknownTransactionStatusException)))
 
 (defn- tx-transfer
-  [tx1 tx2  {:keys [from to amount]}]
+  [tx1 tx2 from to amount]
   (try
     (let [^Result from-result
           (t-append/scan-for-latest tx1 (t-append/prepare-scan-for-latest from))
@@ -34,10 +35,25 @@
       (scalar/rollback-txs [tx1 tx2])
       (throw e))))
 
-(defrecord TransferClient [initialized? n initial-balance]
+(defn- try-tx-transfer
+  [test {:keys [from to amount]}]
+  (let [tx1 (scalar/start-2pc test)
+        tx2 (scalar/join-2pc test (.getId tx1))]
+    (try
+      (tx-transfer tx1 tx2 from to amount)
+      :commit
+      (catch UnknownTransactionStatusException _
+        (swap! (:unknown-tx test) conj (.getId tx1))
+        (warn "Unknown transaction: " (.getId tx1))
+        :unknown-tx-status)
+      (catch Exception e
+        (warn (.getMessage e))
+        :fail))))
+
+(defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
   (open! [_ _ _]
-    (TransferClient. initialized? n initial-balance))
+    (TransferClient. initialized? n initial-balance max-txs))
 
   (setup! [_ test]
     (locking initialized?
@@ -49,23 +65,10 @@
 
   (invoke! [_ test op]
     (case (:f op)
-      :transfer (let [tx1 (scalar/start-2pc test)
-                      tx2 (scalar/join-2pc test (.getId tx1))]
-                  (try
-                    (tx-transfer tx1 tx2 (:value op))
-                    (assoc op :type :ok)
-                    (catch UnknownTransactionStatusException _
-                      (swap! (:unknown-tx test) conj (.getId tx1))
-                      (assoc op
-                             :type :info
-                             :error {:unknown-tx-status (.getId tx1)}))
-                    (catch Exception e
-                      (scalar/try-reconnection! test scalar/prepare-2pc-service!)
-                      (assoc op :type :fail :error (.getMessage e)))))
+      :transfer (transfer/exec-transfers test op try-tx-transfer)
       :get-all (do
                  (wait-for-recovery (:db test) test)
-                 (if-let [results (t-append/scan-all-records-with-retry
-                                   test (:num op))]
+                 (if-let [results (t-append/scan-all-records-with-retry test n)]
                    (assoc op :type :ok
                           :value {:balance (t-append/get-balances results)
                                   :age (t-append/get-ages results)
@@ -85,9 +88,10 @@
 (defn workload
   [_]
   {:client (->TransferClient (atom false)
-                             t-append/NUM_ACCOUNTS
-                             t-append/INITIAL_BALANCE)
-   :generator [t-append/diff-transfer]
+                             transfer/NUM_ACCOUNTS
+                             transfer/INITIAL_BALANCE
+                             transfer/MAX_NUM_TXS)
+   :generator [transfer/transfer]
    :final-generator (gen/phases
                      (gen/once t-append/get-all)
                      (gen/once t-append/check-tx))
