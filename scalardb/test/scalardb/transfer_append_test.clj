@@ -142,7 +142,7 @@
 
 (deftest transfer-client-transfer-no-tx-test
   (with-redefs [scalar/start-transaction (spy/stub nil)
-                scalar/try-reconnection-for-transaction! (spy/spy)]
+                scalar/try-reconnection! (spy/spy)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                nil nil)
           result (client/invoke! client
@@ -150,12 +150,12 @@
                                  (#'transfer/transfer {:client client}
                                                       nil))]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
+      (is (spy/called-once? scalar/try-reconnection!))
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-crud-exception-test
   (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
-                scalar/try-reconnection-for-transaction! (spy/spy)]
+                scalar/try-reconnection! (spy/spy)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                nil nil)
           result (client/invoke! client
@@ -163,14 +163,14 @@
                                  (#'transfer/transfer {:client client}
                                                       nil))]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
+      (is (spy/called-once? scalar/try-reconnection!))
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-unknown-exception-test
   (binding [scan-count (atom 0)
             put-count (atom 0)]
     (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-unknown)
-                  scalar/try-reconnection-for-transaction! (spy/spy)]
+                  scalar/try-reconnection! (spy/spy)]
       (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
                                  nil nil)
             result (client/invoke! client
@@ -178,7 +178,7 @@
                                    (#'transfer/transfer {:client client}
                                                         nil))]
         (is (spy/called-once? scalar/start-transaction))
-        (is (spy/not-called? scalar/try-reconnection-for-transaction!))
+        (is (spy/not-called? scalar/try-reconnection!))
         (is (= 2 @scan-count))
         (is (= 2 @put-count))
         (is (= :info (:type result)))

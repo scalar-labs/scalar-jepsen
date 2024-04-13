@@ -60,7 +60,7 @@
                              :type :info
                              :error {:unknown-tx-status (.getId tx1)}))
                     (catch Exception e
-                      (scalar/try-reconnection-for-2pc! test)
+                      (scalar/try-reconnection! test scalar/prepare-2pc-service!)
                       (assoc op :type :fail :error (.getMessage e)))))
       :get-all (do
                  (wait-for-recovery (:db test) test)

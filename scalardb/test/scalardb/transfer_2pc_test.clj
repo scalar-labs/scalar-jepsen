@@ -117,7 +117,7 @@
                   scalar/prepare-2pc-service! (spy/spy)
                   scalar/prepare-transaction-service! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                  nil nil)]
         (client/setup! client nil)
         (is (true? @(:initialized? client)))
@@ -142,13 +142,13 @@
             commit-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc)
                   scalar/join-2pc (spy/stub mock-2pc)]
-      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                  nil nil)
             result (client/invoke! client
                                    nil
                                    {:type :invoke
                                     :f :transfer
-                                    :value {:from 0 :to 1 :amount 10}})]
+                                    :value [{:from 0 :to 1 :amount 10}]})]
         (is (spy/called-once? scalar/start-2pc))
         (is (spy/called-once? scalar/join-2pc))
         (is (= 2 @get-count))
@@ -163,16 +163,16 @@
   (binding [rollback-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-exception)
                   scalar/join-2pc (spy/stub mock-2pc)
-                  scalar/try-reconnection-for-2pc! (spy/spy)]
-      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                  nil nil)
             result (client/invoke! client
-                                   nil
+                                   {:failures (atom 0)}
                                    (#'transfer/transfer {:client client}
                                                         nil))]
         (is (spy/called-once? scalar/start-2pc))
         (is (spy/called-once? scalar/join-2pc))
-        (is (spy/called-once? scalar/try-reconnection-for-2pc!))
+        (is (spy/called-once? scalar/try-reconnection!))
         (is (= 2 @rollback-count))
         (is (= :fail (:type result)))))))
 
@@ -184,31 +184,31 @@
             rollback-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
                   scalar/join-2pc (spy/stub mock-2pc)
-                  scalar/try-reconnection-for-2pc! (spy/spy)]
-      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                  nil nil)
             result (client/invoke! client
-                                   {:unknown-tx (atom #{})}
+                                   {:unknown-tx (atom #{})
+                                    :failures (atom 0)}
                                    (#'transfer/transfer {:client client}
                                                         nil))]
         (is (spy/called-once? scalar/start-2pc))
         (is (spy/called-once? scalar/join-2pc))
-        (is (spy/not-called? scalar/try-reconnection-for-2pc!))
+        (is (spy/called-once? scalar/try-reconnection!))
         (is (= 2 @get-count))
         (is (= 2 @put-count))
         (is (= 2 @prepare-count))
         (is (= 2 @validate-count))
         (is (= 0 @rollback-count))
-        (is (= :info (:type result)))
-        (is (= "unknown-state-tx" (get-in result
-                                          [:error :unknown-tx-status])))))))
+        (is (= :fail (:type result)))
+        (is (= [:unknown-tx-status] (get-in result [:error :results])))))))
 
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 1000 1 100 2 10 3 1 4 0})]
     (with-redefs [scalar/check-transaction-connection! (spy/spy)
                   scalar/check-storage-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                  nil nil)
             result (client/invoke! client {:db mock-db
                                            :storage (ref mock-storage)}
@@ -227,7 +227,7 @@
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/prepare-storage-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
-    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
                    (client/invoke! client {:db mock-db
@@ -240,7 +240,7 @@
 
 (deftest transfer-client-check-tx-test
   (with-redefs [scalar/check-transaction-states (spy/stub 1)]
-    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                nil nil)
           result (client/invoke! client {:unknown-tx (atom #{"tx1"})}
                                  (#'transfer/check-tx {:client client}
@@ -251,7 +251,7 @@
 
 (deftest transfer-client-check-tx-fail-test
   (with-redefs [scalar/check-transaction-states (spy/stub nil)]
-    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                nil nil)
           result (client/invoke! client {:unknown-tx (atom #{"tx1"})}
                                  (#'transfer/check-tx {:client client}
@@ -260,20 +260,20 @@
       (is (= :fail (:type result))))))
 
 (def correct-history
-  [{:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :fail :f :transfer :error {:unknown-tx-status "unknown-state-tx"}}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
+  [{:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :fail :f :transfer :error {:results [:unknown-tx-status]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
    {:type :ok :f :get-all :value {:balance [10120 10140 9980 9760 10000
                                             10500 9820 8700 10620 10360]
                                   :version [2 3 2 3 1 2 2 4 2 3]}}
    {:type :ok :f :check-tx :value 1}])
 
 (deftest consistency-checker-test
-  (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 10 10000)
+  (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 10 10000 1)
                              nil nil)
         checker (#'transfer/consistency-checker)
         result (checker/check checker {:client client} correct-history nil)]
@@ -284,20 +284,20 @@
     (is (nil? (:bad-version result)))))
 
 (def bad-history
-  [{:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :fail :f :transfer :error {:unknown-tx-status "unknown-state-tx"}}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
+  [{:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :fail :f :transfer :error {:results [:unknown-tx-status]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
    {:type :ok :f :get-all :value {:balance [10120 10140 9980 9760 10001
                                             10500 9820 8700 10620 10360]
                                   :version [2 3 2 3 1 2 2 4 2 3]}}
    {:type :fail :f :check-tx}])
 
 (deftest consistency-checker-fail-test
-  (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 10 10000)
+  (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 10 10000 1)
                              nil nil)
         checker (#'transfer/consistency-checker)
         result (checker/check checker {:client client} bad-history nil)]

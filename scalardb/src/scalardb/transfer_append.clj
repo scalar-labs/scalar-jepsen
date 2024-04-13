@@ -151,10 +151,14 @@
                       (swap! (:unknown-tx test) conj (.getId tx))
                       (assoc op :type :info, :error {:unknown-tx-status (.getId tx)}))
                     (catch Exception e
-                      (scalar/try-reconnection-for-transaction! test)
+                      (scalar/try-reconnection!
+                       test
+                       scalar/prepare-transaction-service!)
                       (assoc op :type :fail, :error (.getMessage e))))
                   (do
-                    (scalar/try-reconnection-for-transaction! test)
+                    (scalar/try-reconnection!
+                     test
+                     scalar/prepare-transaction-service!)
                     (assoc op :type :fail, :error "Skipped due to no connection")))
       :get-all (do
                  (wait-for-recovery (:db test) test)

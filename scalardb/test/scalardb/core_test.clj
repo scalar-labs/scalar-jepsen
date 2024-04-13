@@ -123,13 +123,13 @@
                                                         mock-tx-manager)))]
     (let [test {:transaction (atom nil)
                 :failures (atom 999)}]
-      (scalar/try-reconnection-for-transaction! test)
+      (scalar/try-reconnection! test scalar/prepare-transaction-service!)
       (is (spy/called-once? scalar/prepare-transaction-service!))
       (is (= mock-tx-manager @(:transaction test)))
       (is (= 0 @(:failures test)))
 
       ;; the next one doesn't reconnect
-      (scalar/try-reconnection-for-transaction! test)
+      (scalar/try-reconnection! test scalar/prepare-transaction-service!)
       (is (spy/called-once? scalar/prepare-transaction-service!))
       (is (= 1 @(:failures test))))))
 

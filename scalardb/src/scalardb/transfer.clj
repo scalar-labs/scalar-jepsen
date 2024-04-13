@@ -25,7 +25,6 @@
 (def ^:const INITIAL_BALANCE 10000)
 (def ^:const NUM_ACCOUNTS 10)
 (def ^:const MAX_NUM_TXS 8)
-(def ^:private ^:const TOTAL_BALANCE (* NUM_ACCOUNTS INITIAL_BALANCE))
 
 (def ^:const SCHEMA {(keyword (str KEYSPACE \. TABLE))
                      {:transaction true
@@ -119,13 +118,15 @@
   [test op transfer-fn]
   (let [results (pmap #(transfer-fn test %) (:value op))]
     (when (every? :start-fail results)
-      (scalar/try-reconnection-for-transaction! test))
+      (scalar/try-reconnection! test scalar/prepare-transaction-service!))
     (if (some #{:commit} results)
       ;; return :ok when at least 1 transaction is committed
       (assoc op :type :ok :value {:results results})
       ;; :info type could be better in some cases
       ;; However, our checker doesn't care about the type for now
-      (assoc op :type :fail :error {:results results}))))
+      (do
+        (scalar/try-reconnection! test scalar/prepare-transaction-service!)
+        (assoc op :type :fail :error {:results results})))))
 
 (defn- read-record
   "Read a record with a transaction. If read fails, this function returns nil."
@@ -149,24 +150,24 @@
           results (map #(read-record tx @(:storage test) %) (range n))]
       (if (some nil? results) nil results))))
 
-(defrecord TransferClient [initialized?]
+(defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
   (open! [_ _ _]
-    (TransferClient. initialized?))
+    (TransferClient. initialized? n initial-balance max-txs))
 
   (setup! [_ test]
     (locking initialized?
       (when (compare-and-set! initialized? false true)
         (setup-tables test)
         (scalar/prepare-transaction-service! test)
-        (populate-accounts test NUM_ACCOUNTS INITIAL_BALANCE))))
+        (populate-accounts test n initial-balance))))
 
   (invoke! [_ test op]
     (case (:f op)
       :transfer (exec-transfers test op try-tx-transfer)
       :get-all (do
                  (wait-for-recovery (:db test) test)
-                 (if-let [results (read-all-with-retry test NUM_ACCOUNTS)]
+                 (if-let [results (read-all-with-retry test n)]
                    (assoc op :type :ok :value {:balance (get-balances results)
                                                :version (get-versions results)})
                    (assoc op :type :fail :error "Failed to get balances")))
@@ -189,13 +190,14 @@
       (if-not (= from to) [from to] (recur)))))
 
 (defn transfer
-  [_ _]
-  (let [num-txs (inc (rand-int MAX_NUM_TXS))]
+  [test _]
+  (let [num-accs (-> test :client :n)
+        num-txs (inc (rand-int (-> test :client :max-txs)))]
     {:type  :invoke
      :f     :transfer
      :value (repeatedly num-txs
                         (fn []
-                          (let [[from to] (generate-acc-pair NUM_ACCOUNTS)]
+                          (let [[from to] (generate-acc-pair num-accs)]
                             {:from from
                              :to   to
                              :amount (+ 1 (rand-int 1000))})))}))
@@ -213,8 +215,11 @@
 (defn consistency-checker
   []
   (reify checker/Checker
-    (check [_ _ history _]
-      (let [read-result (->> history
+    (check [_ test history _]
+      (let [num-accs (-> test :client :n)
+            initial-balance (-> test :client :initial-balance)
+            total-balance (* num-accs initial-balance)
+            read-result (->> history
                              (r/filter #(= :get-all (:f %)))
                              (r/filter identity)
                              (into [])
@@ -222,9 +227,9 @@
                              :value)
             actual-balance (->> (:balance read-result)
                                 (reduce +))
-            bad-balance (when-not (= actual-balance TOTAL_BALANCE)
+            bad-balance (when-not (= actual-balance total-balance)
                           {:type     :wrong-balance
-                           :expected TOTAL_BALANCE
+                           :expected total-balance
                            :actual   actual-balance})
             actual-version (->> (:version read-result)
                                 (reduce +))
@@ -245,8 +250,8 @@
                                                 (+ cnt)))
                                          checked-committed))
             expected-version (-> total-commits
-                                 (* 2)              ; update 2 records per transfer
-                                 (+ NUM_ACCOUNTS))  ; initial insertions
+                                 (* 2)          ; update 2 records per transfer
+                                 (+ num-accs))  ; initial insertions
             bad-version (when-not (= actual-version expected-version)
                           {:type     :wrong-version
                            :expected expected-version
@@ -259,7 +264,10 @@
 
 (defn workload
   [_]
-  {:client (->TransferClient (atom false))
+  {:client (->TransferClient (atom false)
+                             NUM_ACCOUNTS
+                             INITIAL_BALANCE
+                             MAX_NUM_TXS)
    :generator [transfer]
    :final-generator (gen/phases
                      (gen/once get-all)

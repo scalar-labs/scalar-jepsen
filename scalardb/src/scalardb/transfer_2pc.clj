@@ -41,10 +41,10 @@
         (warn "transaction" (.getId tx1) "failed:" (.getMessage e))
         :fail))))
 
-(defrecord TransferClient [initialized?]
+(defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
   (open! [_ _ _]
-    (TransferClient. initialized?))
+    (TransferClient. initialized? n initial-balance max-txs))
 
   (setup! [_ test]
     (locking initialized?
@@ -52,18 +52,14 @@
         (transfer/setup-tables test)
         (scalar/prepare-2pc-service! test)
         (scalar/prepare-transaction-service! test)
-        (transfer/populate-accounts test
-                                    transfer/NUM_ACCOUNTS
-                                    transfer/INITIAL_BALANCE))))
+        (transfer/populate-accounts test n initial-balance))))
 
   (invoke! [_ test op]
     (case (:f op)
       :transfer (transfer/exec-transfers test op try-tx-transfer)
       :get-all (do
                  (wait-for-recovery (:db test) test)
-                 (if-let [results (transfer/read-all-with-retry
-                                   test
-                                   transfer/NUM_ACCOUNTS)]
+                 (if-let [results (transfer/read-all-with-retry test n)]
                    (assoc op :type :ok :value {:balance
                                                (transfer/get-balances results)
                                                :version
@@ -82,7 +78,10 @@
 
 (defn workload
   [_]
-  {:client (->TransferClient (atom false))
+  {:client (->TransferClient (atom false)
+                             transfer/NUM_ACCOUNTS
+                             transfer/INITIAL_BALANCE
+                             transfer/MAX_NUM_TXS)
    :generator [transfer/transfer]
    :final-generator (gen/phases
                      (gen/once transfer/get-all)
