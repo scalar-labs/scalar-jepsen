@@ -9,8 +9,7 @@
                  [org.slf4j/slf4j-jdk14 "2.0.6"]
                  [cassandra "0.1.0-SNAPSHOT"]
                  [cheshire "5.12.0"]
-                 [com.scalar-labs/scalardb-schema-loader "4.0.0-SNAPSHOT"
-                  :exclusions [org.slf4j/*]]]
+                 [com.scalar-labs/scalardb-schema-loader "4.0.0-SNAPSHOT"]]
   :repositories {"sonartype" "https://oss.sonatype.org/content/repositories/snapshots/"}
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
