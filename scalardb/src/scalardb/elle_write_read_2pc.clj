@@ -44,7 +44,7 @@
           (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
         (catch Exception e
           (scalar/rollback-txs [tx1 tx2])
-          (scalar/try-reconnection-for-2pc! test)
+          (scalar/try-reconnection! test scalar/prepare-2pc-service!)
           (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
 
   (close! [_ _])

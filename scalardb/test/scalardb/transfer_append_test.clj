@@ -4,6 +4,7 @@
             [jepsen.checker :as checker]
             [scalardb.core :as scalar]
             [scalardb.core-test :refer [mock-db]]
+            [scalardb.transfer :as t]
             [scalardb.transfer-append :as transfer]
             [spy.core :as spy])
   (:import (com.scalar.db.api DistributedTransaction
@@ -87,7 +88,7 @@
     (with-redefs [scalar/setup-transaction-tables (spy/spy)
                   scalar/prepare-transaction-service! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                  nil nil)]
         (client/setup! client nil)
         (is (true? @(:initialized? client)))
@@ -113,7 +114,7 @@
     (with-redefs [scalar/setup-transaction-tables (spy/spy)
                   scalar/prepare-transaction-service! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                  nil nil)]
         (is (thrown? CrudException (client/setup! client nil)))))))
 
@@ -124,13 +125,13 @@
             put-count (atom 0)
             commit-count (atom 0)]
     (with-redefs [scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 2 100)
+      (let [client (client/open! (transfer/->TransferClient (atom false) 2 100 1)
                                  nil nil)
             result (client/invoke! client
                                    nil
                                    {:type :invoke
                                     :f :transfer
-                                    :value {:from 0 :to 1 :amount 10}})]
+                                    :value [{:from 0 :to 1 :amount 10}]})]
         (is (spy/called-once? scalar/start-transaction))
         (is (= 2 @scan-count))
         (is (= 2 @put-count))
@@ -142,48 +143,44 @@
 
 (deftest transfer-client-transfer-no-tx-test
   (with-redefs [scalar/start-transaction (spy/stub nil)
-                scalar/try-reconnection-for-transaction! (spy/spy)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+                scalar/try-reconnection! (spy/spy)]
+    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                nil nil)
           result (client/invoke! client
                                  nil
-                                 (#'transfer/transfer {:client client}
-                                                      nil))]
+                                 (t/transfer {:client client} nil))]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
+      (is (spy/called-once? scalar/try-reconnection!))
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-crud-exception-test
   (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
-                scalar/try-reconnection-for-transaction! (spy/spy)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+                scalar/try-reconnection! (spy/spy)]
+    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                nil nil)
           result (client/invoke! client
                                  nil
-                                 (#'transfer/transfer {:client client}
-                                                      nil))]
+                                 (t/transfer {:client client} nil))]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
+      (is (spy/called-once? scalar/try-reconnection!))
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-unknown-exception-test
   (binding [scan-count (atom 0)
             put-count (atom 0)]
     (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-unknown)
-                  scalar/try-reconnection-for-transaction! (spy/spy)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                  nil nil)
             result (client/invoke! client
                                    {:unknown-tx (atom #{})}
-                                   (#'transfer/transfer {:client client}
-                                                        nil))]
+                                   (t/transfer {:client client} nil))]
         (is (spy/called-once? scalar/start-transaction))
-        (is (spy/not-called? scalar/try-reconnection-for-transaction!))
+        (is (spy/called-once? scalar/try-reconnection!))
         (is (= 2 @scan-count))
         (is (= 2 @put-count))
-        (is (= :info (:type result)))
-        (is (= "unknown-state-tx" (get-in result
-                                          [:error :unknown-tx-status])))))))
+        (is (= :fail (:type result)))
+        (is (= '(:unknown-tx-status) (get-in result [:error :results])))))))
 
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 [{:age 1 :balance 0}
@@ -194,11 +191,10 @@
                                 2 [{:age 1 :balance 1}]})]
     (with-redefs [scalar/check-transaction-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
-      (let [client (client/open! (transfer/->TransferClient (atom false) 3 100)
+      (let [client (client/open! (transfer/->TransferClient (atom false) 3 100 1)
                                  nil nil)
             result (client/invoke! client {:db mock-db}
-                                   (#'transfer/get-all {:client client}
-                                                       nil))]
+                                   (transfer/get-all {:client client} nil))]
         (is (spy/called-once? scalar/check-transaction-connection!))
         (is (= :ok (:type result)))
         (is (= [1000 10 1] (get-in result [:value :balance])))
@@ -210,44 +206,41 @@
                 scalar/check-transaction-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
                    (client/invoke! client {:db mock-db}
-                                   (#'transfer/get-all {:client client}
-                                                       nil))))
+                                   (transfer/get-all {:client client} nil))))
       (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
       (is (spy/called-n-times? scalar/prepare-transaction-service! scalar/RETRIES_FOR_RECONNECTION)))))
 
 (deftest transfer-client-check-tx-test
   (with-redefs [scalar/check-transaction-states (spy/stub 1)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                nil nil)
           result (client/invoke! client {:unknown-tx (atom #{"tx1"})}
-                                 (#'transfer/check-tx {:client client}
-                                                      nil))]
+                                 (transfer/check-tx {:client client} nil))]
       (is (spy/called-once? scalar/check-transaction-states))
       (is (= :ok (:type result)))
       (is (= 1 (:value result))))))
 
 (deftest transfer-client-check-tx-fail-test
   (with-redefs [scalar/check-transaction-states (spy/stub nil)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100)
+    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                nil nil)
           result (client/invoke! client {:unknown-tx (atom #{"tx1"})}
-                                 (#'transfer/check-tx {:client client}
-                                                      nil))]
+                                 (transfer/check-tx {:client client} nil))]
       (is (spy/called-once? scalar/check-transaction-states))
       (is (= :fail (:type result))))))
 
 (def correct-history
-  [{:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :fail :f :transfer :error {:unknown-tx-status "unknown-state-tx"}}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
+  [{:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :fail :f :transfer :error {:results [:unknown-tx-status]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
    {:type :ok :f :get-all :value {:balance [10120 10140 9980 9760 10000
                                             10500 9820 8700 10620 10360]
                                   :age [2 3 2 3 1 2 2 4 2 3]
@@ -255,9 +248,9 @@
    {:type :ok :f :check-tx :value 1}])
 
 (deftest consistency-checker-test
-  (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
+  (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000 1)
                              nil nil)
-        checker (#'transfer/consistency-checker)
+        checker (transfer/consistency-checker)
         result (checker/check checker {:client client} correct-history nil)]
     (is (true? (:valid? result)))
     (is (= 24 (:total-age result)))
@@ -266,13 +259,13 @@
     (is (nil? (:bad-version result)))))
 
 (def bad-history
-  [{:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :fail :f :transfer :error {:unknown-tx-status "unknown-state-tx"}}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
-   {:type :ok :f :transfer}
+  [{:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :fail :f :transfer :error {:results [:unknown-tx-status]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
+   {:type :ok :f :transfer :value {:results [:commit]}}
    {:type :ok :f :get-all :value {:balance [10120 10140 9980 9760 10001
                                             10500 9820 8700 10620 10360]
                                   :age [2 3 2 3 1 2 2 4 2 3]
@@ -280,9 +273,9 @@
    {:type :fail :f :check-tx}])
 
 (deftest consistency-checker-fail-test
-  (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000)
+  (let [client (client/open! (transfer/->TransferClient (atom false) 10 10000 1)
                              nil nil)
-        checker (#'transfer/consistency-checker)
+        checker (transfer/consistency-checker)
         result (checker/check checker {:client client} bad-history nil)]
     (is (false? (:valid? result)))
     (is (= 24 (:total-age result)))

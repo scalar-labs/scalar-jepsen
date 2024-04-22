@@ -115,7 +115,7 @@
 
 (deftest append-client-invoke-crud-exception-test
   (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
-                scalar/try-reconnection-for-transaction! (spy/spy)]
+                scalar/try-reconnection! (spy/spy)]
     (let [client (client/open! (elle-append/->AppendClient (atom false))
                                nil nil)
           result (client/invoke! client
@@ -126,14 +126,14 @@
                                   :f :txn
                                   :value [0 [[:r 1 nil]]]})]
       (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection-for-transaction!))
+      (is (spy/called-once? scalar/try-reconnection!))
       (is (= :fail (:type result))))))
 
 (deftest append-client-invoke-unknown-exception-test
   (binding [get-count (atom 0)
             put-count (atom 0)]
     (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-unknown)
-                  scalar/try-reconnection-for-transaction! (spy/spy)]
+                  scalar/try-reconnection! (spy/spy)]
       (let [client (client/open! (elle-append/->AppendClient (atom false))
                                  nil nil)
             result (client/invoke! client
@@ -147,7 +147,7 @@
                                             [[:r 1 nil]
                                              [:append 1 0]]]})]
         (is (spy/called-once? scalar/start-transaction))
-        (is (spy/not-called? scalar/try-reconnection-for-transaction!))
+        (is (spy/not-called? scalar/try-reconnection!))
         (is (= 2 @get-count))
         (is (= 1 @put-count))
         (is (= :info (:type result)))

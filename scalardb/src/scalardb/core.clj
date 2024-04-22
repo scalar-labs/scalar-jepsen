@@ -192,16 +192,10 @@
   (when-not @(:transaction test)
     (prepare-transaction-service! test)))
 
-(defn try-reconnection-for-transaction!
-  [test]
+(defn try-reconnection!
+  [test prepare-fn]
   (when (= (swap! (:failures test) inc) NUM_FAILURES_FOR_RECONNECTION)
-    (prepare-transaction-service! test)
-    (reset! (:failures test) 0)))
-
-(defn try-reconnection-for-2pc!
-  [test]
-  (when (= (swap! (:failures test) inc) NUM_FAILURES_FOR_RECONNECTION)
-    (prepare-2pc-service! test)
+    (prepare-fn test)
     (reset! (:failures test) 0)))
 
 (defn start-transaction

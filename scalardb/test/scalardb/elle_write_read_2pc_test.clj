@@ -138,7 +138,7 @@
   (binding [rollback-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-exception)
                   scalar/join-2pc (spy/stub mock-2pc)
-                  scalar/try-reconnection-for-2pc! (spy/spy)]
+                  scalar/try-reconnection! (spy/spy)]
       (let [client (client/open! (elle-wr/->WriteReadClient (atom false))
                                  nil nil)
             result (client/invoke! client
@@ -150,7 +150,7 @@
                                     :value [0 [[:r 1 nil]]]})]
         (is (spy/called-once? scalar/start-2pc))
         (is (spy/called-once? scalar/join-2pc))
-        (is (spy/called-once? scalar/try-reconnection-for-2pc!))
+        (is (spy/called-once? scalar/try-reconnection!))
         (is (= 2 @rollback-count))
         (is (= :fail (:type result)))))))
 
@@ -162,7 +162,7 @@
             rollback-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
                   scalar/join-2pc (spy/stub mock-2pc)
-                  scalar/try-reconnection-for-2pc! (spy/spy)]
+                  scalar/try-reconnection! (spy/spy)]
       (let [client (client/open! (elle-wr/->WriteReadClient (atom false))
                                  nil nil)
             result (client/invoke! client
@@ -175,7 +175,7 @@
                                     :value [0 [[:r 1 nil] [:w 1 1]]]})]
         (is (spy/called-once? scalar/start-2pc))
         (is (spy/called-once? scalar/join-2pc))
-        (is (spy/not-called? scalar/try-reconnection-for-2pc!))
+        (is (spy/not-called? scalar/try-reconnection!))
         (is (= 2 @get-count))
         (is (= 1 @put-count))
         (is (= 2 @prepare-count))
