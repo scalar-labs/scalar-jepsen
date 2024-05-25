@@ -131,7 +131,13 @@
 (defn- scan-records
   [tx id]
   (try
-    (.scan tx (prepare-scan id))
+    (let [results (.scan tx (prepare-scan id))]
+      ;; Put the same balance to check conflicts with in-flight transactions
+      (->> (prepare-put id
+                        (-> results first calc-new-age)
+                        (-> results first (calc-new-balance 0)))
+           (.put tx))
+      results)
     (catch CrudException _ nil)))
 
 (defn scan-all-records-with-retry
@@ -139,8 +145,14 @@
   (scalar/check-transaction-connection! test)
   (scalar/with-retry scalar/prepare-transaction-service! test
     (let [tx (scalar/start-transaction test)
-          results (map #(scan-records tx %) (range n))]
-      (if (some nil? results) nil results))))
+          results (doall (map #(scan-records tx %) (range n)))]
+      (try
+        (.commit tx)
+        (if (some nil? results) nil results)
+        (catch Exception e
+          ;; The transaction conflicted
+          (warn (.getMessage e))
+          nil)))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
