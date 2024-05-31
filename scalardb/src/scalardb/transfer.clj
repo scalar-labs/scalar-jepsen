@@ -130,8 +130,14 @@
   "Read a record with a transaction. If read fails, this function returns nil."
   [tx storage i]
   (try
-    (.get tx (prepare-get i))
-    (.get storage (prepare-get i))
+    ;; Need Storage API to read the transaction metadata
+    (let [tx-result (.get tx (prepare-get i))
+          result (.get storage (prepare-get i))]
+      ;; Put the same balance to check conflicts with in-flight transactions
+      (->> (calc-new-balance tx-result 0)
+           (prepare-put i)
+           (.put tx))
+      result)
     (catch CrudException _ nil)
     (catch ExecutionException _ nil)))
 
@@ -145,8 +151,14 @@
       (scalar/prepare-storage-service! test))
     test
     (let [tx (scalar/start-transaction test)
-          results (map #(read-record tx @(:storage test) %) (range n))]
-      (if (some nil? results) nil results))))
+          results (doall (map #(read-record tx @(:storage test) %) (range n)))]
+      (try
+        (.commit tx)
+        (if (some nil? results) nil results)
+        (catch Exception e
+          ;; The transaction conflicted
+          (warn (.getMessage e))
+          nil)))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
