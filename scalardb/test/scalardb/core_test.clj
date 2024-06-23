@@ -25,7 +25,9 @@
       (condp = column
         "tx_id" (Optional/of (TextValue. column id))
         "tx_created_at" (Optional/of (BigIntValue. column (long 1566376246)))
-        "tx_state" (Optional/of (IntValue. column (Integer/parseInt id)))))))
+        "tx_state" (Optional/of (IntValue. column (Integer/parseInt id)))
+        ;; for the coordinator table
+        "tx_child_ids" (Optional/empty)))))
 
 (def mock-db
   (reify

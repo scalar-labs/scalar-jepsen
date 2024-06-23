@@ -14,9 +14,7 @@
                               Result)
            (com.scalar.db.io IntValue
                              Key)
-           (com.scalar.db.exception.storage ExecutionException)
-           (com.scalar.db.exception.transaction CrudException
-                                                UnknownTransactionStatusException)))
+           (com.scalar.db.exception.transaction UnknownTransactionStatusException)))
 
 (def ^:private ^:const TABLE "transfer")
 (def ^:private ^:const ACCOUNT_ID "account_id")

@@ -13,8 +13,7 @@
                               Scan$Ordering
                               Scan$Ordering$Order
                               Result)
-           (com.scalar.db.exception.transaction CrudException
-                                                UnknownTransactionStatusException)
+           (com.scalar.db.exception.transaction UnknownTransactionStatusException)
            (com.scalar.db.io IntValue
                              Key)))
 
