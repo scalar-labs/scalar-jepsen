@@ -14,9 +14,7 @@
                               Result)
            (com.scalar.db.io IntValue
                              Key)
-           (com.scalar.db.exception.storage ExecutionException)
-           (com.scalar.db.exception.transaction CrudException
-                                                UnknownTransactionStatusException)))
+           (com.scalar.db.exception.transaction UnknownTransactionStatusException)))
 
 (def ^:private ^:const TABLE "transfer")
 (def ^:private ^:const ACCOUNT_ID "account_id")
@@ -127,19 +125,16 @@
         (assoc op :type :fail :error {:results results})))))
 
 (defn- read-record
-  "Read a record with a transaction. If read fails, this function returns nil."
+  "Read a record with a transaction. If read fails, an exception is thrown."
   [tx storage i]
-  (try
-    ;; Need Storage API to read the transaction metadata
-    (let [tx-result (.get tx (prepare-get i))
-          result (.get storage (prepare-get i))]
-      ;; Put the same balance to check conflicts with in-flight transactions
-      (->> (calc-new-balance tx-result 0)
-           (prepare-put i)
-           (.put tx))
-      result)
-    (catch CrudException _ nil)
-    (catch ExecutionException _ nil)))
+  ;; Need Storage API to read the transaction metadata
+  (let [tx-result (.get tx (prepare-get i))
+        result (.get storage (prepare-get i))]
+    ;; Put the same balance to check conflicts with in-flight transactions
+    (->> (calc-new-balance tx-result 0)
+         (prepare-put i)
+         (.put tx))
+    result))
 
 (defn read-all-with-retry
   [test n]
@@ -150,15 +145,16 @@
       (scalar/prepare-transaction-service! test)
       (scalar/prepare-storage-service! test))
     test
-    (let [tx (scalar/start-transaction test)
-          results (doall (map #(read-record tx @(:storage test) %) (range n)))]
-      (try
+    (try
+      (let [tx (scalar/start-transaction test)
+            results (doall (map #(read-record tx @(:storage test) %)
+                                (range n)))]
         (.commit tx)
-        (if (some nil? results) nil results)
-        (catch Exception e
-          ;; The transaction conflicted
-          (warn (.getMessage e))
-          nil)))))
+        results)
+      (catch Exception e
+        ;; The transaction conflicted
+        (warn (.getMessage e))
+        nil))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
