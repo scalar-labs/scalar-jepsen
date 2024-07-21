@@ -124,7 +124,7 @@
                      "consistency model to be checked"
                      ["snapshot-isolation"])
 
-   [nil "--config-file CONFIG_FILE" "ScalarDB config file"
+   [nil "--config-file CONFIG_FILE" "ScalarDB config file. When this is given, other configuration options are ignored."
     :default ""]])
 
 (defn- test-name
