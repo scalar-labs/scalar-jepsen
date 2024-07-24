@@ -122,7 +122,10 @@
 
    (cli/repeated-opt nil "--consistency-model CONSISTENCY_MODEL"
                      "consistency model to be checked"
-                     ["snapshot-isolation"])])
+                     ["snapshot-isolation"])
+
+   [nil "--config-file CONFIG_FILE" "ScalarDB config file. When this is given, other configuration options are ignored."
+    :default ""]])
 
 (defn- test-name
   [workload-key faults admin]
