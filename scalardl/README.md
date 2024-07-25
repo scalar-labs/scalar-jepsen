@@ -1,10 +1,10 @@
-# Jepsen tests for Scalar DL
+# Jepsen tests for ScalarDL
 
-The Scalar DL Jepsen tests make use of the [Cassandra Jepsen tests](https://github.com/scalar-labs/scalar-jepsen/tree/master/cassandra).
+The ScalarDL Jepsen tests make use of the [Cassandra Jepsen tests](https://github.com/scalar-labs/scalar-jepsen/tree/master/cassandra).
 
 ## How to run a test
-1. Get Scalar DL
-  - Scalar DL is licensed under commercial license only
+1. Get ScalarDL
+  - ScalarDL is licensed under commercial license only
     - A test checks `resources/ledger.tar` as default
     - You can specify the DL archive by `--ledger-tarball` option
   - A certificate and a private key for a sample is stored in `resources`
@@ -22,7 +22,7 @@ The Scalar DL Jepsen tests make use of the [Cassandra Jepsen tests](https://gith
     $ lein install
     ```
 
-4. Run a Scalar DL Jepsen test
+4. Run a ScalarDL Jepsen test
 
     ```
     # in jepsen-control
