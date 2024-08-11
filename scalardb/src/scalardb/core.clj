@@ -10,9 +10,7 @@
            (com.scalar.db.schemaloader SchemaLoader)
            (com.scalar.db.service TransactionFactory
                                   StorageFactory)
-           (com.scalar.db.transaction.consensuscommit Coordinator)
-           (java.io FileInputStream)
-           (java.util Properties)))
+           (com.scalar.db.transaction.consensuscommit Coordinator)))
 
 (def ^:const RETRIES 8)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
@@ -75,23 +73,15 @@
     (cassandra/create-my-table session {:keyspace "coordinator"
                                         :table    "state"
                                         :schema   {:tx_id         :text
+                                                   :tx_child_ids  :text
                                                    :tx_state      :int
                                                    :tx_created_at :bigint
                                                    :primary-key   [:tx_id]}})
     (cassandra/close-cassandra cluster session)))
 
-(defn- load-config
-  [test]
-  (when-let [path (and (seq (:config-file test)) (:config-file test))]
-    (let [props (Properties.)]
-      (with-open [stream (FileInputStream. path)]
-        (.load props stream))
-      props)))
-
 (defn setup-transaction-tables
   [test schemata]
-  (let [properties (or (load-config test)
-                       (ext/create-properties (:db test) test))
+  (let [properties (ext/create-properties (:db test) test)
         options (ext/create-table-opts (:db test) test)]
     (if (= (.getProperty properties "scalar.db.username") "cassandra")
       ;; Workaround the issue of the schema loader for Cassandra
