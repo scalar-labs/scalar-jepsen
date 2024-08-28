@@ -124,7 +124,11 @@
                      "consistency model to be checked"
                      ["snapshot-isolation"])
 
-   [nil "--config-file CONFIG_FILE" "ScalarDB config file. When this is given, other configuration options are ignored."
+   [nil "--enable-group-commit" "if set, group commit is enabled"
+    :default false]
+
+   [nil "--config-file CONFIG_FILE"
+    "ScalarDB config file. When this is given, other configuration options are ignored."
     :default ""]])
 
 (defn- test-name
