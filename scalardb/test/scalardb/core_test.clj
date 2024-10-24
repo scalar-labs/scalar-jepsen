@@ -152,3 +152,9 @@
                    (scalar/check-transaction-states test #{"tx"})))
       (is (spy/called-n-times? scalar/exponential-backoff 8))
       (is (spy/called-n-times? scalar/prepare-storage-service! 3)))))
+
+(deftest compute-exponential-backoff-test
+  (is (= 2000 (scalar/compute-exponential-backoff 1)))
+  (is (= 4000 (scalar/compute-exponential-backoff 2)))
+  (is (= 32000 (scalar/compute-exponential-backoff 5)))
+  (is (= 32000 (scalar/compute-exponential-backoff 10))))
