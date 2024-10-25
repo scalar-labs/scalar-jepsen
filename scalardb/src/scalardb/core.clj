@@ -12,7 +12,7 @@
                                   StorageFactory)
            (com.scalar.db.transaction.consensuscommit Coordinator)))
 
-(def ^:const RETRIES 8)
+(def ^:const RETRIES 20)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 (def ^:private ^:const MAX_WAIT_MILLIS 32000)

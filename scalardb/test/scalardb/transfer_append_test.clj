@@ -212,7 +212,8 @@
                    (client/invoke! client {:db mock-db}
                                    (transfer/get-all {:client client} nil))))
       (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
-      (is (spy/called-n-times? scalar/prepare-transaction-service! scalar/RETRIES_FOR_RECONNECTION)))))
+      (is (spy/called-n-times? scalar/prepare-transaction-service!
+                               (+ (quot scalar/RETRIES scalar/RETRIES_FOR_RECONNECTION) 1))))))
 
 (deftest transfer-client-check-tx-test
   (with-redefs [scalar/check-transaction-states (spy/stub 1)]
