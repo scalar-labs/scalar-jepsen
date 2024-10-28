@@ -125,16 +125,24 @@
         (assoc op :type :fail :error {:results results})))))
 
 (defn- read-record
-  "Read a record with a transaction. If read fails, an exception is thrown."
-  [tx storage i]
-  ;; Need Storage API to read the transaction metadata
-  (let [tx-result (.get tx (prepare-get i))
-        result (.get storage (prepare-get i))]
-    ;; Put the same balance to check conflicts with in-flight transactions
-    (->> (calc-new-balance tx-result 0)
-         (prepare-put i)
-         (.put tx))
-    result))
+  "Read and update the specified record with a transaction.
+  Return nil if the read fails or a conflict happens."
+  [test storage i]
+  (try
+    (let [tx (scalar/start-transaction test)
+          tx-result (.get tx (prepare-get i))
+          ;; Need Storage API to read the transaction metadata
+          result (.get storage (prepare-get i))]
+      ;; Put the same balance to check conflicts with in-flight transactions
+      (->> (calc-new-balance tx-result 0)
+           (prepare-put i)
+           (.put tx))
+      (.commit tx)
+      result)
+    (catch Exception e
+      ;; Read failure or the transaction conflicted
+      (warn (.getMessage e))
+      nil)))
 
 (defn read-all-with-retry
   [test n]
@@ -145,16 +153,9 @@
       (scalar/prepare-transaction-service! test)
       (scalar/prepare-storage-service! test))
     test
-    (try
-      (let [tx (scalar/start-transaction test)
-            results (doall (map #(read-record tx @(:storage test) %)
-                                (range n)))]
-        (.commit tx)
-        results)
-      (catch Exception e
-        ;; The transaction conflicted
-        (warn (.getMessage e))
-        nil))))
+    (let [results (pmap #(read-record test @(:storage test) %) (range n))]
+      (when (every? #(some? %) results)
+        results))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
