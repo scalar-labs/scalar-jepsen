@@ -103,7 +103,7 @@
                 scalar/create-service-instance (spy/stub nil)]
     (let [test {:db mock-db :storage (atom nil)}]
       (scalar/prepare-storage-service! test)
-      (is (spy/called-n-times? scalar/exponential-backoff 20))
+      (is (spy/called-n-times? scalar/exponential-backoff scalardb.core/RETRIES))
       (is (nil? @(:storage test))))))
 
 (deftest check-connection-test
@@ -150,8 +150,9 @@
     (let [test {:storage (atom mock-storage)}]
       (is (thrown? clojure.lang.ExceptionInfo
                    (scalar/check-transaction-states test #{"tx"})))
-      (is (spy/called-n-times? scalar/exponential-backoff 20))
-      (is (spy/called-n-times? scalar/prepare-storage-service! 7)))))
+      (is (spy/called-n-times? scalar/exponential-backoff scalardb.core/RETRIES))
+      (is (spy/called-n-times? scalar/prepare-storage-service!
+                               (+ (quot scalar/RETRIES scalar/RETRIES_FOR_RECONNECTION) 1))))))
 
 (deftest compute-exponential-backoff-test
   (is (= 2000 (scalar/compute-exponential-backoff 1)))
