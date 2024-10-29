@@ -12,18 +12,23 @@
                                   StorageFactory)
            (com.scalar.db.transaction.consensuscommit Coordinator)))
 
-(def ^:const RETRIES 8)
+(def ^:const RETRIES 20)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
+(def ^:private ^:const MAX_WAIT_MILLIS 32000)
 (def ^:const INITIAL_TABLE_ID 1)
 (def ^:const DEFAULT_TABLE_COUNT 3)
 
 (def ^:const KEYSPACE "jepsen")
 (def ^:const VERSION "tx_version")
 
+(defn compute-exponential-backoff
+  [r]
+  (min MAX_WAIT_MILLIS (reduce * 1000 (repeat r 2))))
+
 (defn exponential-backoff
   [r]
-  (Thread/sleep (reduce * 1000 (repeat r 2))))
+  (Thread/sleep (compute-exponential-backoff r)))
 
 (defn- get-cassandra-schema
   "Only the current test schemata are covered
