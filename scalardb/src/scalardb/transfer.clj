@@ -156,10 +156,7 @@
   [test n]
   (scalar/check-transaction-connection! test)
   (scalar/check-storage-connection! test)
-  (try
-    (doall (pmap #(read-record-with-retry test %) (range n)))
-    ;; unwrap the exception
-    (catch java.util.concurrent.ExecutionException e (throw (.getCause e)))))
+  (doall (map #(read-record-with-retry test %) (range n))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
