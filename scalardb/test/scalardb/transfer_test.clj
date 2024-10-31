@@ -210,7 +210,8 @@
                                            :storage (ref mock-storage)}
                                    (#'transfer/get-all {:client client}
                                                        nil))))
-      (is (spy/called-n-times? scalar/exponential-backoff (* scalar/RETRIES 5)))
+      (is (spy/called-n-times? scalar/exponential-backoff
+                               (* scalar/RETRIES num-accounts)))
       (is (spy/called-n-times? scalar/prepare-transaction-service!
                                retries-reconnection))
       (is (spy/called-n-times? scalar/prepare-storage-service!
