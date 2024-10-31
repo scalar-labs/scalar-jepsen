@@ -125,24 +125,18 @@
         (assoc op :type :fail :error {:results results})))))
 
 (defn- read-record
-  "Read and update the specified record with a transaction.
-  Return nil if the read fails or a conflict happens."
+  "Read and update the specified record with a transaction"
   [test i]
-  (try
-    (let [tx (scalar/start-transaction test)
-          tx-result (.get tx (prepare-get i))
-          ;; Need Storage API to read the transaction metadata
-          result (.get @(:storage test) (prepare-get i))]
-      ;; Put the same balance to check conflicts with in-flight transactions
-      (->> (calc-new-balance tx-result 0)
-           (prepare-put i)
-           (.put tx))
-      (.commit tx)
-      result)
-    (catch Exception e
-      ;; Read failure or the transaction conflicted
-      (warn (.getMessage e))
-      nil)))
+  (let [tx (scalar/start-transaction test)
+        tx-result (.get tx (prepare-get i))
+        ;; Need Storage API to read the transaction metadata
+        result (.get @(:storage test) (prepare-get i))]
+    ;; Put the same balance to check conflicts with in-flight transactions
+    (->> (calc-new-balance tx-result 0)
+         (prepare-put i)
+         (.put tx))
+    (.commit tx)
+    result))
 
 (defn- read-record-with-retry
   [test i]
@@ -151,15 +145,21 @@
       (scalar/prepare-transaction-service! test)
       (scalar/prepare-storage-service! test))
     test
-    (read-record test i)))
+    (try
+      (read-record test i)
+      (catch Exception e
+        ;; Read failure or the transaction conflicted
+        (warn (.getMessage e))
+        nil))))
 
 (defn read-all-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
   (scalar/check-storage-connection! test)
   (try
-    (pmap #(read-record-with-retry test %) (range n))
-    (catch Exception _ nil)))
+    (doall (pmap #(read-record-with-retry test %) (range n)))
+    ;; unwrap the exception
+    (catch java.util.concurrent.ExecutionException e (throw (.getCause e)))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client

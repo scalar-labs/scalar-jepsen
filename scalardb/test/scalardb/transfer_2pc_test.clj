@@ -227,18 +227,26 @@
                 scalar/prepare-transaction-service! (spy/spy)
                 scalar/prepare-storage-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
-    (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
-                               nil nil)]
+    (let [num-accounts 5
+          client (client/open! (transfer-2pc/->TransferClient (atom false)
+                                                              num-accounts
+                                                              100 1)
+                               nil nil)
+          retries-reconnection (* num-accounts
+                                  (+ (quot scalar/RETRIES
+                                           scalar/RETRIES_FOR_RECONNECTION)
+                                     1))]
       (is (thrown? clojure.lang.ExceptionInfo
                    (client/invoke! client {:db mock-db
                                            :storage (ref mock-storage)}
                                    (#'transfer/get-all {:client client}
                                                        nil))))
-      (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
+      (is (spy/called-n-times? scalar/exponential-backoff
+                               (* scalar/RETRIES num-accounts)))
       (is (spy/called-n-times? scalar/prepare-transaction-service!
-                               (+ (quot scalar/RETRIES scalar/RETRIES_FOR_RECONNECTION) 1)))
+                               retries-reconnection))
       (is (spy/called-n-times? scalar/prepare-storage-service!
-                               (+ (quot scalar/RETRIES scalar/RETRIES_FOR_RECONNECTION) 1))))))
+                               retries-reconnection)))))
 
 (deftest transfer-client-check-tx-test
   (with-redefs [scalar/check-transaction-states (spy/stub 1)]
