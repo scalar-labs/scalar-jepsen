@@ -126,27 +126,27 @@
 
 (defn- read-record
   "Read and update the specified record with a transaction"
-  [test i]
+  [test id]
   (let [tx (scalar/start-transaction test)
-        tx-result (.get tx (prepare-get i))
+        tx-result (.get tx (prepare-get id))
         ;; Need Storage API to read the transaction metadata
-        result (.get @(:storage test) (prepare-get i))]
+        result (.get @(:storage test) (prepare-get id))]
     ;; Put the same balance to check conflicts with in-flight transactions
     (->> (calc-new-balance tx-result 0)
-         (prepare-put i)
+         (prepare-put id)
          (.put tx))
     (.commit tx)
     result))
 
 (defn- read-record-with-retry
-  [test i]
+  [test id]
   (scalar/with-retry
     (fn [test]
       (scalar/prepare-transaction-service! test)
       (scalar/prepare-storage-service! test))
     test
     (try
-      (read-record test i)
+      (read-record test id)
       (catch Exception e
         ;; Read failure or the transaction conflicted
         (warn (.getMessage e))
