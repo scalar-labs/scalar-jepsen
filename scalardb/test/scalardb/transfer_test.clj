@@ -52,6 +52,7 @@
 (def mock-transaction
   (reify
     DistributedTransaction
+    (^String getId [_] "dummy-tx-id")
     (^Optional get [_ ^Get g] (mock-get g))
     (^void put [_ ^Put p] (mock-put p))
     (^void commit [_] (swap! commit-count inc))))
@@ -65,6 +66,7 @@
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
+    (^String getId [_] "dummy-tx-id")
     (^Optional get [_ ^Get _] (throw (CrudException. "get failed" nil)))
     (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
     (^void commit [_] (throw (CommitException. "commit failed" nil)))))
