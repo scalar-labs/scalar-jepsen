@@ -21,7 +21,7 @@
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
              :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]
-                                       [org.apache.commons/commons-text "1.10.0"]]
+                                       [org.apache.commons/commons-text "1.13.0"]]
                         :resource-paths ["resources/scalardb.jar"]}
              :default [:base :system :user :provided :dev :use-released]}
   :jvm-opts ["-Djava.awt.headless=true"]
