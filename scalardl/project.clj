@@ -9,7 +9,7 @@
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
                  [org.slf4j/slf4j-jdk14 "2.0.6"]
-                 [cassandra "0.1.0-SNAPSHOT"]
+                 [cassandra "0.1.0-SNAPSHOT" :exclusions [org.apache.commons/commons-lang3]]
                  [cc.qbits/alia "4.3.6"]
                  [cc.qbits/hayt "4.1.0"]]
   :repositories {"sonartype" "https://oss.sonatype.org/content/repositories/snapshots/"}
