@@ -10,7 +10,7 @@
              [cli :as cli]
              [generator :as gen]
              [tests :as tests]]
-            [jepsen.nemesis [combined :as jn]]
+            [jepsen.nemesis.combined :as jn]
             [scalardb
              [core :refer [INITIAL_TABLE_ID]]
              [transfer]
@@ -67,17 +67,7 @@
                    :pause {:targets [:one]}})
                  1])
     :cluster (let [db (extend-db (cluster/db) :cluster)]
-               [db
-                jn/noop
-                ;; TODO
-                ;(jn/nemesis-package
-                ; {:db db
-                ;  :interval 60
-                ;  :faults faults
-                ;  :partition {:targets [:one]}
-                ;  :kill {:targets [:one]}
-                ;  :pause {:targets [:one]}})
-                1])
+               [db (cluster/nemesis-package db 60 faults) 1])
     (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
