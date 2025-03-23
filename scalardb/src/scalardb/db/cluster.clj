@@ -12,6 +12,8 @@
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
 
+(def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
+
 (defn- install!
   "Install prerequisites. You should already have installed minikube, kubectl and helm."
   []
@@ -80,18 +82,18 @@
     (c/exec :helm :uninstall :scalardb-cluster :postgresql-scalardb-cluster)
     (catch Exception _ nil)))
 
-(defn- get-cluster-node-list
-  []
+(defn- get-pod-list
+  [name]
   (->> (c/exec :kubectl :get :pod)
        str/split-lines
-       (filter #(str/includes? % "scalardb-cluster-node-"))
+       (filter #(str/starts-with? % name))
        (filter #(str/includes? % "Running"))
        (map #(first (str/split % #"\s+")))))
 
 (defn- get-logs
   [_test]
   (binding [c/*dir* (System/getProperty "user.dir")]
-    (let [pods (get-cluster-node-list)
+    (let [pods (get-pod-list CLUSTER_NODE_NAME)
           logs (map #(str c/*dir* \/ % ".log") pods)]
       (mapv #(spit %1 (c/exec :kubectl :logs %2)) logs pods)
       logs)))
@@ -122,7 +124,7 @@
   (-> test
       :nodes
       first
-      (c/on (get-cluster-node-list))
+      (c/on (get-pod-list CLUSTER_NODE_NAME))
       count
       ;; TODO: check the number of pods
       (= 3)))
@@ -141,7 +143,7 @@
 
 (defn- kill-cluster-pods
   []
-  (let [targets (->> (get-cluster-node-list)
+  (let [targets (->> (get-pod-list CLUSTER_NODE_NAME)
                      shuffle
                      (take (inc (rand-int 3))))]
     (info "Try to kill nodes:" targets)
@@ -169,14 +171,6 @@
     db/Primary
     (primaries [_ test] (:nodes test))
     (setup-primary! [_ _ _])
-
-    db/Pause
-    (pause! [_ _ _]
-      ;; TODO
-      (c/su (c/exec :service :postgresql :stop)))
-    (resume! [_ _ _]
-      ;; TODO
-      (c/su (c/exec :service :postgresql :start)))
 
     db/Kill
     (start! [_ _ _]
