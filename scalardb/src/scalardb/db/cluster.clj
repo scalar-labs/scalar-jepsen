@@ -1,18 +1,23 @@
 (ns scalardb.db.cluster
-  (:require [clojure.string :as str]
+  (:require [clj-yaml.core :as yaml]
+            [clojure.string :as str]
             [clojure.tools.logging :refer [info]]
             [jepsen
              [control :as c]
              [db :as db]]
-            [jepsen.nemesis.combined :as jn]))
+            [jepsen.nemesis.combined :as jn])
+  (:import (java.io File)))
 
 (def ^:private ^:const DEFAULT_VERSION "3.14.0")
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
+(def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.1")
 
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
+
+(def ^:private ^:const KILL_PODS_YAML "./kill-pods.yaml")
 
 (defn- install!
   "Install prerequisites. You should already have installed minikube, kubectl and helm."
@@ -21,7 +26,9 @@
   (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami")
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
-          "scalar-labs" "https://scalar-labs.github.io/helm-charts"))
+          "scalar-labs" "https://scalar-labs.github.io/helm-charts")
+  ;; Chaos mesh
+  (c/exec :helm :repo :add "chaos-mesh" "https://charts.chaos-mesh.org"))
 
 (defn- configure!
   [test]
@@ -41,7 +48,13 @@
     (c/exec :kubectl :create :secret :generic "scalardb-credentials-secret"
             "--from-literal=SCALAR_DB_CLUSTER_POSTGRES_USERNAME=postgres"
             "--from-literal=SCALAR_DB_CLUSTER_POSTGRES_PASSWORD=postgres"
-            :-n "default")))
+            :-n "default"))
+
+  ;; Chaos Mesh
+  (try
+    (c/exec :kubectl :get :namespaces "chaos-mesh")
+    (catch Exception _
+      (c/exec :kubectl :create :ns "chaos-mesh"))))
 
 (defn- start!
   []
@@ -67,7 +80,12 @@
       (c/exec :helm :install "scalardb-cluster" "scalar-labs/scalardb-cluster"
               :-f CLUSTER_VALUES_YAML
               :--version chart-version
-              :-n "default"))))
+              :-n "default")))
+
+  ;; Chaos mesh
+  (c/exec :helm :install "chaos-mesh" "chaos-mesh/chaos-mesh"
+          :-n "chaos-mesh"
+          :--version DEFAULT_CHAOS_MESH_VERSION))
 
 (defn- wipe!
   []
@@ -80,6 +98,7 @@
                (apply c/exec :rm :-f)))
     (info "wiping the pods...")
     (c/exec :helm :uninstall :scalardb-cluster :postgresql-scalardb-cluster)
+    (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
     (catch Exception _ nil)))
 
 (defn- get-pod-list
@@ -143,12 +162,31 @@
 
 (defn- kill-cluster-pods
   []
-  (let [targets (->> (get-pod-list CLUSTER_NODE_NAME)
-                     shuffle
-                     (take (inc (rand-int 3))))]
-    (info "Try to kill nodes:" targets)
-    (mapv #(c/exec :kubectl :delete :pod % "--grace-period=0" "--force")
-          targets)))
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (let [targets (->> (get-pod-list CLUSTER_NODE_NAME)
+                       shuffle
+                       (take (inc (rand-int 3))))]
+      (info "Try to kill nodes:" targets)
+      (->> (yaml/generate-string
+            {:apiVersion "chaos-mesh.org/v1alpha1"
+             :kind "PodChaos"
+             :metadata {:name "pod-kill-multiple" :namespace "chaos-mesh"}
+             :spec {:action "pod-kill"
+                    :mode "all"
+                    :selector {:pods {"default" targets}}}})
+           (spit KILL_PODS_YAML))
+      (info "DEBUG:" (slurp KILL_PODS_YAML))
+      (c/exec :kubectl :apply :-f KILL_PODS_YAML)
+      targets)))
+
+(defn- delete-chaos-exp
+  "Delete Chaos experiment if it exists."
+  [yaml-path]
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (let [file (File. yaml-path)]
+      (when (.exists file)
+        (c/exec :kubectl :delete :-f yaml-path)
+        (.delete file)))))
 
 (defn db
   "Setup ScalarDB cluster."
@@ -174,7 +212,7 @@
 
     db/Kill
     (start! [_ _ _]
-      (info "Nothing to do because pods should have been recreated"))
+      (delete-chaos-exp KILL_PODS_YAML))
     (kill! [_ _ _]
       (kill-cluster-pods))
 
