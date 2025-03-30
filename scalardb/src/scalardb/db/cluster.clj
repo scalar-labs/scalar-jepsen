@@ -1,7 +1,7 @@
 (ns scalardb.db.cluster
   (:require [clj-yaml.core :as yaml]
             [clojure.string :as str]
-            [clojure.tools.logging :refer [info]]
+            [clojure.tools.logging :refer [error info]]
             [jepsen
              [control :as c]
              [db :as db]]
@@ -17,7 +17,7 @@
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
 
-(def ^:private ^:const KILL_PODS_YAML "./kill-pods.yaml")
+(def ^:private ^:const POD_FAULT_YAML "./pod-fault.yaml")
 
 (defn- install!
   "Install prerequisites. You should already have installed minikube, kubectl and helm."
@@ -160,24 +160,33 @@
        (throw (ex-info "Timed out waiting for pods"
                        {:causes "Some pod couldn't start"}))))))
 
-(defn- kill-cluster-pods
-  []
-  (binding [c/*dir* (System/getProperty "user.dir")]
-    (let [targets (->> (get-pod-list CLUSTER_NODE_NAME)
-                       shuffle
-                       (take (inc (rand-int 3))))]
-      (info "Try to kill nodes:" targets)
-      (->> (yaml/generate-string
-            {:apiVersion "chaos-mesh.org/v1alpha1"
-             :kind "PodChaos"
-             :metadata {:name "pod-kill-multiple" :namespace "chaos-mesh"}
-             :spec {:action "pod-kill"
-                    :mode "all"
-                    :selector {:pods {"default" targets}}}})
-           (spit KILL_PODS_YAML))
-      (info "DEBUG:" (slurp KILL_PODS_YAML))
-      (c/exec :kubectl :apply :-f KILL_PODS_YAML)
-      targets)))
+(defn- apply-pod-fault-exp
+  [pod-fault]
+  (if (contains? #{:pause :kill} pod-fault)
+    (binding [c/*dir* (System/getProperty "user.dir")]
+      (let [targets (->> (get-pod-list CLUSTER_NODE_NAME)
+                         shuffle
+                         (take (inc (rand-int 3))))
+            action (case pod-fault
+                     :pause "pod-failure"
+                     :kill "pod-kill")
+            base-spec {:action action
+                       :mode "all"
+                       :selector {:pods {"default" targets}}}
+            spec (if (= pod-fault :pause)
+                   (assoc base-spec :duration "60s")
+                   base-spec)]
+        (info "Try" action "nodes:" targets)
+        (->> (yaml/generate-string
+              {:apiVersion "chaos-mesh.org/v1alpha1"
+               :kind "PodChaos"
+               :metadata {:name action :namespace "chaos-mesh"}
+               :spec spec})
+             (spit POD_FAULT_YAML))
+        (info "DEBUG:" (slurp POD_FAULT_YAML))
+        (c/exec :kubectl :apply :-f POD_FAULT_YAML)
+        targets))
+    (error "Unexpected pod-fault type")))
 
 (defn- delete-chaos-exp
   "Delete Chaos experiment if it exists."
@@ -210,11 +219,17 @@
     (primaries [_ test] (:nodes test))
     (setup-primary! [_ _ _])
 
+    db/Pause
+    (pause! [_ _ _]
+      (apply-pod-fault-exp :pause))
+    (resume! [_ _ _]
+      (delete-chaos-exp POD_FAULT_YAML))
+
     db/Kill
     (start! [_ _ _]
-      (delete-chaos-exp KILL_PODS_YAML))
+      (delete-chaos-exp POD_FAULT_YAML))
     (kill! [_ _ _]
-      (kill-cluster-pods))
+      (apply-pod-fault-exp :kill))
 
     db/LogFiles
     (log-files [_ test _]
