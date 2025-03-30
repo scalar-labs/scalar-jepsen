@@ -24,7 +24,8 @@
              [db-extend :refer [extend-db]]]
             [scalardb.db
              [cluster :as cluster]
-             [postgres :as postgres]]))
+             [postgres :as postgres]]
+            [scalardb.nemesis.cluster :as nc]))
 
 (def db-keys
   "The map of test DBs."
@@ -67,7 +68,7 @@
                    :pause {:targets [:one]}})
                  1])
     :cluster (let [db (extend-db (cluster/db) :cluster)]
-               [db (cluster/nemesis-package db 60 faults) 1])
+               [db (nc/nemesis-package db 60 faults) 1])
     (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
