@@ -4,13 +4,15 @@
             [clojure.tools.logging :refer [error info]]
             [jepsen
              [control :as c]
-             [generator :as gen]
-             [nemesis :as n]]
-            [jepsen.nemesis.combined :as jn])
+             [nemesis :as n]
+             [net :as net]]
+            [jepsen.nemesis.combined :as jn]
+            [jepsen.net :as net])
   (:import (java.io File)))
 
 (def ^:private ^:const POD_FAULT_YAML "./pod-fault.yaml")
 (def ^:private ^:const PARTITION_YAML "./partition.yaml")
+(def ^:private ^:const PACKET_FAULT_YAML "./packet-fault.yaml")
 
 (defn get-pod-list
   "Get all pods."
@@ -50,7 +52,7 @@
         targets))
     (error "Unexpected pod-fault type")))
 
-(defn apply-partition-exp
+(defn- apply-partition-exp
   [grudge]
   (binding [c/*dir* (System/getProperty "user.dir")]
     (let [remain (->> (get-pod-list) (remove (set grudge)))]
@@ -68,6 +70,38 @@
       (info "DEBUG:" (slurp PARTITION_YAML))
       (c/exec :kubectl :apply :-f PARTITION_YAML))))
 
+(defn- apply-packet-fault-exp
+  [targets behaviour]
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (let [[action params] (first behaviour)
+          get-percent-fn #(-> % :percent name (str/replace "%" ""))
+          get-correlation-fn #(-> % :correlation name (str/replace "%" ""))
+          base {:apiVersion "chaos-mesh.org/v1alpha1"
+                :kind "NetworkChaos"
+                :metadata {:name action :namespace "chaos-mesh"}
+                :spec {:action action
+                       :mode "all"
+                       :selector {:pods {"default" targets}}}}
+          fault-spec (case action
+                       :delay {:latency (-> params :time name)
+                               :jitter (-> params :jitter name)
+                               :correlation (get-percent-fn params)}
+                       :loss {:loss (get-percent-fn params)
+                              :correlation (get-correlation-fn params)}
+                       :corrupt {:corrupt (get-percent-fn params)
+                                 :correlation (get-correlation-fn params)}
+                       :duplicate {:duplicate (get-percent-fn params)
+                                   :correlation (get-correlation-fn params)}
+                       ;; TODO: check how to enable this fault
+                       ;:reorder {:reorder (get-percent-fn params)
+                       ;          :correlation (get-correlation-fn params)}
+                       :rate {:rate (-> params :rate name)})]
+      (->> (assoc-in base [:spec action] fault-spec)
+           yaml/generate-string
+           (spit PACKET_FAULT_YAML))
+      (info "DEBUG:" (slurp PACKET_FAULT_YAML))
+      (c/exec :kubectl :apply :-f PACKET_FAULT_YAML))))
+
 (defn- delete-chaos-exp
   "Delete Chaos experiment if it exists."
   [yaml-path]
@@ -84,6 +118,10 @@
 (defn delete-partition-exp
   []
   (delete-chaos-exp PARTITION_YAML))
+
+(defn delete-packet-fault-exp
+  []
+  (delete-chaos-exp PACKET_FAULT_YAML))
 
 (defn- partitioner
   "Partitioner for Chaos Mesh."
@@ -108,26 +146,43 @@
       (c/on (-> test :nodes first) delete-partition-exp))))
 
 (defn- partition-package
-  "Almost copied from jepsen.nemesis.combined/partition-package.
-  Replace partition-nemesis for Chaos Mesh."
+  "Replace partition-nemesis for Chaos Mesh."
   [opts]
-  (let [needed? ((:faults opts) :partition)
-        db      (:db opts)
-        start (fn start [_ _]
-                {:type  :info
-                 :f     :start-partition
-                 ;; Target the k8s host. Pods will be choosen.
-                 :value :one})
-        stop  {:type :info, :f :stop-partition, :value nil}
-        gen   (->> (gen/flip-flop start (repeat stop))
-                   (gen/stagger (:interval opts jn/default-interval)))]
-    {:generator       (when needed? gen)
-     :final-generator (when needed? stop)
-     :nemesis         (jn/partition-nemesis db (partitioner))
-     :perf            #{{:name  "partition"
-                         :start #{:start-partition}
-                         :stop  #{:stop-partition}
-                         :color "#E9DCA0"}}}))
+  (assoc (jn/partition-package opts)
+         :nemesis (jn/partition-nemesis (:db opts) (partitioner))))
+
+(defn- packet-nemesis
+  "A nemesis to disrupt packets with Chaos Mesh."
+  []
+  (reify
+    n/Reflection
+    (fs [_this]
+      [:start-packet  :stop-packet])
+
+    n/Nemesis
+    (setup! [this test]
+      (c/on (-> test :nodes first) delete-packet-fault-exp)
+      this)
+
+    (invoke! [_ test {:keys [f value] :as op}]
+      (c/on (-> test :nodes first)
+            (let [result (case f
+                           :start-packet (let [[_ behavior] value
+                                               targets (->> (get-pod-list)
+                                                            shuffle
+                                                            (take (inc (rand-int 7))))]
+                                           (apply-packet-fault-exp targets behavior))
+                           :stop-packet  (delete-packet-fault-exp))]
+              (assoc op :value result))))
+
+    (teardown! [_ test]
+      (c/on (-> test :nodes first) delete-packet-fault-exp))))
+
+(defn- packet-package
+  "Replace packet-nemesis for Chaos Mesh."
+  [opts]
+  (assoc (jn/packet-package opts)
+         :nemesis (packet-nemesis)))
 
 (defn nemesis-package
   "Nemeses for ScalarDB cluster"
@@ -136,7 +191,12 @@
               :interval interval
               :faults (set faults)
               :partition {:targets [:one]}
+              :packet {:targets [:one]
+                       :behaviors (reduce (fn [acc [k v]] (conj acc {k v}))
+                                          []
+                                          net/all-packet-behaviors)}
               :kill {:targets [:one]}
               :pause {:targets [:one]}}]
     (jn/compose-packages [(partition-package opts)
+                          (packet-package opts)
                           (jn/db-package opts)])))
