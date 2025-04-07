@@ -58,7 +58,7 @@
   (c/exec
    :helm :install "postgresql-scalardb-cluster" "bitnami/postgresql"
    :--set "auth.postgresPassword=postgres"
-   :--set "primary.persistence.enabled=false"
+   :--set "primary.persistence.enabled=true"
    ;; Need an external IP for storage APIs
    :--set "service.type=LoadBalancer"
    :--set "primary.service.type=LoadBalancer")

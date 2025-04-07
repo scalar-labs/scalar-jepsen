@@ -4,15 +4,19 @@
             [clojure.tools.logging :refer [error info]]
             [jepsen
              [control :as c]
+             [generator :as gen]
              [nemesis :as n]
              [net :as net]]
             [jepsen.nemesis.combined :as jn]
-            [jepsen.net :as net])
+            [jepsen.nemesis.time :as nt])
   (:import (java.io File)))
 
 (def ^:private ^:const POD_FAULT_YAML "./pod-fault.yaml")
 (def ^:private ^:const PARTITION_YAML "./partition.yaml")
 (def ^:private ^:const PACKET_FAULT_YAML "./packet-fault.yaml")
+(defn- time-fault-yaml
+  [pod-name]
+  (str "./time-fault-" pod-name ".yaml"))
 
 (defn get-pod-list
   "Get all pods."
@@ -29,6 +33,8 @@
       (let [targets (->> (get-pod-list)
                          ;; choose envoy or cluster nodes
                          (filter #(str/starts-with? % "scalardb-"))
+                         ;; TODO: test failed when killing a postgres pod
+                         ;(filter #(str/starts-with? % "postgresql-"))
                          shuffle
                          (take (inc (rand-int 3))))
             action (case pod-fault
@@ -123,6 +129,32 @@
   []
   (delete-chaos-exp PACKET_FAULT_YAML))
 
+(defn delete-time-fault-exp
+  [pod-names]
+  (mapv #(-> % time-fault-yaml delete-chaos-exp) pod-names))
+
+(defn- apply-time-fault-exp
+  [target delta-ms]
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (delete-time-fault-exp [target])
+    (let [file-name (time-fault-yaml target)
+         time-offset (if (>= (abs delta-ms) 1000)
+                       (str (quot delta-ms 1000) "s"
+                            (mod (abs delta-ms) 1000) "ms")
+                       (str delta-ms "ms"))]
+      (->> (yaml/generate-string
+            {:apiVersion "chaos-mesh.org/v1alpha1"
+             :kind "TimeChaos"
+             :metadata {:name "time-bump"
+                        :namespace "chaos-mesh"}
+             :spec {:mode "all"
+                    :selector {:pods {"default" [target]}}
+                    :timeOffset time-offset}})
+           (spit file-name))
+      (info "DEBUG:" (slurp file-name))
+      (c/exec :kubectl :apply :-f file-name)))
+  delta-ms)
+
 (defn- partitioner
   "Partitioner for Chaos Mesh."
   []
@@ -184,6 +216,50 @@
   (assoc (jn/packet-package opts)
          :nemesis (packet-nemesis)))
 
+(defn- clock-nemesis
+  []
+  (reify n/Nemesis
+    (setup! [this test]
+      (c/on (-> test :nodes first) delete-time-fault-exp)
+      this)
+
+    (invoke! [_ test op]
+      (c/on (-> test :nodes first)
+            (let [res (case (:f op)
+                        :reset (delete-time-fault-exp (:value op))
+                        :bump (mapv #(apply apply-time-fault-exp %) (:value op)))]
+              (assoc op :clock-offsets res))))
+
+    (teardown! [_ test]
+      (c/on (-> test :nodes first) delete-time-fault-exp))))
+
+(defn- clock-package
+  "Copied from nemesis.combine/clock-package. Modified for Chaos Mesh."
+  [opts]
+  (let [needed? ((:faults opts) :clock)
+        nemesis (n/compose {{:reset-clock :reset
+                             :bump-clock  :bump}
+                            (clock-nemesis)})
+        target-select (fn [test]
+                        (->> (c/on (-> test :nodes first) (get-pod-list))
+                             ;; only cluster nodes
+                             (filter #(str/starts-with? % "scalardb-cluster-node"))
+                             shuffle
+                             (take (inc (rand-int 3)))))
+        clock-gen (gen/mix [(nt/reset-gen-select target-select)
+                            (nt/bump-gen-select  target-select)])
+        gen (->> clock-gen
+                 (gen/f-map {:reset :reset-clock
+                             :bump  :bump-clock})
+                 (gen/stagger (:interval opts)))]
+    {:generator         (when needed? gen)
+     :final-generator   (when needed? {:type :info, :f :reset-clock})
+     :nemesis           nemesis
+     :perf              #{{:name  "clock"
+                           :start #{:bump-clock}
+                           :stop  #{:reset-clock}
+                           :color "#A0E9E3"}}}))
+
 (defn nemesis-package
   "Nemeses for ScalarDB cluster"
   [db interval faults]
@@ -199,4 +275,5 @@
               :pause {:targets [:one]}}]
     (jn/compose-packages [(partition-package opts)
                           (packet-package opts)
+                          (clock-package opts)
                           (jn/db-package opts)])))
