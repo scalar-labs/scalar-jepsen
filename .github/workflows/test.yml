@@ -48,13 +48,16 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y openssh-server
-        sudo service ssh start
 
-    - name: Set up SSH access to localhost
+    - name: Enable ssh for runner user
       run: |
-        echo "root:root" | sudo chpasswd
-        sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-        sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ""
+        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+        chmod 600 ~/.ssh/authorized_keys
+        sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+        sudo sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
         sudo service ssh restart
 
     - name: Setup Java
@@ -123,4 +126,4 @@ jobs:
     - name: ScalarDB cluster test
       run: |
         cd scalardb
-        lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --time-limit 120
+        lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --username runner --ssh-private-key ~/.ssh/id_rsa--docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --time-limit 120
