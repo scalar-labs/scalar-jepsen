@@ -14,6 +14,7 @@
 (def ^:private ^:const POD_FAULT_YAML "./pod-fault.yaml")
 (def ^:private ^:const PARTITION_YAML "./partition.yaml")
 (def ^:private ^:const PACKET_FAULT_YAML "./packet-fault.yaml")
+
 (defn- time-fault-yaml
   [pod-name]
   (str "./time-fault-" pod-name ".yaml"))
@@ -25,6 +26,11 @@
        str/split-lines
        (filter #(str/includes? % "scalardb"))
        (map #(-> % (str/split #"\s+") first))))
+
+(defn- get-cluster-node-pods
+  []
+  (->> (get-pod-list)
+       (filter #(str/starts-with? % "scalardb-cluster-node"))))
 
 (defn apply-pod-fault-exp
   [pod-fault]
@@ -136,16 +142,17 @@
 (defn- apply-time-fault-exp
   [target delta-ms]
   (binding [c/*dir* (System/getProperty "user.dir")]
+    ;; stop the previous experiment because the existing one can't be updated
     (delete-time-fault-exp [target])
     (let [file-name (time-fault-yaml target)
-         time-offset (if (>= (abs delta-ms) 1000)
-                       (str (quot delta-ms 1000) "s"
-                            (mod (abs delta-ms) 1000) "ms")
-                       (str delta-ms "ms"))]
+          time-offset (if (>= (abs delta-ms) 1000)
+                        (str (quot delta-ms 1000) "s"
+                             (mod (abs delta-ms) 1000) "ms")
+                        (str delta-ms "ms"))]
       (->> (yaml/generate-string
             {:apiVersion "chaos-mesh.org/v1alpha1"
              :kind "TimeChaos"
-             :metadata {:name "time-bump"
+             :metadata {:name (str "time-bump-" target)
                         :namespace "chaos-mesh"}
              :spec {:mode "all"
                     :selector {:pods {"default" [target]}}
@@ -220,7 +227,8 @@
   []
   (reify n/Nemesis
     (setup! [this test]
-      (c/on (-> test :nodes first) delete-time-fault-exp)
+      (c/on (-> test :nodes first)
+            (delete-time-fault-exp (get-cluster-node-pods)))
       this)
 
     (invoke! [_ test op]
@@ -231,7 +239,8 @@
               (assoc op :clock-offsets res))))
 
     (teardown! [_ test]
-      (c/on (-> test :nodes first) delete-time-fault-exp))))
+      (c/on (-> test :nodes first)
+            (delete-time-fault-exp (get-cluster-node-pods))))))
 
 (defn- clock-package
   "Copied from nemesis.combine/clock-package. Modified for Chaos Mesh."
@@ -241,9 +250,8 @@
                              :bump-clock  :bump}
                             (clock-nemesis)})
         target-select (fn [test]
-                        (->> (c/on (-> test :nodes first) (get-pod-list))
-                             ;; only cluster nodes
-                             (filter #(str/starts-with? % "scalardb-cluster-node"))
+                        (->> (c/on (-> test :nodes first)
+                                   (get-cluster-node-pods))
                              shuffle
                              (take (inc (rand-int 3)))))
         clock-gen (gen/mix [(nt/reset-gen-select target-select)
