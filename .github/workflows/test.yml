@@ -92,8 +92,8 @@ jobs:
           --selector=app=metallb \
           --timeout=90s
 
-        NET=$(docker network inspect kind --format '{{(index .IPAM.Config 0).Subnet}}')
-        echo "Kind subnet: $NET"
+        NET=$(docker network inspect kind | jq -r '.[0].IPAM.Config[] | select(.Subnet | test("^fc00") | not) | .Subnet')
+        echo "IPv4 Subnet: $NET"
 
         PREFIX=$(echo "$NET" | cut -d. -f1-2)
         IP_RANGE="${PREFIX}.255.200-${PREFIX}.255.250"
