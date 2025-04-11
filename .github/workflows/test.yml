@@ -7,16 +7,16 @@ on:
   pull_request:
 
 jobs:
-  testing:
+  cassandra-scaladb:
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Buildx
       id: buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     - name: Setup Cache
       uses: satackey/action-docker-layer-caching@v0.0.11
@@ -36,3 +36,91 @@ jobs:
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
         docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+
+  cluster:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Need ssh to the localhost
+    - name: Install SSH server
+      run: |
+        sudo apt update
+        sudo apt install -y openssh-server
+        sudo service ssh start
+
+    - name: Set up SSH access to localhost
+      run: |
+        echo "root:root" | sudo chpasswd
+        sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+        sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+        sudo service ssh restart
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Install leiningen
+      uses: DeLaGuardo/setup-clojure@13.0
+      with:
+        lein: latest
+
+    - name: Cache m2 repository
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Set up Kind cluster
+      uses: helm/kind-action@v1.12.0
+      with:
+        cluster_name: test-cluster
+
+    - name: Install MetalLB
+      run: |
+        kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
+        kubectl wait --namespace metallb-system \
+          --for=condition=Ready pods \
+          --selector=app=metallb \
+          --timeout=90s
+
+        NET=$(docker network inspect kind --format '{{(index .IPAM.Config 0).Subnet}}')
+        echo "Kind subnet: $NET"
+
+        PREFIX=$(echo "$NET" | cut -d. -f1-2)
+        IP_RANGE="${PREFIX}.255.200-${PREFIX}.255.250"
+
+        cat <<EOF | kubectl apply -f -
+        apiVersion: metallb.io/v1beta1
+        kind: IPAddressPool
+        metadata:
+          name: kind-pool
+          namespace: metallb-system
+        spec:
+          addresses:
+            - $IP_RANGE
+        ---
+        apiVersion: metallb.io/v1beta1
+        kind: L2Advertisement
+        metadata:
+          name: l2adv
+          namespace: metallb-system
+        EOF
+
+    - name: Install dependencies
+      run: |
+        cd cassandra
+        lein install
+
+    - name: ScalarDB cluster test
+      run: |
+        cd scalardb
+        lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --time-limit 120
