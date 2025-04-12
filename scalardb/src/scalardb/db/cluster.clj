@@ -2,13 +2,13 @@
   (:require [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.tools.logging :refer [info]]
+            [environ.core :refer [env]]
             [jepsen
              [control :as c]
              [db :as db]]
             [scalardb.nemesis.cluster :as n])
   (:import (java.io File)))
 
-(def ^:private ^:const DEFAULT_VERSION "3.14.0")
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
 (def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.1")
 
@@ -58,7 +58,9 @@
   (c/exec :helm :repo :add
           "scalar-labs" "https://scalar-labs.github.io/helm-charts")
   ;; Chaos mesh
-  (c/exec :helm :repo :add "chaos-mesh" "https://charts.chaos-mesh.org"))
+  (c/exec :helm :repo :add "chaos-mesh" "https://charts.chaos-mesh.org")
+
+  (c/exec :helm :repo :update))
 
 (defn- configure!
   [test]
@@ -98,10 +100,11 @@
    :--set "primary.service.type=LoadBalancer")
 
   ;; ScalarDB cluster
-  (let [chart-version (->> (c/exec :helm :search
+  (let [version (env :scalardb-cluster-version)
+        chart-version (->> (c/exec :helm :search
                                    :repo "scalar-labs/scalardb-cluster" :-l)
                            str/split-lines
-                           (filter #(str/includes? % DEFAULT_VERSION))
+                           (filter #(str/includes? % version))
                            (map #(nth (str/split % #"\s+") 1))
                            (sort #(compare %2 %1))
                            first)]
@@ -129,7 +132,8 @@
                seq
                (apply c/exec :rm :-f)))
     (info "wiping the pods...")
-    (c/exec :helm :uninstall :scalardb-cluster :postgresql-scalardb-cluster)
+    (c/exec :helm :uninstall :postgresql-scalardb-cluster)
+    (c/exec :helm :uninstall :scalardb-cluster)
     (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
     (catch Exception _ nil)))
 

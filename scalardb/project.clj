@@ -10,7 +10,8 @@
                  [cassandra "0.1.0-SNAPSHOT" :exclusions [org.apache.commons/commons-lang3]]
                  [cheshire "5.12.0"]
                  [clj-commons/clj-yaml "1.0.29"]
-                 [com.scalar-labs/scalardb-schema-loader "4.0.0-SNAPSHOT"]]
+                 [com.scalar-labs/scalardb-schema-loader "4.0.0-SNAPSHOT"]
+                 [environ "1.2.0"]]
   :repositories {"sonartype" "https://oss.sonatype.org/content/repositories/snapshots/"}
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
@@ -21,12 +22,14 @@
                                                          com.azure/azure-cosmos
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
-             :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "3.14.0"
+             :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "3.15.2"
                                        ;; avoid the netty dependency issue
                                        :exclusions [software.amazon.awssdk/*
                                                     com.oracle.database.jdbc/ojdbc8-production
                                                     com.azure/azure-cosmos
-                                                    com.scalar-labs/scalardb-rpc]]]}
+                                                    com.scalar-labs/scalardb-rpc]]]
+                       :env {:scalardb-cluster-version "3.15.2"}
+                       :plugins [[lein-environ "1.2.0"]]}
              :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]
                                        [org.apache.commons/commons-text "1.10.0"]]
                         :resource-paths ["resources/scalardb.jar"]}
