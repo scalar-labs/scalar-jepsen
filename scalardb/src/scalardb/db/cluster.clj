@@ -1,10 +1,12 @@
 (ns scalardb.db.cluster
-  (:require [clojure.string :as str]
+  (:require [clj-yaml.core :as yaml]
+            [clojure.string :as str]
             [clojure.tools.logging :refer [info]]
             [jepsen
              [control :as c]
              [db :as db]]
-            [scalardb.nemesis.cluster :as n]))
+            [scalardb.nemesis.cluster :as n])
+  (:import (java.io File)))
 
 (def ^:private ^:const DEFAULT_VERSION "3.14.0")
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
@@ -15,8 +17,40 @@
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
 
+(def ^:private ^:const CLUSTER_VALUES
+  {:envoy {:enabled true
+           :service {:type "LoadBalancer"}}
+
+   :scalardbCluster
+   {:image {:repository "ghcr.io/scalar-labs/scalardb-cluster-node"}
+
+    :scalardbClusterNodeProperties
+    (str/join "\n"
+              ;; ScalarDB Cluster configurations
+              ["scalar.db.cluster.membership.type=KUBERNETES"
+               "scalar.db.cluster.membership.kubernetes.endpoint.namespace_name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAMESPACE_NAME}"
+               "scalar.db.cluster.membership.kubernetes.endpoint.name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAME}"
+               ""
+               ;; Storage configurations
+               "scalar.db.storage=jdbc"
+               "scalar.db.contact_points=jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
+               "scalar.db.username=${env:SCALAR_DB_CLUSTER_POSTGRES_USERNAME}"
+               "scalar.db.password=${env:SCALAR_DB_CLUSTER_POSTGRES_PASSWORD}"
+               ""
+               ;; For ScalarDB Cluster GraphQL
+               "scalar.db.graphql.enabled=false"
+               ;; For ScalarDB Cluster SQL
+               "scalar.db.sql.enabled=false"])
+
+    :graphql {:enabled false
+              :service {:type "LoadBalancer"}}
+
+    :imagePullSecrets [{:name "scalardb-ghcr-secret"}]
+    :secretName "scalardb-credentials-secret"}})
+
 (defn- install!
-  "Install prerequisites. You should already have installed minikube, kubectl and helm."
+  "Install prerequisites.
+  You should already have installed kind (or similar tool), kubectl and helm."
   []
   ;; postgre
   (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami")
@@ -73,10 +107,12 @@
                            first)]
     (info "helm chart version:" chart-version)
     (binding [c/*dir* (System/getProperty "user.dir")]
+      (spit CLUSTER_VALUES_YAML (yaml/generate-string CLUSTER_VALUES))
       (c/exec :helm :install "scalardb-cluster" "scalar-labs/scalardb-cluster"
               :-f CLUSTER_VALUES_YAML
               :--version chart-version
-              :-n "default")))
+              :-n "default")
+      (-> CLUSTER_VALUES_YAML File. .delete)))
 
   ;; Chaos mesh
   (c/exec :helm :install "chaos-mesh" "chaos-mesh/chaos-mesh"
