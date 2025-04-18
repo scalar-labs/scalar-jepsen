@@ -99,7 +99,9 @@
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]
-  (if-let [tx (scalar/start-transaction test)]
+  (if-let [tx (try (scalar/start-transaction test)
+                   (catch Exception e
+                     (warn (.getMessage e))))]
     (try
       (tx-transfer tx from to amount)
       :commit

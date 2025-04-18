@@ -133,6 +133,8 @@
                (apply c/exec :rm :-f)))
     (info "wiping the pods...")
     (c/exec :helm :uninstall :postgresql-scalardb-cluster)
+    (c/exec :kubectl :delete
+            :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
     (c/exec :helm :uninstall :scalardb-cluster)
     (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
     (catch Exception _ nil)))
