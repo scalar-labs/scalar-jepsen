@@ -1,0 +1,265 @@
+name: Daily ScalarDB cluster test
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+
+jobs:
+  daily-cluster:
+    name: "Daily ScalarDB cluster test"
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tests:
+          - name: "Transfers_SI"
+            workload: "transfer transfer-append"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "snapshot"
+            consistency_model: "snapshot-isolation"
+            # Required but not used
+            serializable_strategy: "extra-read"
+          - name: "Transfers_2PC_SI"
+            workload: "transfer-2pc transfer-append-2pc"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "snapshot"
+            consistency_model: "snapshot-isolation"
+            # Required but not used
+            serializable_strategy: "extra-read"
+          - name: "RCSI"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "snapshot"
+            consistency_model: "cursor-stability"
+            # Required but not used
+            serializable_strategy: "extra-read"
+          - name: "RCSI_2PC"
+            workload: "elle-append-2pc elle-write-read-2pc"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "snapshot"
+            consistency_model: "cursor-stability"
+            # Required but not used
+            serializable_strategy: "extra-read"
+          - name: "Serializable_ExtraRead"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "serializable"
+            consistency_model: "strict-serializable"
+            serializable_strategy: "extra-read"
+          - name: "Serializable_ExtraWrite"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "serializable"
+            consistency_model: "strict-serializable"
+            serializable_strategy: "extra-write"
+          - name: "Serializable_2PC_ExtraRead"
+            workload: "elle-append-2pc elle-write-read-2pc"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "serializable"
+            consistency_model: "strict-serializable"
+            serializable_strategy: "extra-read"
+          - name: "Serializable_2PC_ExtraWrite"
+            workload: "elle-append-2pc elle-write-read-2pc"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: false
+            isolation_level: "serializable"
+            consistency_model: "strict-serializable"
+            serializable_strategy: "extra-write"
+          - name: "GroupCommit"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable-group-commit: true
+            isolation_level: "serializable"
+            consistency_model: "strict-serializable"
+            serializable_strategy: "extra-read"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Need ssh to the localhost
+    - name: Install SSH server
+      run: |
+        sudo apt update
+        sudo apt install -y openssh-server
+
+    - name: Enable ssh for runner user
+      run: |
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ""
+        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+        chmod 600 ~/.ssh/authorized_keys
+        sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+        sudo sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+        sudo service ssh restart
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Install leiningen
+      uses: DeLaGuardo/setup-clojure@13.0
+      with:
+        lein: latest
+
+    - name: Cache m2 repository
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Set up Kind cluster
+      uses: helm/kind-action@v1.12.0
+      with:
+        cluster_name: test-cluster
+
+    - name: Install MetalLB
+      run: |
+        kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
+        kubectl wait --namespace metallb-system \
+          --for=condition=Ready pods \
+          --selector=app=metallb \
+          --timeout=90s
+
+        NET=$(docker network inspect kind | jq -r '.[0].IPAM.Config[] | select(.Subnet | test("^fc00") | not) | .Subnet')
+        echo "IPv4 Subnet: $NET"
+
+        PREFIX=$(echo "$NET" | cut -d. -f1-2)
+        IP_RANGE="${PREFIX}.255.200-${PREFIX}.255.250"
+
+        cat <<EOF | kubectl apply -f -
+        apiVersion: metallb.io/v1beta1
+        kind: IPAddressPool
+        metadata:
+          name: kind-pool
+          namespace: metallb-system
+        spec:
+          addresses:
+            - $IP_RANGE
+        ---
+        apiVersion: metallb.io/v1beta1
+        kind: L2Advertisement
+        metadata:
+          name: l2adv
+          namespace: metallb-system
+        EOF
+
+    - name: Install dependencies
+      run: |
+        cd cassandra
+        lein install
+
+    - name: ${{ matrix.tests.name }}
+      run: |
+        cd scalardb
+        GROUP_COMMIT_OPT=""
+        if [ "${{ matrix.tests.enable-group-commit }}" = "true" ]; then
+          GROUP_COMMIT_OPT="--enable-group-commit"
+        fi
+        lein with-profile cluster run test \
+          --workload ${{ matrix.tests.workload }} \
+          --nemesis ${{ matrix.tests.nemesis }} \
+          --isolation-level ${{ matrix.tests.isolation_level }} \
+          --consistency-model ${{ matrix.tests.consistency_model }} \
+          --serializable-strategy ${{ matrix.tests.serializable_strategy }} \
+          --time-limit 600 \
+          --nodes localhost \
+          --db cluster \
+          --concurrency 5 \
+          --username runner \
+          --ssh-private-key ~/.ssh/id_rsa \
+          --docker-username ${{ github.repository_owner }} \
+          --docker-access-token ${{ secrets.CR_PAT }} \
+          $GROUP_COMMIT_OPT > /dev/null 2>&1
+
+    - name: Record result
+      if: always()
+      run: |
+        echo "${{ matrix.tests.name }}:${{ job.status }}" >> result.txt
+
+    - name: Upload result
+      uses: actions/upload-artifact@v4
+      with:
+        name: result-${{ matrix.tests.name }}
+        path: result.txt
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: logs-${{ matrix.tests.name }}
+        path: scalardb/store
+
+  # Disable the notification until the tests work well
+  #notify-slack:
+  #  name: Notify Slack
+  #  if: always()
+  #  needs: daily-cluster
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - name: Install GitHub CLI
+  #      run: sudo apt-get install -y gh
+
+  #    - name: Download result artifacts only
+  #      env:
+  #        GH_TOKEN: ${{ secrets.GH_PAT }}
+  #      run: |
+  #        mkdir -p results
+  #        gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+  #          --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
+  #          while read name; do
+  #            echo "Downloading $name"
+  #            gh run download ${{ github.run_id }} -n "$name" -D results
+  #          done
+
+  #    - name: Generate Slack message
+  #      id: message
+  #      run: |
+  #        successes=""
+  #        failures=""
+
+  #        for file in results/result-*/result.txt; do
+  #          while read -r line; do
+  #            name=$(echo "$line" | cut -d: -f1)
+  #            status=$(echo "$line" | cut -d: -f2)
+
+  #            if [ "$status" = "success" ]; then
+  #              successes+="- $name\n"
+  #            else
+  #              failures+="- $name\n"
+  #            fi
+  #          done < "$file"
+  #        done
+
+  #        echo "message<<EOF" >> $GITHUB_OUTPUT
+  #        echo ":white_check_mark: *ScalarDB cluster tests completed*" >> $GITHUB_OUTPUT
+  #        echo "" >> $GITHUB_OUTPUT
+  #        echo "*Success:*" >> $GITHUB_OUTPUT
+  #        echo -e "$successes" >> $GITHUB_OUTPUT
+  #        echo "" >> $GITHUB_OUTPUT
+  #        echo "*Failed:*" >> $GITHUB_OUTPUT
+  #        echo -e "$failures" >> $GITHUB_OUTPUT
+  #        echo "" >> $GITHUB_OUTPUT
+  #        echo "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>" >> $GITHUB_OUTPUT
+  #        echo "EOF" >> $GITHUB_OUTPUT
+
+  #    - name: Post to Slack
+  #      run: |
+  #        curl -X POST -H 'Content-type: application/json' \
+  #          --data "{\"text\": \"${{ steps.message.outputs.message }}\"}" \
+  #          ${{ secrets.SLACK_TOKEN }}
