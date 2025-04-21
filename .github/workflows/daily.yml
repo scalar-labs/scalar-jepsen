@@ -168,16 +168,20 @@ jobs:
     - name: ${{ matrix.tests.name }}
       run: |
         cd scalardb
-        GROUP_COMMIT_OPT=""
+        OPTS=""
+        for w in ${{ matrix.tests.workload }}; do
+          OPTS+=" --workload ${w}"
+        done
+        for n in ${{ matrix.tests.nemesis }}; do
+          OPTS+=" --nemesis ${n}"
+        done
+        OPTS+=" --isolation-level ${{ matrix.tests.isolation_level }}"
+        OPTS+=" --consistency-model ${{ matrix.tests.consistency_model }}"
+        OPTS+=" --serializable-strategy ${{ matrix.tests.serializable_strategy }}"
         if [ "${{ matrix.tests.enable-group-commit }}" = "true" ]; then
-          GROUP_COMMIT_OPT="--enable-group-commit"
+          OPT+=" --enable-group-commit"
         fi
         lein with-profile cluster run test \
-          --workload ${{ matrix.tests.workload }} \
-          --nemesis ${{ matrix.tests.nemesis }} \
-          --isolation-level ${{ matrix.tests.isolation_level }} \
-          --consistency-model ${{ matrix.tests.consistency_model }} \
-          --serializable-strategy ${{ matrix.tests.serializable_strategy }} \
           --time-limit 600 \
           --nodes localhost \
           --db cluster \
@@ -186,7 +190,7 @@ jobs:
           --ssh-private-key ~/.ssh/id_rsa \
           --docker-username ${{ github.repository_owner }} \
           --docker-access-token ${{ secrets.CR_PAT }} \
-          $GROUP_COMMIT_OPT > /dev/null 2>&1
+          ${OPTS} > /dev/null 2>&1
 
     - name: Record result
       if: always()
