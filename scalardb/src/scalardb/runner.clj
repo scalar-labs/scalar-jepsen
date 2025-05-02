@@ -113,13 +113,6 @@
     :validate [#{:snapshot :serializable}
                "Should be one of snapshot or serializable"]]
 
-   [nil "--serializable-strategy SERIALIZABLE_STRATEGY"
-    "serializable strategy"
-    :default :extra-read
-    :parse-fn keyword
-    :validate [#{:extra-read :extra-write}
-               "Should be one of extra-read or extra-write"]]
-
    (cli/repeated-opt nil "--consistency-model CONSISTENCY_MODEL"
                      "consistency model to be checked"
                      ["snapshot-isolation"])

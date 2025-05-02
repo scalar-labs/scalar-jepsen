@@ -95,7 +95,6 @@
                                  nil nil)
             result (client/invoke! client
                                    {:isolation-level :serializable
-                                    :serializable-strategy :extra-write
                                     :table-id (atom 1)}
                                    {:type :invoke
                                     :f :txn
@@ -119,7 +118,6 @@
                                nil nil)
           result (client/invoke! client
                                  {:isolation-level :serializable
-                                  :serializable-strategy :extra-write
                                   :table-id (atom 1)}
                                  {:type :invoke
                                   :f :txn
@@ -137,7 +135,6 @@
                                  nil nil)
             result (client/invoke! client
                                    {:isolation-level :serializable
-                                    :serializable-strategy :extra-write
                                     :table-id (atom 1)
                                     :unknown-tx (atom #{})}
                                    {:type :invoke

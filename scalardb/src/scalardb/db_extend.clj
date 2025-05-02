@@ -12,9 +12,6 @@
 (def ^:private ISOLATION_LEVELS {:snapshot "SNAPSHOT"
                                  :serializable "SERIALIZABLE"})
 
-(def ^:private SERIALIZABLE_STRATEGIES {:extra-read "EXTRA_READ"
-                                        :extra-write "EXTRA_WRITE"})
-
 (defn- load-config
   [test]
   (when-let [path (and (seq (:config-file test)) (:config-file test))]
@@ -28,8 +25,6 @@
   (doto properties
     (.setProperty "scalar.db.consensus_commit.isolation_level"
                   ((:isolation-level test) ISOLATION_LEVELS))
-    (.setProperty "scalar.db.consensus_commit.serializable_strategy"
-                  ((:serializable-strategy test) SERIALIZABLE_STRATEGIES))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.enabled"
                   (str (:enable-group-commit test)))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.slot_capacity" "4")

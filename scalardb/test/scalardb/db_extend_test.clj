@@ -7,8 +7,7 @@
   (let [db (ext/extend-db (cassandra/db) :cassandra)
         properties (ext/create-properties db
                                           {:nodes ["n1" "n2" "n3"]
-                                           :isolation-level :serializable
-                                           :serializable-strategy :extra-write})]
+                                           :isolation-level :serializable})]
     (is (= "n1,n2,n3"
            (.getProperty properties "scalar.db.contact_points")))
     (is (= "cassandra"
@@ -18,8 +17,4 @@
     (is (= "SERIALIZABLE"
            (.getProperty
             properties
-            "scalar.db.consensus_commit.isolation_level")))
-    (is (= "EXTRA_WRITE"
-           (.getProperty
-            properties
-            "scalar.db.consensus_commit.serializable_strategy")))))
+            "scalar.db.consensus_commit.isolation_level")))))
