@@ -38,9 +38,9 @@
     (binding [c/*dir* (System/getProperty "user.dir")]
       (let [targets (->> (get-pod-list)
                          ;; choose envoy or cluster nodes
-                         (filter #(str/starts-with? % "scalardb-"))
+                         ;(filter #(str/starts-with? % "scalardb-"))
                          ;; TODO: test failed when killing a postgres pod
-                         ;(filter #(str/starts-with? % "postgresql-"))
+                         (filter #(str/starts-with? % "postgresql-"))
                          shuffle
                          (take (inc (rand-int 3))))
             action (case pod-fault
