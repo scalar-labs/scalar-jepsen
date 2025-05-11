@@ -20,67 +20,42 @@ jobs:
             enable-group-commit: false
             isolation_level: "snapshot"
             consistency_model: "snapshot-isolation"
-            # Required but not used
-            serializable_strategy: "extra-read"
           - name: "Transfers_2PC_SI"
             workload: "transfer-2pc transfer-append-2pc"
             nemesis: "none partition packet clock crash"
             enable-group-commit: false
             isolation_level: "snapshot"
             consistency_model: "snapshot-isolation"
-            # Required but not used
-            serializable_strategy: "extra-read"
           - name: "RCSI"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable-group-commit: false
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
-            # Required but not used
-            serializable_strategy: "extra-read"
           - name: "RCSI_2PC"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable-group-commit: false
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
-            # Required but not used
-            serializable_strategy: "extra-read"
-          - name: "Serializable_ExtraRead"
+          - name: "Serializable"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable-group-commit: false
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
-            serializable_strategy: "extra-read"
-          - name: "Serializable_ExtraWrite"
-            workload: "elle-append elle-write-read"
-            nemesis: "none partition packet clock crash"
-            enable-group-commit: false
-            isolation_level: "serializable"
-            consistency_model: "strict-serializable"
-            serializable_strategy: "extra-write"
-          - name: "Serializable_2PC_ExtraRead"
+          - name: "Serializable_2PC"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable-group-commit: false
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
-            serializable_strategy: "extra-read"
-          - name: "Serializable_2PC_ExtraWrite"
-            workload: "elle-append-2pc elle-write-read-2pc"
-            nemesis: "none partition packet clock crash"
-            enable-group-commit: false
-            isolation_level: "serializable"
-            consistency_model: "strict-serializable"
-            serializable_strategy: "extra-write"
           - name: "GroupCommit"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable-group-commit: true
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
-            serializable_strategy: "extra-read"
 
     steps:
     - uses: actions/checkout@v4
@@ -177,7 +152,6 @@ jobs:
         done
         OPTS+=" --isolation-level ${{ matrix.tests.isolation_level }}"
         OPTS+=" --consistency-model ${{ matrix.tests.consistency_model }}"
-        OPTS+=" --serializable-strategy ${{ matrix.tests.serializable_strategy }}"
         if [ "${{ matrix.tests.enable-group-commit }}" = "true" ]; then
           OPT+=" --enable-group-commit"
         fi
