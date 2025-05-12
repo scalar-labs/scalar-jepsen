@@ -60,11 +60,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # Need ssh to the localhost
-    - name: Install SSH server
+    # Need ssh to the localhost and graphviz
+    - name: Install packages
       run: |
         sudo apt update
-        sudo apt install -y openssh-server
+        sudo apt install -y openssh-server graphviz
 
     - name: Enable ssh for runner user
       run: |
