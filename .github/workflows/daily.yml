@@ -1,4 +1,4 @@
-name: Daily ScalarDB cluster test
+name: Daily ScalarDB Cluster test
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   daily-cluster:
-    name: "Daily ScalarDB cluster test"
+    name: "Daily ScalarDB Cluster test"
 
     runs-on: ubuntu-latest
 
@@ -225,7 +225,7 @@ jobs:
   #        done
 
   #        echo "message<<EOF" >> $GITHUB_OUTPUT
-  #        echo ":white_check_mark: *ScalarDB cluster tests completed*" >> $GITHUB_OUTPUT
+  #        echo ":white_check_mark: *ScalarDB Cluster tests completed*" >> $GITHUB_OUTPUT
   #        echo "" >> $GITHUB_OUTPUT
   #        echo "*Success:*" >> $GITHUB_OUTPUT
   #        echo -e "$successes" >> $GITHUB_OUTPUT

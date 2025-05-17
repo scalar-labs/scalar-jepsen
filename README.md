@@ -61,12 +61,12 @@ $ cd ${SCALAR_JEPSEN}/cassandra
 $ lein run test --workload lwt --ssh-private-key ~/.ssh/id_rsa
 ```
 
-# Run ScalarDB cluster test
+# Run ScalarDB Cluster test
 This test runs against a Kubernetes cluster and requires `kind` (or a similar tool), `helm`, and `kubectl` to be installed beforehand.
 
 The test will attempt to SSH into a machine where the Kubernetes cluster is deployed, so SSH access must be properly configured in advance.
 
-Below is an example command to run the ScalarDB cluster test:
+Below is an example command to run the ScalarDB Cluster test:
 ```sh
 lein with-profile cluster run test --workload transfer --db cluster \
     --nodes ${KUBERNETES_CLUSTER_HOST} \
@@ -76,6 +76,6 @@ lein with-profile cluster run test --workload transfer --db cluster \
 ```
   - `KUBERNETES_CLUSTER_HOST`: The IP address or hostname of the machine running the Kubernetes cluster.
   - `USER`: The SSH username used to connect to the Kubernetes cluster host. If needed, `--password` or `--ssh-private-key` can be added.
-  - `GITHUB_USER`: Your GitHub username, used to authenticate with ghcr.io for pulling the ScalarDB cluster Docker image.
+  - `GITHUB_USER`: Your GitHub username, used to authenticate with ghcr.io for pulling the ScalarDB Cluster Docker image.
   - `GITHUB_ACCESS_TOKEN`: A GitHub access token with permissions to pull images from ghcr.io.
   - Other parameters are the same as tests with regular ScalarDB tests

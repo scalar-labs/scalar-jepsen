@@ -269,7 +269,7 @@
                            :color "#A0E9E3"}}}))
 
 (defn nemesis-package
-  "Nemeses for ScalarDB cluster"
+  "Nemeses for ScalarDB Cluster"
   [db interval faults]
   (let [opts {:db db
               :interval interval

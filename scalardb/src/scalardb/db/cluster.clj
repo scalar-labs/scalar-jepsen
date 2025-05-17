@@ -34,19 +34,10 @@
                ;; Storage configurations
                "scalar.db.storage=jdbc"
                "scalar.db.contact_points=jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
-               "scalar.db.username=${env:SCALAR_DB_CLUSTER_POSTGRES_USERNAME}"
-               "scalar.db.password=${env:SCALAR_DB_CLUSTER_POSTGRES_PASSWORD}"
-               ""
-               ;; For ScalarDB Cluster GraphQL
-               "scalar.db.graphql.enabled=false"
-               ;; For ScalarDB Cluster SQL
-               "scalar.db.sql.enabled=false"])
+               "scalar.db.username=postgres"
+               "scalar.db.password=postgres"])
 
-    :graphql {:enabled false
-              :service {:type "LoadBalancer"}}
-
-    :imagePullSecrets [{:name "scalardb-ghcr-secret"}]
-    :secretName "scalardb-credentials-secret"}})
+    :imagePullSecrets [{:name "scalardb-ghcr-secret"}]}})
 
 (defn- install!
   "Install prerequisites.
@@ -72,15 +63,7 @@
     (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
             "--docker-server=ghcr.io"
             (str "--docker-username=" (:docker-username test))
-            (str "--docker-password=" (:docker-access-token test)))
-    (try
-      (c/exec :kubectl :delete :secret "scalardb-credentials-secret")
-      ;; ignore the failure when the secret doesn't exist
-      (catch Exception _))
-    (c/exec :kubectl :create :secret :generic "scalardb-credentials-secret"
-            "--from-literal=SCALAR_DB_CLUSTER_POSTGRES_USERNAME=postgres"
-            "--from-literal=SCALAR_DB_CLUSTER_POSTGRES_PASSWORD=postgres"
-            :-n "default"))
+            (str "--docker-password=" (:docker-access-token test))))
 
   ;; Chaos Mesh
   (try
@@ -99,7 +82,7 @@
    :--set "service.type=LoadBalancer"
    :--set "primary.service.type=LoadBalancer")
 
-  ;; ScalarDB cluster
+  ;; ScalarDB Cluster
   (let [version (env :scalardb-cluster-version)
         chart-version (->> (c/exec :helm :search
                                    :repo "scalar-labs/scalardb-cluster" :-l)
@@ -199,7 +182,7 @@
                        {:causes "Some pod couldn't start"}))))))
 
 (defn db
-  "Setup ScalarDB cluster."
+  "Setup ScalarDB Cluster."
   []
   (reify
     db/DB
