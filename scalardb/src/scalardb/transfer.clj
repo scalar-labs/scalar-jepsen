@@ -139,25 +139,21 @@
     (.commit tx)
     result))
 
-(defn- read-record-with-retry
-  [test id]
+(defn read-all-with-retry
+  [test n]
+  (scalar/check-transaction-connection! test)
+  (scalar/check-storage-connection! test)
   (scalar/with-retry
     (fn [test]
       (scalar/prepare-transaction-service! test)
       (scalar/prepare-storage-service! test))
     test
     (try
-      (read-record test id)
+      (mapv #(read-record test %) (range n))
       (catch Exception e
         ;; Read failure or the transaction conflicted
         (warn (.getMessage e))
         nil))))
-
-(defn read-all-with-retry
-  [test n]
-  (scalar/check-transaction-connection! test)
-  (scalar/check-storage-connection! test)
-  (doall (map #(read-record-with-retry test %) (range n))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client

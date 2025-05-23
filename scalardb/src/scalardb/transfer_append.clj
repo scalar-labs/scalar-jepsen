@@ -140,20 +140,18 @@
     (.commit tx)
     results))
 
-(defn- scan-records-with-retry
-  [test id]
-  (scalar/with-retry scalar/prepare-transaction-service! test
+(defn scan-all-records-with-retry
+  [test n]
+  (scalar/check-transaction-connection! test)
+  (scalar/with-retry
+    scalar/prepare-transaction-service!
+    test
     (try
-      (scan-records test id)
+      (mapv #(scan-records test %) (range n))
       (catch Exception e
         ;; Scan failure or the transaction conflicted
         (warn (.getMessage e))
         nil))))
-
-(defn scan-all-records-with-retry
-  [test n]
-  (scalar/check-transaction-connection! test)
-  (doall (map #(scan-records-with-retry test %) (range n))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
