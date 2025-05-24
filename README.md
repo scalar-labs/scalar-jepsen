@@ -78,4 +78,4 @@ lein with-profile cluster run test --workload transfer --db cluster \
   - `USER`: The SSH username used to connect to the Kubernetes cluster host. If needed, `--password` or `--ssh-private-key` can be added.
   - `GITHUB_USER`: Your GitHub username, used to authenticate with ghcr.io for pulling the ScalarDB Cluster Docker image.
   - `GITHUB_ACCESS_TOKEN`: A GitHub access token with permissions to pull images from ghcr.io.
-  - Other parameters are the same as tests with regular ScalarDB tests
+  - All other parameters match those used in standard ScalarDB tests
