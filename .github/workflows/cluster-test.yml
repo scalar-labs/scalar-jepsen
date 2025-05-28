@@ -1,0 +1,164 @@
+name: ScalarDB Cluster Test (dispatch)
+
+on:
+  workflow_dispatch:
+    inputs:
+      time_limit:
+        description: 'Test duration in second'
+        required: true
+        type: number
+      workload:
+        description: 'Test workload'
+        required: true
+        type: choice
+        options:
+          - transfer
+          - transfer-2pc
+          - transfer-append
+          - transfer-append-2pc
+          - elle-append
+          - elle-append-2pc
+          - elle-write-read
+          - elle-write-read-2pc
+      nemesis:
+        description: 'Injected fault. No fault will not be injected if `none`.'
+        type: choice
+        default: none
+        options:
+          - pause
+          - crash
+          - partition
+          - packet
+          - clock
+      enable_group_commit:
+        description: 'Enable Group commit if true'
+        default: false
+        type: boolean
+      isolation_level:
+        description: 'Isolation level'
+        type: choice
+        default: snapshot
+        options:
+          - snapshot
+          - serializable
+      consistency_model:
+        description: 'Cosnsistency model for Jepsen checking'
+        type: choice
+        default: snapshot-isolation
+        options:
+          - snapshot-isolation
+          - strict-serializable
+
+jobs:
+  cluster:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Need ssh to the localhost
+    - name: Install SSH server
+      run: |
+        sudo apt update
+        sudo apt install -y openssh-server
+
+    - name: Enable ssh for runner user
+      run: |
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ""
+        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+        chmod 600 ~/.ssh/authorized_keys
+        sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+        sudo sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+        sudo service ssh restart
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Install leiningen
+      uses: DeLaGuardo/setup-clojure@13.0
+      with:
+        lein: latest
+
+    - name: Cache m2 repository
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Set up Kind cluster
+      uses: helm/kind-action@v1.12.0
+      with:
+        cluster_name: test-cluster
+
+    - name: Install MetalLB
+      run: |
+        kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
+        kubectl wait --namespace metallb-system \
+          --for=condition=Ready pods \
+          --selector=app=metallb \
+          --timeout=90s
+
+        NET=$(docker network inspect kind | jq -r '.[0].IPAM.Config[] | select(.Subnet | test("^fc00") | not) | .Subnet')
+        echo "IPv4 Subnet: $NET"
+
+        PREFIX=$(echo "$NET" | cut -d. -f1-2)
+        IP_RANGE="${PREFIX}.255.200-${PREFIX}.255.250"
+
+        cat <<EOF | kubectl apply -f -
+        apiVersion: metallb.io/v1beta1
+        kind: IPAddressPool
+        metadata:
+          name: kind-pool
+          namespace: metallb-system
+        spec:
+          addresses:
+            - $IP_RANGE
+        ---
+        apiVersion: metallb.io/v1beta1
+        kind: L2Advertisement
+        metadata:
+          name: l2adv
+          namespace: metallb-system
+        EOF
+
+    - name: Install dependencies
+      run: |
+        cd cassandra
+        lein install
+
+    - name: ScalarDB Cluster test
+      run: |
+        cd scalardb
+        OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
+        OPTS+=" --workload ${{ github.event.inputs.workload }}"
+        OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
+        OPTS+=" --isolation-level ${{ github.event.inputs.isolation_level }}"
+        OPTS+=" --consistency-model ${{ github.event.inputs.consistency_model }}"
+        if [ "${{ github.event.inputs.enable_group_commit }}" = "true" ]; then
+          OPTS+=" --enable-group-commit"
+        fi
+        lein with-profile cluster run test \
+          --nodes localhost \
+          --db cluster \
+          --concurrency 5 \
+          --username runner \
+          --ssh-private-key ~/.ssh/id_rsa \
+          --docker-username ${{ github.repository_owner }} \
+          --docker-access-token ${{ secrets.CR_PAT }} \
+          ${OPTS}
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: jepsen-logs
+        path: scalardb/store

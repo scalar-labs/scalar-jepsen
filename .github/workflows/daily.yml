@@ -17,43 +17,43 @@ jobs:
           - name: "Transfers_SI"
             workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: false
+            enable_group_commit: false
             isolation_level: "snapshot"
             consistency_model: "snapshot-isolation"
           - name: "Transfers_2PC_SI"
             workload: "transfer-2pc transfer-append-2pc"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: false
+            enable_group_commit: false
             isolation_level: "snapshot"
             consistency_model: "snapshot-isolation"
           - name: "RCSI"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: false
+            enable_group_commit: false
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
           - name: "RCSI_2PC"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: false
+            enable_group_commit: false
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
           - name: "Serializable"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: false
+            enable_group_commit: false
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
           - name: "Serializable_2PC"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: false
+            enable_group_commit: false
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
           - name: "GroupCommit"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
-            enable-group-commit: true
+            enable_group_commit: true
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
 
@@ -141,6 +141,7 @@ jobs:
         lein install
 
     - name: ${{ matrix.tests.name }}
+      id: test-run
       run: |
         cd scalardb
         OPTS=""
@@ -152,8 +153,8 @@ jobs:
         done
         OPTS+=" --isolation-level ${{ matrix.tests.isolation_level }}"
         OPTS+=" --consistency-model ${{ matrix.tests.consistency_model }}"
-        if [ "${{ matrix.tests.enable-group-commit }}" = "true" ]; then
-          OPT+=" --enable-group-commit"
+        if [ "${{ matrix.tests.enable_group_commit }}" = "true" ]; then
+          OPTS+=" --enable-group-commit"
         fi
         lein with-profile cluster run test \
           --time-limit 600 \
@@ -169,7 +170,7 @@ jobs:
     - name: Record result
       if: always()
       run: |
-        echo "${{ matrix.tests.name }}:${{ job.status }}" >> result.txt
+        echo "${{ matrix.tests.name }}:${{ steps.test-run.outcome }}" >> result.txt
 
     - name: Upload result
       uses: actions/upload-artifact@v4
