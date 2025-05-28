@@ -22,7 +22,7 @@
                                                          com.azure/azure-cosmos
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
-             :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "3.15.3"
+             :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "4.0.0-SNAPSHOT"
                                        ;; avoid the netty dependency issue
                                        :exclusions [software.amazon.awssdk/*
                                                     com.oracle.database.jdbc/ojdbc8-production

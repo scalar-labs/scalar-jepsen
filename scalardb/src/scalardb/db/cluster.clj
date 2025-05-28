@@ -10,6 +10,7 @@
   (:import (java.io File)))
 
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
+(def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "3.15.3")
 (def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.1")
 
 (def ^:private ^:const TIMEOUT_SEC 600)
@@ -83,7 +84,8 @@
    :--set "primary.service.type=LoadBalancer")
 
   ;; ScalarDB Cluster
-  (let [version (env :scalardb-cluster-version)
+  (let [version (or (some-> (env :scalardb-cluster-version) not-empty)
+                    DEFAULT_SCALARDB_CLUSTER_VERSION)
         chart-version (->> (c/exec :helm :search
                                    :repo "scalar-labs/scalardb-cluster" :-l)
                            str/split-lines

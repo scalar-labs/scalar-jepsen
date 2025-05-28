@@ -3,6 +3,10 @@ name: ScalarDB Cluster Test (dispatch)
 on:
   workflow_dispatch:
     inputs:
+      scalardb_cluster_version:
+        description: 'ScalarDB Cluster version'
+        type: string
+        default: "3.15.3"
       time_limit:
         description: 'Test duration in second'
         required: true
@@ -52,6 +56,9 @@ on:
 jobs:
   cluster:
     runs-on: ubuntu-latest
+
+    env:
+      SCALARDB_CLUSTER_VERSION: ${{ github.event.inputs.scalardb_cluster_version }}
 
     steps:
     - uses: actions/checkout@v4
