@@ -22,13 +22,13 @@
                                                          com.azure/azure-cosmos
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
-             :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "3.15.2"
+             :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "3.15.3"
                                        ;; avoid the netty dependency issue
                                        :exclusions [software.amazon.awssdk/*
                                                     com.oracle.database.jdbc/ojdbc8-production
                                                     com.azure/azure-cosmos
                                                     com.scalar-labs/scalardb-rpc]]]
-                       :env {:scalardb-cluster-version "3.15.2"}
+                       :env {:scalardb-cluster-version "3.15.3"}
                        :plugins [[lein-environ "1.2.0"]]}
              :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]
                                        [org.apache.commons/commons-text "1.10.0"]]

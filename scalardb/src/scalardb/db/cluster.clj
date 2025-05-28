@@ -1,7 +1,7 @@
 (ns scalardb.db.cluster
   (:require [clj-yaml.core :as yaml]
             [clojure.string :as str]
-            [clojure.tools.logging :refer [info]]
+            [clojure.tools.logging :refer [info warn]]
             [environ.core :refer [env]]
             [jepsen
              [control :as c]
@@ -160,7 +160,7 @@
 
 (defn running-pods?
   "Check a live node."
-  [_test]
+  [test]
   (-> test
       :nodes
       first
@@ -169,12 +169,27 @@
       ;; TODO: check the number of pods
       (= 3)))
 
+(defn- cluster-nodes-ready?
+  [test]
+  (and (running-pods? test)
+       (try
+         (c/on (-> test :nodes first)
+               (->> (get-pod-list CLUSTER_NODE_NAME)
+                    (mapv #(c/exec :kubectl :wait
+                                   "--for=condition=Ready"
+                                   "--timeout=120s"
+                                   (str "pod/" %)))))
+         true
+         (catch Exception e
+           (warn (.getMessage e))
+           false))))
+
 (defn wait-for-recovery
   "Wait for the node bootstrapping."
   ([test]
    (wait-for-recovery TIMEOUT_SEC INTERVAL_SEC test))
   ([timeout-sec interval-sec test]
-   (when (not (running-pods? test))
+   (when-not (cluster-nodes-ready? test)
      (Thread/sleep (* interval-sec 1000))
      (if (>= timeout-sec interval-sec)
        (wait-for-recovery (- timeout-sec interval-sec) interval-sec test)
