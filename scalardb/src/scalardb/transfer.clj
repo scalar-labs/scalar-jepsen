@@ -127,39 +127,34 @@
         (scalar/try-reconnection! test scalar/prepare-transaction-service!)
         (assoc op :type :fail :error {:results results})))))
 
-(defn- read-record
-  "Read and update the specified record with a transaction"
-  [test id]
-  (let [tx (scalar/start-transaction test)
-        tx-result (.get tx (prepare-get id))
-        ;; Need Storage API to read the transaction metadata
-        result (.get @(:storage test) (prepare-get id))]
-    ;; Put the same balance to check conflicts with in-flight transactions
-    (->> (calc-new-balance tx-result 0)
-         (prepare-put id)
-         (.put tx))
-    (.commit tx)
-    result))
-
-(defn- read-record-with-retry
-  [test id]
-  (scalar/with-retry
-    (fn [test]
-      (scalar/prepare-transaction-service! test)
-      (scalar/prepare-storage-service! test))
-    test
-    (try
-      (read-record test id)
-      (catch Exception e
-        ;; Read failure or the transaction conflicted
-        (warn (.getMessage e))
-        nil))))
+(defn- read-all
+  "Read and update the all records with a transaction"
+  [test n]
+  (try
+    (let [tx (scalar/start-transaction test)
+          tx-results (map #(.get tx (prepare-get %)) (range n))
+          ;; Need Storage API to read the transaction metadata
+          results (mapv #(.get @(:storage test) (prepare-get %)) (range n))]
+      ;; Put the same balance to check conflicts with in-flight transactions
+      (mapv #(->> (calc-new-balance %2 0) (prepare-put %1) (.put tx))
+            (range n)
+            tx-results)
+      (.commit tx)
+      results)
+    (catch Exception e
+      (warn "read-all failed:" (.getMessage e))
+      nil)))
 
 (defn read-all-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
   (scalar/check-storage-connection! test)
-  (doall (map #(read-record-with-retry test %) (range n))))
+  (scalar/with-retry
+    (fn [test]
+      (scalar/prepare-transaction-service! test)
+      (scalar/prepare-storage-service! test))
+    test
+    (read-all test n)))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client

@@ -129,33 +129,32 @@
         :fail))
     :start-fail))
 
-(defn- scan-records
-  "Scan records and append a new record with a transaction"
-  [test id]
-  (let [tx (scalar/start-transaction test)
-        results (.scan tx (prepare-scan id))]
-    ;; Put the same balance to check conflicts with in-flight transactions
-    (->> (prepare-put id
-                      (-> results first calc-new-age)
-                      (-> results first (calc-new-balance 0)))
-         (.put tx))
-    (.commit tx)
-    results))
-
-(defn- scan-records-with-retry
-  [test id]
-  (scalar/with-retry scalar/prepare-transaction-service! test
-    (try
-      (scan-records test id)
-      (catch Exception e
-        ;; Scan failure or the transaction conflicted
-        (warn (.getMessage e))
-        nil))))
+(defn- scan-all-records
+  "Scan all records and append new records with a transaction"
+  [test n]
+  (try
+    (let [tx (scalar/start-transaction test)
+          results (map #(.scan tx (prepare-scan %)) (range n))]
+      ;; Put the same balance to check conflicts with in-flight transactions
+      (mapv #(->> (prepare-put %1
+                               (-> %2 first calc-new-age)
+                               (-> %2 first (calc-new-balance 0)))
+                  (.put tx))
+            (range n)
+            results)
+      (.commit tx)
+      results)
+    (catch Exception e
+      (warn "scan-all failed:" (.getMessage e))
+      nil)))
 
 (defn scan-all-records-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
-  (doall (map #(scan-records-with-retry test %) (range n))))
+  (scalar/with-retry
+    scalar/prepare-transaction-service!
+    test
+    (scan-all-records test n)))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client
