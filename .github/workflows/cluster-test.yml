@@ -166,7 +166,7 @@ jobs:
 
     - name: Check test result
       run: |
-        if grep -q "Everything looks good!" scalardb/store/jepsen.log; then
+        if grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
           echo "Test passed"
         else
           echo "Test failed"
