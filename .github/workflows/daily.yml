@@ -141,7 +141,6 @@ jobs:
         lein install
 
     - name: ${{ matrix.tests.name }}
-      id: test-run
       run: |
         cd scalardb
         OPTS=""
@@ -170,7 +169,11 @@ jobs:
     - name: Record result
       if: always()
       run: |
-        echo "${{ matrix.tests.name }}:${{ steps.test-run.outcome }}" >> result.txt
+        if grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
+          echo "${{ matrix.tests.name }}:success" >> result.txt
+        else
+          echo "${{ matrix.tests.name }}:failure" >> result.txt
+        fi
 
     - name: Upload result
       uses: actions/upload-artifact@v4

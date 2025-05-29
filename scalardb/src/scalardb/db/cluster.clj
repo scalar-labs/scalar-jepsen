@@ -10,7 +10,8 @@
   (:import (java.io File)))
 
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
-(def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "3.15.3")
+(def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "4.0.0-SNAPSHOT")
+(def ^:private ^:const DEFAULT_HELM_CHART_VERSION "1.7.2")
 (def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.1")
 
 (def ^:private ^:const TIMEOUT_SEC 600)
@@ -23,7 +24,9 @@
            :service {:type "LoadBalancer"}}
 
    :scalardbCluster
-   {:image {:repository "ghcr.io/scalar-labs/scalardb-cluster-node"}
+   {:image {:repository "ghcr.io/scalar-labs/scalardb-cluster-node"
+            :tag (or (some-> (env :scalardb-cluster-version) not-empty)
+                     DEFAULT_SCALARDB_CLUSTER_VERSION)}
 
     :scalardbClusterNodeProperties
     (str/join "\n"
@@ -84,15 +87,8 @@
    :--set "primary.service.type=LoadBalancer")
 
   ;; ScalarDB Cluster
-  (let [version (or (some-> (env :scalardb-cluster-version) not-empty)
-                    DEFAULT_SCALARDB_CLUSTER_VERSION)
-        chart-version (->> (c/exec :helm :search
-                                   :repo "scalar-labs/scalardb-cluster" :-l)
-                           str/split-lines
-                           (filter #(str/includes? % version))
-                           (map #(nth (str/split % #"\s+") 1))
-                           (sort #(compare %2 %1))
-                           first)]
+  (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
+                          DEFAULT_HELM_CHART_VERSION)]
     (info "helm chart version:" chart-version)
     (binding [c/*dir* (System/getProperty "user.dir")]
       (spit CLUSTER_VALUES_YAML (yaml/generate-string CLUSTER_VALUES))

@@ -164,7 +164,17 @@ jobs:
           --docker-access-token ${{ secrets.CR_PAT }} \
           ${OPTS}
 
+    - name: Check test result
+      run: |
+        if grep -q "Everything looks good!" scalardb/store/jepsen.log; then
+          echo "Test passed"
+        else
+          echo "Test failed"
+          exit 1
+        fi
+
     - name: Upload logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: jepsen-logs

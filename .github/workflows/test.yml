@@ -127,3 +127,19 @@ jobs:
       run: |
         cd scalardb
         lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --username runner --ssh-private-key ~/.ssh/id_rsa --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --nemesis crash
+
+    - name: Check test result
+      run: |
+        if grep -q "Everything looks good!" scalardb/store/jepsen.log; then
+          echo "Test passed"
+        else
+          echo "Test failed"
+          exit 1
+        fi
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: jepsen-logs
+        path: scalardb/store
