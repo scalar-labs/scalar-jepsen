@@ -6,7 +6,7 @@ on:
       scalardb_cluster_version:
         description: 'ScalarDB Cluster version'
         type: string
-        default: "3.15.3"
+        default: "4.0.0-SNAPSHOT"
       time_limit:
         description: 'Test duration in second'
         required: true
