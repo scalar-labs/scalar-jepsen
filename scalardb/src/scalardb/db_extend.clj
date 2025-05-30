@@ -1,7 +1,9 @@
 (ns scalardb.db-extend
   (:require [cassandra.core :as cassandra]
             [clojure.string :as string]
+            [jepsen.control :as c]
             [jepsen.db :as db]
+            [scalardb.db.cluster :as cluster]
             [scalardb.db.postgres :as postgres])
   (:import (com.scalar.db.storage.cassandra CassandraAdmin
                                             CassandraAdmin$ReplicationStrategy
@@ -33,13 +35,16 @@
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled" "true")))
 
 (defprotocol DbExtension
+  (get-db-type [this])
   (live-nodes [this test])
   (wait-for-recovery [this test])
   (create-table-opts [this test])
-  (create-properties [this test]))
+  (create-properties [this test])
+  (create-storage-properties [this test]))
 
 (defrecord ExtCassandra []
   DbExtension
+  (get-db-type [_] :cassandra)
   (live-nodes [_ test] (cassandra/live-nodes test))
   (wait-for-recovery [_ test] (cassandra/wait-rf-nodes test))
   (create-table-opts
@@ -61,10 +66,12 @@
                                (string/join "," nodes))
                  (.setProperty "scalar.db.username" "cassandra")
                  (.setProperty "scalar.db.password" "cassandra"))
-               (set-common-properties test))))))
+               (set-common-properties test)))))
+  (create-storage-properties [this test] (create-properties this test)))
 
 (defrecord ExtPostgres []
   DbExtension
+  (get-db-type [_] :postgres)
   (live-nodes [_ test] (postgres/live-node? test))
   (wait-for-recovery [_ test] (postgres/wait-for-recovery test))
   (create-table-opts [_ _] {})
@@ -79,11 +86,42 @@
                                (str "jdbc:postgresql://" node ":5432/"))
                  (.setProperty "scalar.db.username" "postgres")
                  (.setProperty "scalar.db.password" "postgres"))
-               (set-common-properties test))))))
+               (set-common-properties test)))))
+  (create-storage-properties [this test] (create-properties this test)))
+
+(defrecord ExtCluster []
+  DbExtension
+  (get-db-type [_] :cluster)
+  (live-nodes [_ test] (cluster/running-pods? test))
+  (wait-for-recovery [_ test] (cluster/wait-for-recovery test))
+  (create-table-opts [_ _] {})
+  (create-properties
+    [_ test]
+    (or (load-config test)
+        (let [node (-> test :nodes first)
+              ip (c/on node (cluster/get-load-balancer-ip))]
+          (->> (doto (Properties.)
+                 (.setProperty "scalar.db.transaction_manager" "cluster")
+                 (.setProperty "scalar.db.contact_points"
+                               (str "indirect:" ip))
+                 (.setProperty "scalar.db.sql.connection_mode" "cluster")
+                 (.setProperty "scalar.db.sql.cluster_mode.contact_points"
+                               (str "indirect:" ip)))
+               (set-common-properties test)))))
+  (create-storage-properties [_ _]
+    (let [node (-> test :nodes first)
+          ip (c/on node (cluster/get-postgres-ip))]
+      (doto (Properties.)
+        (.setProperty "scalar.db.storage" "jdbc")
+        (.setProperty "scalar.db.contact_points"
+                      (str "jdbc:postgresql://" ip ":5432/postgres"))
+        (.setProperty "scalar.db.username" "postgres")
+        (.setProperty "scalar.db.password" "postgres")))))
 
 (def ^:private ext-dbs
   {:cassandra (->ExtCassandra)
-   :postgres (->ExtPostgres)})
+   :postgres (->ExtPostgres)
+   :cluster (->ExtCluster)})
 
 (defn extend-db
   [db db-type]
@@ -104,7 +142,11 @@
       db/LogFiles
       (log-files [_ test node] (db/log-files db test node))
       DbExtension
+      (get-db-type [_] (get-db-type ext-db))
       (live-nodes [_ test] (live-nodes ext-db test))
       (wait-for-recovery [_ test] (wait-for-recovery ext-db test))
       (create-table-opts [_ test] (create-table-opts ext-db test))
-      (create-properties [_ test] (create-properties ext-db test)))))
+      (create-properties [_ test] (create-properties ext-db test))
+      (create-storage-properties
+        [_ test]
+        (create-storage-properties ext-db test)))))

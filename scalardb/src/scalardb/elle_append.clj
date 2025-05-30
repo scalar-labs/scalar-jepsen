@@ -1,6 +1,6 @@
 (ns scalardb.elle-append
   (:require [clojure.string :as str]
-            [clojure.tools.logging :refer [info]]
+            [clojure.tools.logging :refer [info warn]]
             [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
@@ -97,7 +97,9 @@
         (scalar/prepare-transaction-service! test))))
 
   (invoke! [_ test op]
-    (let [tx (scalar/start-transaction test)
+    (let [tx (try (scalar/start-transaction test)
+                  (catch Exception e
+                    (warn (.getMessage e))))
           [seq-id txn] (:value op)]
       (try
         (when (<= @(:table-id test) seq-id)

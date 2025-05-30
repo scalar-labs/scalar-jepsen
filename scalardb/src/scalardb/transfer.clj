@@ -99,7 +99,9 @@
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]
-  (if-let [tx (scalar/start-transaction test)]
+  (if-let [tx (try (scalar/start-transaction test)
+                   (catch Exception e
+                     (warn (.getMessage e))))]
     (try
       (tx-transfer tx from to amount)
       :commit
@@ -115,7 +117,7 @@
 (defn exec-transfers
   "Execute transfers in parallel. Give the transfer function."
   [test op transfer-fn]
-  (let [results (pmap #(transfer-fn test %) (:value op))]
+  (let [results (doall (pmap #(transfer-fn test %) (:value op)))]
     (if (some #{:commit} results)
       ;; return :ok when at least 1 transaction is committed
       (assoc op :type :ok :value {:results results})

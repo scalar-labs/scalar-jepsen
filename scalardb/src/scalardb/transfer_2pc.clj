@@ -28,8 +28,12 @@
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]
-  (let [tx1 (scalar/start-2pc test)
-        tx2 (scalar/join-2pc test (.getId tx1))]
+  (let [tx1 (try (scalar/start-2pc test)
+                 (catch Exception e
+                   (warn (.getMessage e))))
+        tx2 (try (scalar/join-2pc test (.getId tx1))
+                 (catch Exception e
+                   (warn (.getMessage e))))]
     (try
       (tx-transfer tx1 tx2 from to amount)
       :commit

@@ -88,7 +88,7 @@
   [test schemata]
   (let [properties (ext/create-properties (:db test) test)
         options (ext/create-table-opts (:db test) test)]
-    (if (= (.getProperty properties "scalar.db.username") "cassandra")
+    (if (= (ext/get-db-type (:db test)) :cassandra)
       ;; Workaround the issue of the schema loader for Cassandra
       (setup-cassandra-tables test schemata)
       (doseq [schema (map cheshire/generate-string schemata)]
@@ -147,7 +147,8 @@
   (when-let [properties (ext/create-properties (:db test) test)]
     (try
       (condp = mode
-        :storage (.getStorage (StorageFactory/create properties))
+        :storage (.getStorage (StorageFactory/create
+                               (ext/create-storage-properties (:db test) test)))
         :transaction (.getTransactionManager
                       (TransactionFactory/create properties))
         :2pc (let [factory (TransactionFactory/create properties)]
@@ -155,7 +156,7 @@
                [(.getTwoPhaseCommitTransactionManager factory)
                 (.getTwoPhaseCommitTransactionManager factory)]))
       (catch Exception e
-        (warn (.getMessage e))))))
+        (warn "Failed to create a service instance" mode \: (.getMessage e))))))
 
 (defn- prepare-service!
   [test mode]
