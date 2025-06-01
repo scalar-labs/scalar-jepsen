@@ -85,30 +85,39 @@
 (defn- apply-packet-fault-exp
   [targets behaviour]
   (binding [c/*dir* (System/getProperty "user.dir")]
-    (let [[action params] (first behaviour)
+    (let [[kind params] (first behaviour)
+          action (case kind
+                   :reorder :delay
+                   :rate :netem
+                   kind)
           get-percent-fn #(-> % :percent name (str/replace "%" ""))
           get-correlation-fn #(-> % :correlation name (str/replace "%" ""))
           base {:apiVersion "chaos-mesh.org/v1alpha1"
                 :kind "NetworkChaos"
-                :metadata {:name action :namespace "chaos-mesh"}
+                :metadata {:name kind :namespace "chaos-mesh"}
                 :spec {:action action
                        :mode "all"
                        :selector {:pods {"default" targets}}}}
-          fault-spec (case action
+          fault-spec (case kind
                        :delay {:latency (-> params :time name)
                                :jitter (-> params :jitter name)
-                               :correlation (get-percent-fn params)}
+                               :correlation (get-correlation-fn params)}
                        :loss {:loss (get-percent-fn params)
                               :correlation (get-correlation-fn params)}
                        :corrupt {:corrupt (get-percent-fn params)
                                  :correlation (get-correlation-fn params)}
                        :duplicate {:duplicate (get-percent-fn params)
                                    :correlation (get-correlation-fn params)}
-                       ;; TODO: check how to enable this fault
-                       ;:reorder {:reorder (get-percent-fn params)
-                       ;          :correlation (get-correlation-fn params)}
-                       :rate {:rate (-> params :rate name)})]
-      (->> (assoc-in base [:spec action] fault-spec)
+                       ;; with delay fault
+                       :reorder {:latency (-> net/all-packet-behaviors :delay :time name)
+                                 :jitter (-> net/all-packet-behaviors :delay :jitter name)
+                                 :correlation (-> net/all-packet-behaviors
+                                                  :delay
+                                                  get-correlation-fn)
+                                 :reorder {:reorder (get-percent-fn params)
+                                           :correlation (get-correlation-fn params)}}
+                       :rate {:rate (-> params :rate name (str/replace "bit" "bps"))})]
+      (->> (assoc-in base [:spec (if (= kind :rate) :rate action)] fault-spec)
            yaml/generate-string
            (spit PACKET_FAULT_YAML))
       (info "DEBUG:" (slurp PACKET_FAULT_YAML))

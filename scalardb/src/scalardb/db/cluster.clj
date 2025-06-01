@@ -12,7 +12,7 @@
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
 (def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "4.0.0-SNAPSHOT")
 (def ^:private ^:const DEFAULT_HELM_CHART_VERSION "1.7.2")
-(def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.1")
+(def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.2")
 
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
