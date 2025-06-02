@@ -1,44 +1,64 @@
-name: Test with Docker
+name: ScalarDB Cluster Test (dispatch)
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      scalardb_cluster_version:
+        description: 'ScalarDB Cluster version'
+        type: string
+        default: "4.0.0-SNAPSHOT"
+      time_limit:
+        description: 'Test duration in second'
+        required: true
+        type: number
+      workload:
+        description: 'Test workload'
+        required: true
+        type: choice
+        options:
+          - transfer
+          - transfer-2pc
+          - transfer-append
+          - transfer-append-2pc
+          - elle-append
+          - elle-append-2pc
+          - elle-write-read
+          - elle-write-read-2pc
+      nemesis:
+        description: 'Injected fault. No fault will not be injected if `none`.'
+        type: choice
+        default: none
+        options:
+          - pause
+          - crash
+          - partition
+          - packet
+          - clock
+      enable_group_commit:
+        description: 'Enable Group commit if true'
+        default: false
+        type: boolean
+      isolation_level:
+        description: 'Isolation level'
+        type: choice
+        default: snapshot
+        options:
+          - snapshot
+          - serializable
+      consistency_model:
+        description: 'Cosnsistency model for Jepsen checking'
+        type: choice
+        default: snapshot-isolation
+        options:
+          - snapshot-isolation
+          - strict-serializable
 
 jobs:
-  cassandra-scaladb:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Setup Cache
-      uses: satackey/action-docker-layer-caching@v0.0.11
-      # Ignore the failure of a step and avoid terminating the job.
-      continue-on-error: true
-
-    - name: docker-compose up
-      run: |
-        cd docker
-        docker compose up -d
-
-    - name: Cassandra test
-      run: |
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
-
-    - name: ScalarDB test
-      run: |
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
-
   cluster:
     runs-on: ubuntu-latest
+
+    env:
+      SCALARDB_CLUSTER_VERSION: ${{ github.event.inputs.scalardb_cluster_version }}
 
     steps:
     - uses: actions/checkout@v4
@@ -126,7 +146,23 @@ jobs:
     - name: ScalarDB Cluster test
       run: |
         cd scalardb
-        lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --username runner --ssh-private-key ~/.ssh/id_rsa --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --nemesis crash
+        OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
+        OPTS+=" --workload ${{ github.event.inputs.workload }}"
+        OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
+        OPTS+=" --isolation-level ${{ github.event.inputs.isolation_level }}"
+        OPTS+=" --consistency-model ${{ github.event.inputs.consistency_model }}"
+        if [ "${{ github.event.inputs.enable_group_commit }}" = "true" ]; then
+          OPTS+=" --enable-group-commit"
+        fi
+        lein with-profile cluster run test \
+          --nodes localhost \
+          --db cluster \
+          --concurrency 5 \
+          --username runner \
+          --ssh-private-key ~/.ssh/id_rsa \
+          --docker-username ${{ github.repository_owner }} \
+          --docker-access-token ${{ secrets.CR_PAT }} \
+          ${OPTS}
 
     - name: Check test result
       run: |

@@ -10,7 +10,7 @@
              [cli :as cli]
              [generator :as gen]
              [tests :as tests]]
-            [jepsen.nemesis [combined :as jn]]
+            [jepsen.nemesis.combined :as jn]
             [scalardb
              [core :refer [INITIAL_TABLE_ID]]
              [transfer]
@@ -23,12 +23,15 @@
              [elle-write-read-2pc]
              [db-extend :refer [extend-db]]]
             [scalardb.db
-             [postgres :as postgres]]))
+             [cluster :as cluster]
+             [postgres :as postgres]]
+            [scalardb.nemesis.cluster :as nc]))
 
 (def db-keys
   "The map of test DBs."
   {"cassandra" :cassandra
-   "postgres" :postgres})
+   "postgres" :postgres
+   "cluster" :cluster})
 
 (defn- gen-db
   "Returns [extended-db constructed-nemesis num-max-nodes]."
@@ -64,6 +67,8 @@
                    :kill {:targets [:one]}
                    :pause {:targets [:one]}})
                  1])
+    :cluster (let [db (extend-db (cluster/db) :cluster)]
+               [db (nc/nemesis-package db 60 faults) 1])
     (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
@@ -122,7 +127,13 @@
 
    [nil "--config-file CONFIG_FILE"
     "ScalarDB config file. When this is given, other configuration options are ignored."
-    :default ""]])
+    :default ""]
+
+   [nil "--docker-username DOCKER_USERNAME"
+    "Username to pull ScalarDB Cluster node image in ghcr.io."
+    :default ""]
+   [nil "--docker-access-token DOCKER_ACCESS_TOKEN"
+    "Access token to pull ScalarDB Cluster node image in ghcr.io."]])
 
 (defn- test-name
   [workload-key faults admin]
