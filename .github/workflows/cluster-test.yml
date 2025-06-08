@@ -29,13 +29,14 @@ on:
         type: choice
         default: none
         options:
+          - none
           - pause
           - crash
           - partition
           - packet
           - clock
       enable_group_commit:
-        description: 'Enable Group commit if true'
+        description: 'Enable Group commit'
         default: false
         type: boolean
       isolation_level:
