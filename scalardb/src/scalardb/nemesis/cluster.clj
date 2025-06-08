@@ -136,17 +136,29 @@
   []
   (delete-chaos-exp POD_FAULT_YAML))
 
-(defn delete-partition-exp
-  []
-  (delete-chaos-exp PARTITION_YAML))
-
-(defn delete-packet-fault-exp
-  []
-  (delete-chaos-exp PACKET_FAULT_YAML))
-
 (defn delete-time-fault-exp
   [pod-names]
   (mapv #(-> % time-fault-yaml delete-chaos-exp) pod-names))
+
+(defn- force-delete-network-fault-exp
+  [yaml-path]
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (let [file (File. yaml-path)]
+      (when (.exists file)
+        (let [action (-> yaml-path slurp yaml/parse-string :spec :action)]
+          (c/exec :kubectl :patch "networkchaos" action
+                  :-n "chaos-mesh"
+                  :-p "{\"metadata\":{\"finalizers\":[]}}"
+                  :--type "merge"))
+        (.delete file)))))
+
+(defn delete-partition-exp
+  []
+  (force-delete-network-fault-exp PARTITION_YAML))
+
+(defn delete-packet-fault-exp
+  []
+  (force-delete-network-fault-exp PACKET_FAULT_YAML))
 
 (defn- apply-time-fault-exp
   [target delta-ms]
