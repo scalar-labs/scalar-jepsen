@@ -11,9 +11,6 @@
            (java.io FileInputStream)
            (java.util Properties)))
 
-(def ^:private ISOLATION_LEVELS {:snapshot "SNAPSHOT"
-                                 :serializable "SERIALIZABLE"})
-
 (defn- load-config
   [test]
   (when-let [path (and (seq (:config-file test)) (:config-file test))]
@@ -26,7 +23,7 @@
   [test properties]
   (doto properties
     (.setProperty "scalar.db.consensus_commit.isolation_level"
-                  ((:isolation-level test) ISOLATION_LEVELS))
+                  (-> test :isolation-level name string/upper-case))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.enabled"
                   (str (:enable-group-commit test)))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.slot_capacity" "4")

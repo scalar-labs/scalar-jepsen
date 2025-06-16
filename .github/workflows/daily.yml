@@ -176,12 +176,14 @@ jobs:
         fi
 
     - name: Upload result
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: result-${{ matrix.tests.name }}
         path: result.txt
 
     - name: Upload logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: logs-${{ matrix.tests.name }}

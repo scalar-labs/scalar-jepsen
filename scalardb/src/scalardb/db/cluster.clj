@@ -43,6 +43,15 @@
 
     :imagePullSecrets [{:name "scalardb-ghcr-secret"}]}})
 
+(defn- update-cluster-values
+  [test values]
+  (let [path [:scalardbCluster :scalardbClusterNodeProperties]
+        new-db-props (-> values
+                         (get-in path)
+                         (str "\nscalar.db.consensus_commit.isolation_level="
+                              (-> test :isolation-level name str/upper-case)))]
+    (assoc-in values path new-db-props)))
+
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
@@ -76,7 +85,7 @@
       (c/exec :kubectl :create :ns "chaos-mesh"))))
 
 (defn- start!
-  []
+  [test]
   ;; postgre
   (c/exec
    :helm :install "postgresql-scalardb-cluster" "bitnami/postgresql"
@@ -91,7 +100,10 @@
                           DEFAULT_HELM_CHART_VERSION)]
     (info "helm chart version:" chart-version)
     (binding [c/*dir* (System/getProperty "user.dir")]
-      (spit CLUSTER_VALUES_YAML (yaml/generate-string CLUSTER_VALUES))
+      (->> CLUSTER_VALUES
+           (update-cluster-values test)
+           yaml/generate-string
+           (spit CLUSTER_VALUES_YAML))
       (c/exec :helm :install "scalardb-cluster" "scalar-labs/scalardb-cluster"
               :-f CLUSTER_VALUES_YAML
               :--version chart-version
@@ -204,7 +216,7 @@
         (wipe!))
       (install!)
       (configure! test)
-      (start!)
+      (start! test)
       ;; wait for the pods
       (wait-for-recovery test))
 
