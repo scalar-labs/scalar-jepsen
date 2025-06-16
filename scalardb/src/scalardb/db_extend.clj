@@ -11,7 +11,8 @@
            (java.io FileInputStream)
            (java.util Properties)))
 
-(def ^:private ISOLATION_LEVELS {:snapshot "SNAPSHOT"
+(def ^:private ISOLATION_LEVELS {:read-committed "READ_COMMITTED"
+                                 :snapshot "SNAPSHOT"
                                  :serializable "SERIALIZABLE"})
 
 (defn- load-config

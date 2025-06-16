@@ -115,8 +115,8 @@
    [nil "--isolation-level ISOLATION_LEVEL" "isolation level"
     :default :snapshot
     :parse-fn keyword
-    :validate [#{:snapshot :serializable}
-               "Should be one of snapshot or serializable"]]
+    :validate [#{:read-committed :snapshot :serializable}
+               "Should be one of read-committed, snapshot, or serializable"]]
 
    (cli/repeated-opt nil "--consistency-model CONSISTENCY_MODEL"
                      "consistency model to be checked"
