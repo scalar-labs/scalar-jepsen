@@ -35,6 +35,6 @@
                                        [org.apache.commons/commons-text "1.13.0"]]
                         :resource-paths ["resources/scalardb.jar"]}
              :default [:base :system :user :provided :dev :use-released]}
-  :jvm-opts ["-Djava.awt.headless=true"]
+  :jvm-opts ["-Djava.awt.headless=true" "-Xmx4g"]
   :main scalardb.runner
   :aot [scalardb.runner])

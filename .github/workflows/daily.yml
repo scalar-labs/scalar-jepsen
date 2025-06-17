@@ -189,61 +189,57 @@ jobs:
         name: logs-${{ matrix.tests.name }}
         path: scalardb/store
 
-  # Disable the notification until the tests work well
-  #notify-slack:
-  #  name: Notify Slack
-  #  if: always()
-  #  needs: daily-cluster
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #    - name: Install GitHub CLI
-  #      run: sudo apt-get install -y gh
+  notify-slack:
+    name: Notify Slack
+    if: always()
+    needs: daily-cluster
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
 
-  #    - name: Download result artifacts only
-  #      env:
-  #        GH_TOKEN: ${{ secrets.GH_PAT }}
-  #      run: |
-  #        mkdir -p results
-  #        gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-  #          --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
-  #          while read name; do
-  #            echo "Downloading $name"
-  #            gh run download ${{ github.run_id }} -n "$name" -D results
-  #          done
+      - name: Download result artifacts only
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          mkdir -p results
+          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
+            while read name; do
+              echo "Downloading $name"
+              gh run download ${{ github.run_id }} -n "$name" -D results
+            done
 
-  #    - name: Generate Slack message
-  #      id: message
-  #      run: |
-  #        successes=""
-  #        failures=""
+      - name: Generate Slack message
+        id: message
+        run: |
+          successes=""
+          failures=""
 
-  #        for file in results/result-*/result.txt; do
-  #          while read -r line; do
-  #            name=$(echo "$line" | cut -d: -f1)
-  #            status=$(echo "$line" | cut -d: -f2)
+          for file in results/result-*/result.txt; do
+            while read -r line; do
+              name=$(echo "$line" | cut -d: -f1)
+              status=$(echo "$line" | cut -d: -f2)
 
-  #            if [ "$status" = "success" ]; then
-  #              successes+="- $name\n"
-  #            else
-  #              failures+="- $name\n"
-  #            fi
-  #          done < "$file"
-  #        done
+              if [ "$status" = "success" ]; then
+                successes="${successes}- $name\n"
+              else
+                failures="${failures}- $name\n"
+              fi
+            done < "$file"
+          done
 
-  #        echo "message<<EOF" >> $GITHUB_OUTPUT
-  #        echo ":white_check_mark: *ScalarDB Cluster tests completed*" >> $GITHUB_OUTPUT
-  #        echo "" >> $GITHUB_OUTPUT
-  #        echo "*Success:*" >> $GITHUB_OUTPUT
-  #        echo -e "$successes" >> $GITHUB_OUTPUT
-  #        echo "" >> $GITHUB_OUTPUT
-  #        echo "*Failed:*" >> $GITHUB_OUTPUT
-  #        echo -e "$failures" >> $GITHUB_OUTPUT
-  #        echo "" >> $GITHUB_OUTPUT
-  #        echo "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>" >> $GITHUB_OUTPUT
-  #        echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "message<<EOF"
+            printf ":white_check_mark: *ScalarDB Cluster tests completed*\n\n"
+            printf "*Success:*\n%s\n" "$successes"
+            printf "*Failed:*\n%s\n" "$failures"
+            printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
-  #    - name: Post to Slack
-  #      run: |
-  #        curl -X POST -H 'Content-type: application/json' \
-  #          --data "{\"text\": \"${{ steps.message.outputs.message }}\"}" \
-  #          ${{ secrets.SLACK_TOKEN }}
+      - name: Post to Slack
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\": \"${{ steps.message.outputs.message }}\"}" \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
