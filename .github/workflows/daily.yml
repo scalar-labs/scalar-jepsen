@@ -207,7 +207,7 @@ jobs:
             --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
             while read name; do
               echo "Downloading $name"
-              gh run download ${{ github.run_id }} -n "$name" -D results
+              gh run download ${{ github.run_id }} -n "$name" -D results -R "${{ github.repository }}"
             done
 
       - name: Generate Slack message
