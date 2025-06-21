@@ -28,6 +28,8 @@
   (doto properties
     (.setProperty "scalar.db.consensus_commit.isolation_level"
                   ((:isolation-level test) ISOLATION_LEVELS))
+    (.setProperty "scalar.db.consensus_commit.one_phase_commit.enabled"
+                  (str (:enable-one-phase-commit test)))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.enabled"
                   (str (:enable-group-commit test)))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.slot_capacity" "4")
