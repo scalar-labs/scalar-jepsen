@@ -169,18 +169,19 @@ jobs:
     - name: Record result
       if: always()
       run: |
+        mkdir -p result-${{ matrix.tests.name }}
         if grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
-          echo "${{ matrix.tests.name }}:success" >> result.txt
+          echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}/result.txt
         else
-          echo "${{ matrix.tests.name }}:failure" >> result.txt
+          echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}/result.txt
         fi
-
+    
     - name: Upload result
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: result-${{ matrix.tests.name }}
-        path: result.txt
+        path: result-${{ matrix.tests.name }}/result.txt
 
     - name: Upload logs
       if: always()
