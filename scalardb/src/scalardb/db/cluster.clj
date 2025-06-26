@@ -282,4 +282,4 @@
   [faults admin]
   (when (seq admin)
     (warn "The admin operations are ignored:" admin))
-  [(ext/extend-db db (->ExtCluster)) (n/nemesis-package db 60 faults) 1])
+  [(ext/extend-db (db) (->ExtCluster)) (n/nemesis-package db 60 faults) 1])

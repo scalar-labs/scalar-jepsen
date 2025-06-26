@@ -162,7 +162,7 @@
   [faults admin]
   (when (seq admin)
     (warn "The admin operations are ignored:" admin))
-  [(ext/extend-db db (->ExtPostgres))
+  [(ext/extend-db (db) (->ExtPostgres))
    (jn/nemesis-package
     {:db db
      :interval 60

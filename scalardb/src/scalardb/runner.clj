@@ -117,12 +117,11 @@
 
 (defn- gen-test-opt-spec
   []
-  (let [specs (atom test-opt-spec)]
+  (let [specs (atom (into test-opt-spec cli/test-opt-spec))]
     (when (= (env :cassandra?) "true")
-      (require '[cassandra.runner :as cr])
-      (swap! specs into @(resolve 'cr/cassandra-opt-spec))
-      (swap! specs into @(resolve 'cr/admin-opt-spec)))
-    (swap! specs into cli/test-opt-spec)
+      (binding [*ns* *ns*] (require 'cassandra.runner))
+      (swap! specs into @(resolve 'cassandra.runner/cassandra-opt-spec))
+      (swap! specs into @(resolve 'cassandra.runner/admin-opt-spec)))
     @specs))
 
 (def ^:private scalardb-opts
@@ -167,11 +166,12 @@
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
+                  (clojure.tools.logging/info "DEBUG:" options)
                   (doseq [_ (range (:test-count options))
                           db-key (:db options)
                           workload-key (:workload options)
                           faults (:nemesis options)
-                          admin (:admin options)]
+                          admin (or (:admin options) [[]])]
                     (let [test (-> options
                                    (scalardb-test db-key
                                                   workload-key
