@@ -7,7 +7,6 @@
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
                  [org.slf4j/slf4j-jdk14 "2.0.6"]
-                 [cassandra "0.1.0-SNAPSHOT" :exclusions [org.apache.commons/commons-lang3]]
                  [cheshire "5.12.0"]
                  [clj-commons/clj-yaml "1.0.29"]
                  [com.scalar-labs/scalardb-schema-loader "4.0.0-SNAPSHOT"]
@@ -22,6 +21,10 @@
                                                          com.azure/azure-cosmos
                                                          io.grpc/grpc-core
                                                          com.scalar-labs/scalardb-rpc]]]}
+             :cassandra {:dependencies [[cassandra "0.1.0-SNAPSHOT"
+                                         :exclusions [org.apache.commons/commons-lang3]]]
+                         :env {:cassandra? "true"}
+                         :plugins [[lein-environ "1.2.0"]]}
              :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "4.0.0-SNAPSHOT"
                                        ;; avoid the netty dependency issue
                                        :exclusions [software.amazon.awssdk/*

@@ -6,8 +6,10 @@
             [jepsen
              [control :as c]
              [db :as db]]
+            [scalardb.db-extend :as ext]
             [scalardb.nemesis.cluster :as n])
-  (:import (java.io File)))
+  (:import (java.io File)
+           (java.util Properties)))
 
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
 (def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "4.0.0-SNAPSHOT")
@@ -171,7 +173,7 @@
        (map #(nth (str/split % #"\s+") 3))
        first))
 
-(defn running-pods?
+(defn- running-pods?
   "Check a live node."
   [test]
   (-> test
@@ -197,7 +199,7 @@
            (warn (.getMessage e))
            false))))
 
-(defn wait-for-recovery
+(defn- wait-for-recovery
   "Wait for the node bootstrapping."
   ([test]
    (wait-for-recovery TIMEOUT_SEC INTERVAL_SEC test))
@@ -246,3 +248,38 @@
     db/LogFiles
     (log-files [_ test _]
       (get-logs test))))
+
+(defrecord ExtCluster []
+  ext/DbExtension
+  (get-db-type [_] :cluster)
+  (live-nodes [_ test] (running-pods? test))
+  (wait-for-recovery [_ test] (wait-for-recovery test))
+  (create-table-opts [_ _] {})
+  (create-properties
+    [_ test]
+    (or (ext/load-config test)
+        (let [node (-> test :nodes first)
+              ip (c/on node (get-load-balancer-ip))]
+          (->> (doto (Properties.)
+                 (.setProperty "scalar.db.transaction_manager" "cluster")
+                 (.setProperty "scalar.db.contact_points"
+                               (str "indirect:" ip))
+                 (.setProperty "scalar.db.sql.connection_mode" "cluster")
+                 (.setProperty "scalar.db.sql.cluster_mode.contact_points"
+                               (str "indirect:" ip)))
+               (ext/set-common-properties test)))))
+  (create-storage-properties [_ _]
+    (let [node (-> test :nodes first)
+          ip (c/on node (get-postgres-ip))]
+      (doto (Properties.)
+        (.setProperty "scalar.db.storage" "jdbc")
+        (.setProperty "scalar.db.contact_points"
+                      (str "jdbc:postgresql://" ip ":5432/postgres"))
+        (.setProperty "scalar.db.username" "postgres")
+        (.setProperty "scalar.db.password" "postgres")))))
+
+(defn gen-db
+  [faults admin]
+  (when (seq admin)
+    (warn "The admin operations are ignored:" admin))
+  [(ext/extend-db db (->ExtCluster)) (n/nemesis-package db 60 faults) 1])

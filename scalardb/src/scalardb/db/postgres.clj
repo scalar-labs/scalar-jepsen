@@ -1,11 +1,14 @@
 (ns scalardb.db.postgres
-  (:require [clojure.tools.logging :refer [info]]
+  (:require [clojure.tools.logging :refer [info warn]]
             [jepsen
              [control :as c]
              [db :as db]
              [util :refer [meh]]]
             [jepsen.control.util :as cu]
-            [jepsen.os.debian :as debian]))
+            [jepsen.os.debian :as debian]
+            [jepsen.nemesis.combined :as jn]
+            [scalardb.db-extend :as ext])
+  (:import (java.util Properties)))
 
 (def ^:private ^:const DEFAULT_VERSION "15")
 (def ^:private ^:const TIMEOUT_SEC 600)
@@ -71,7 +74,7 @@
   (c/su (meh (c/exec :rm :-r (get-main-dir version))))
   (c/su (meh (c/exec :rm (get-log-path version)))))
 
-(defn live-node?
+(defn- live-node?
   [test]
   (let [node (-> test :nodes first)]
     (try
@@ -81,7 +84,7 @@
         (info node "is down")
         false))))
 
-(defn wait-for-recovery
+(defn- wait-for-recovery
   "Wait for the node bootstrapping."
   ([test]
    (wait-for-recovery TIMEOUT_SEC INTERVAL_SEC test))
@@ -134,3 +137,37 @@
 
     db/LogFiles
     (log-files [_ test _] [(get-log-path test)])))
+
+(defrecord ExtPostgres []
+  ext/DbExtension
+  (get-db-type [_] :postgres)
+  (live-nodes [_ test] (live-node? test))
+  (wait-for-recovery [_ test] (wait-for-recovery test))
+  (create-table-opts [_ _] {})
+  (create-properties
+    [_ test]
+    (or (ext/load-config test)
+        (let [node (-> test :nodes first)]
+          ;; We have only one node in this test
+          (->> (doto (Properties.)
+                 (.setProperty "scalar.db.storage" "jdbc")
+                 (.setProperty "scalar.db.contact_points"
+                               (str "jdbc:postgresql://" node ":5432/"))
+                 (.setProperty "scalar.db.username" "postgres")
+                 (.setProperty "scalar.db.password" "postgres"))
+               (ext/set-common-properties test)))))
+  (create-storage-properties [this test] (ext/create-properties this test)))
+
+(defn gen-db
+  [faults admin]
+  (when (seq admin)
+    (warn "The admin operations are ignored:" admin))
+  [(ext/extend-db db (->ExtPostgres))
+   (jn/nemesis-package
+    {:db db
+     :interval 60
+     :faults faults
+     :partition {:targets [:one]}
+     :kill {:targets [:one]}
+     :pause {:targets [:one]}})
+   1])
