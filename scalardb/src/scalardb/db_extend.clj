@@ -23,7 +23,7 @@
   [test properties]
   (doto properties
     (.setProperty "scalar.db.consensus_commit.isolation_level"
-                  (-> test :isolation-level name string/upper-case))
+                  (-> test :isolation-level name string/upper-case (string/replace #"-" "_")))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.enabled"
                   (str (:enable-group-commit test)))
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.slot_capacity" "4")
