@@ -166,7 +166,6 @@
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
-                  (clojure.tools.logging/info "DEBUG:" options)
                   (doseq [_ (range (:test-count options))
                           db-key (:db options)
                           workload-key (:workload options)
