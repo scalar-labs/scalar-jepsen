@@ -118,11 +118,6 @@ jobs:
           namespace: metallb-system
         EOF
 
-    - name: Install dependencies
-      run: |
-        cd cassandra
-        lein install
-
     - name: ScalarDB Cluster test
       run: |
         cd scalardb
