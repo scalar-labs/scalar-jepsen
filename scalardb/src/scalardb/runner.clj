@@ -120,8 +120,8 @@
   (let [specs (atom test-opt-spec)]
     (when (= (env :cassandra?) "true")
       (require '[cassandra.runner :as cr])
-      (swap! specs into (resolve 'cr/cassandra-opt-spec))
-      (swap! specs into (resolve 'cr/admin-opt-spec)))
+      (swap! specs into @(resolve 'cr/cassandra-opt-spec))
+      (swap! specs into @(resolve 'cr/admin-opt-spec)))
     (swap! specs into cli/test-opt-spec)
     @specs))
 
