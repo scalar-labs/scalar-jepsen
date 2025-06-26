@@ -23,8 +23,7 @@
                                                          com.scalar-labs/scalardb-rpc]]]}
              :cassandra {:dependencies [[cassandra "0.1.0-SNAPSHOT"
                                          :exclusions [org.apache.commons/commons-lang3]]]
-                         :env {:cassandra? "true"}
-                         :plugins [[lein-environ "1.2.0"]]}
+                         :env {:cassandra? "true"}}
              :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "4.0.0-SNAPSHOT"
                                        ;; avoid the netty dependency issue
                                        :exclusions [software.amazon.awssdk/*
@@ -32,12 +31,12 @@
                                                     com.azure/azure-cosmos
                                                     com.scalar-labs/scalardb-rpc]]]
                        :env {:scalardb-cluster-version "4.0.0-SNAPSHOT"
-                             :helm-chart-version "1.7.2"}
-                       :plugins [[lein-environ "1.2.0"]]}
+                             :helm-chart-version "1.7.2"}}
              :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]
                                        [org.apache.commons/commons-text "1.13.0"]]
                         :resource-paths ["resources/scalardb.jar"]}
              :default [:base :system :user :provided :dev :use-released]}
+  :plugins [[lein-environ "1.2.0"]]
   :jvm-opts ["-Djava.awt.headless=true" "-Xmx4g"]
   :main scalardb.runner
   :aot [scalardb.runner])
