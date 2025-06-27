@@ -132,13 +132,11 @@
   [test n]
   (try
     (let [tx (scalar/start-transaction test)
-          tx-results (map #(.get tx (prepare-get %)) (range n))
-          ;; Need Storage API to read the transaction metadata
-          results (mapv #(.get @(:storage test) (prepare-get %)) (range n))]
+          results (map #(.get tx (prepare-get %)) (range n))]
       ;; Put the same balance to check conflicts with in-flight transactions
       (mapv #(->> (calc-new-balance %2 0) (prepare-put %1) (.put tx))
             (range n)
-            tx-results)
+            results)
       (.commit tx)
       results)
     (catch Exception e
@@ -148,11 +146,9 @@
 (defn read-all-with-retry
   [test n]
   (scalar/check-transaction-connection! test)
-  (scalar/check-storage-connection! test)
   (scalar/with-retry
     (fn [test]
-      (scalar/prepare-transaction-service! test)
-      (scalar/prepare-storage-service! test))
+      (scalar/prepare-transaction-service! test))
     test
     (read-all test n)))
 

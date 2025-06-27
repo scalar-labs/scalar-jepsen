@@ -7,7 +7,6 @@
             [scalardb.transfer :as transfer]
             [spy.core :as spy])
   (:import (com.scalar.db.api DistributedTransaction
-                              DistributedStorage
                               Get
                               Put
                               Result)
@@ -56,12 +55,6 @@
     (^Optional get [_ ^Get g] (mock-get g))
     (^void put [_ ^Put p] (mock-put p))
     (^void commit [_] (swap! commit-count inc))))
-
-(def mock-storage
-  (reify
-    DistributedStorage
-    (^Optional get [_ ^Get g] (mock-get g))
-    (^void put [_ ^Put p] (mock-put p))))
 
 (def mock-transaction-throws-exception
   (reify
@@ -178,16 +171,13 @@
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 1000 1 100 2 10 3 1 4 0})]
     (with-redefs [scalar/check-transaction-connection! (spy/spy)
-                  scalar/check-storage-connection! (spy/spy)
                   scalar/start-transaction (spy/stub mock-transaction)]
       (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                  nil nil)
-            result (client/invoke! client {:db mock-db
-                                           :storage (ref mock-storage)}
+            result (client/invoke! client {:db mock-db}
                                    (#'transfer/get-all {:client client}
                                                        nil))]
         (is (spy/called-once? scalar/check-transaction-connection!))
-        (is (spy/called-once? scalar/check-storage-connection!))
         (is (= :ok (:type result)))
         (is (= [1000 100 10 1 0] (get-in result [:value :balance])))
         (is (= [1000 100 10 1 0] (get-in result [:value :version])))))))
@@ -195,21 +185,16 @@
 (deftest transfer-client-get-all-fail-test
   (with-redefs [scalar/exponential-backoff (spy/spy)
                 scalar/check-transaction-connection! (spy/spy)
-                scalar/check-storage-connection! (spy/spy)
                 scalar/prepare-transaction-service! (spy/spy)
-                scalar/prepare-storage-service! (spy/spy)
                 scalar/start-transaction (spy/stub mock-transaction-throws-exception)]
     (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
                                nil nil)]
       (is (thrown? clojure.lang.ExceptionInfo
-                   (client/invoke! client {:db mock-db
-                                           :storage (ref mock-storage)}
+                   (client/invoke! client {:db mock-db}
                                    (#'transfer/get-all {:client client}
                                                        nil))))
       (is (spy/called-n-times? scalar/exponential-backoff scalar/RETRIES))
       (is (spy/called-n-times? scalar/prepare-transaction-service!
-                               (+ (quot scalar/RETRIES scalar/RETRIES_FOR_RECONNECTION) 1)))
-      (is (spy/called-n-times? scalar/prepare-storage-service!
                                (+ (quot scalar/RETRIES scalar/RETRIES_FOR_RECONNECTION) 1))))))
 
 (deftest transfer-client-check-tx-test

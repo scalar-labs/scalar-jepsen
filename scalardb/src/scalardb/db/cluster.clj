@@ -39,7 +39,10 @@
                "scalar.db.storage=jdbc"
                "scalar.db.contact_points=jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
                "scalar.db.username=postgres"
-               "scalar.db.password=postgres"])
+               "scalar.db.password=postgres"
+               ""
+               ;; Set to true to include transaction metadata in the records
+               "scalar.db.consensus_commit.include_metadata.enabled=true"])
 
     :imagePullSecrets [{:name "scalardb-ghcr-secret"}]}})
 
