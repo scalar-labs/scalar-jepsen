@@ -122,6 +122,9 @@
                      "consistency model to be checked"
                      ["snapshot-isolation"])
 
+   [nil "--enable-one-phase-commit" "if set, one-phase commit is enabled"
+    :default false]
+
    [nil "--enable-group-commit" "if set, group commit is enabled"
     :default false]
 
