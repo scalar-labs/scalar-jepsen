@@ -29,7 +29,8 @@
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.slot_capacity" "4")
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.old_group_abort_timeout_millis" "15000")
     (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.delayed_slot_move_timeout_millis" "400")
-    (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled" "true")))
+    (.setProperty "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled" "true")
+    (.setProperty "scalar.db.consensus_commit.include_metadata.enabled" "true")))
 
 (defprotocol DbExtension
   (get-db-type [this])
