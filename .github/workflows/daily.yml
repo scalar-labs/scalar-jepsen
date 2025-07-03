@@ -229,9 +229,15 @@ jobs:
             done < "$file"
           done
 
+          if [ -n "$failures" ]; then
+            icon=":fire:"
+          else
+            icon=":white_check_mark:"
+          fi
+
           {
             echo "message<<EOF"
-            printf ":white_check_mark: *ScalarDB Cluster tests completed*\n\n"
+            printf "${icon} *ScalarDB Cluster tests completed*\n\n"
             printf "*Success:*\n%s\n" "$successes"
             printf "*Failed:*\n%s\n" "$failures"
             printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
