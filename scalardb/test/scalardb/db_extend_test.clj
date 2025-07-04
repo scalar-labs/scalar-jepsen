@@ -1,18 +1,18 @@
 (ns scalardb.db-extend-test
-  (:require [cassandra.core :as cassandra]
-            [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is]]
+            [scalardb.db.postgres :as postgres]
             [scalardb.db-extend :as ext]))
 
 (deftest create-properties-test
-  (let [db (ext/extend-db (cassandra/db) :cassandra)
+  (let [db (ext/extend-db postgres/db (postgres/->ExtPostgres))
         properties (ext/create-properties db
-                                          {:nodes ["n1" "n2" "n3"]
+                                          {:nodes ["n1"]
                                            :isolation-level :serializable})]
-    (is (= "n1,n2,n3"
+    (is (= "jdbc:postgresql://n1:5432/"
            (.getProperty properties "scalar.db.contact_points")))
-    (is (= "cassandra"
+    (is (= "postgres"
            (.getProperty properties "scalar.db.username")))
-    (is (= "cassandra"
+    (is (= "postgres"
            (.getProperty properties "scalar.db.password")))
     (is (= "SERIALIZABLE"
            (.getProperty

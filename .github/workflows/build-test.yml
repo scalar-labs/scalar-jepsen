@@ -46,7 +46,7 @@ jobs:
     - name: Run test for ScalarDB
       run: |
         cd scalardb
-        lein cloverage
+        lein with-profile dev,cassandra cloverage
 
     - name: Run test for ScalarDL
       run: |
