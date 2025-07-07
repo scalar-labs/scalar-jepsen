@@ -85,7 +85,7 @@ jobs:
             enable_group_commit: false
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
-            time_limit: 180
+            time_limit: 600
           - name: "GroupCommit"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
