@@ -35,7 +35,7 @@ jobs:
     - name: ScalarDB test
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein with-profile cassandra run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
 
   cluster:
     runs-on: ubuntu-latest
@@ -117,11 +117,6 @@ jobs:
           name: l2adv
           namespace: metallb-system
         EOF
-
-    - name: Install dependencies
-      run: |
-        cd cassandra
-        lein install
 
     - name: ScalarDB Cluster test
       run: |

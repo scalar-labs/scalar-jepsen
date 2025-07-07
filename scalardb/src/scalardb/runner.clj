@@ -1,16 +1,12 @@
 (ns scalardb.runner
   (:gen-class)
-  (:require [cassandra.core :as cassandra]
-            [cassandra.nemesis :as cn]
-            [cassandra.runner :as cr]
-            [clojure.tools.logging :refer [warn]]
-            [clojure.string :as string]
+  (:require [clojure.string :as string]
+            [environ.core :refer [env]]
             [jepsen
              [core :as jepsen]
              [cli :as cli]
              [generator :as gen]
              [tests :as tests]]
-            [jepsen.nemesis.combined :as jn]
             [scalardb
              [core :refer [INITIAL_TABLE_ID]]
              [transfer]
@@ -20,56 +16,14 @@
              [transfer-2pc]
              [transfer-append-2pc]
              [elle-append-2pc]
-             [elle-write-read-2pc]
-             [db-extend :refer [extend-db]]]
-            [scalardb.db
-             [cluster :as cluster]
-             [postgres :as postgres]]
-            [scalardb.nemesis.cluster :as nc]))
+             [elle-write-read-2pc]]
+            [clojure.core :as c]))
 
 (def db-keys
   "The map of test DBs."
   {"cassandra" :cassandra
    "postgres" :postgres
    "cluster" :cluster})
-
-(defn- gen-db
-  "Returns [extended-db constructed-nemesis num-max-nodes]."
-  [db-key faults admin]
-  (case db-key
-    :cassandra (let [db (extend-db (cassandra/db) :cassandra)
-                     ;; replace :kill nemesis with :crash for Cassandra
-                     faults (mapv #(if (= % :kill) :crash %) faults)]
-                 (when-not (every? #(some? (get cr/nemeses (name %))) faults)
-                   (throw
-                    (ex-info
-                     (str "Invalid nemesis for Cassandra: " faults) {})))
-                 [db
-                  (cn/nemesis-package
-                   {:db db
-                    :faults faults
-                    :admin admin
-                    :partition {:targets [:one
-                                          :primaries
-                                          :majority
-                                          :majorities-ring
-                                          :minority-third]}})
-                  Integer/MAX_VALUE])
-    :postgres (let [db (extend-db (postgres/db) :postgres)]
-                (when (seq admin)
-                  (warn "The admin operations are ignored:" admin))
-                [db
-                 (jn/nemesis-package
-                  {:db db
-                   :interval 60
-                   :faults faults
-                   :partition {:targets [:one]}
-                   :kill {:targets [:one]}
-                   :pause {:targets [:one]}})
-                 1])
-    :cluster (let [db (extend-db (cluster/db) :cluster)]
-               [db (nc/nemesis-package db 60 faults) 1])
-    (throw (ex-info "Unsupported DB" {:db db-key}))))
 
 (def workload-keys
   "A map of test workload keys."
@@ -145,6 +99,31 @@
       (into (map name admin))
       (->> (remove nil?) (string/join "-"))))
 
+(defn- load-module
+  [db-key]
+  (case db-key
+    :cassandra (require 'scalardb.db.cassandra)
+    :postgres  (require 'scalardb.db.postgres)
+    :cluster  (require 'scalardb.db.cluster)
+    (throw (ex-info "Unsupported DB" {:db db-key}))))
+
+(defn- gen-db
+  "Returns [extended-db constructed-nemesis num-max-nodes]."
+  [db-key faults admin]
+  (load-module db-key)
+  (let [gen-db-sym (symbol (str "scalardb.db." (name db-key)) "gen-db")
+        gen-db-fn (resolve gen-db-sym)]
+    (gen-db-fn faults admin)))
+
+(defn- gen-test-opt-spec
+  []
+  (let [specs (atom (into test-opt-spec cli/test-opt-spec))]
+    (when (= (env :cassandra?) "true")
+      (binding [*ns* *ns*] (require 'cassandra.runner))
+      (swap! specs into @(resolve 'cassandra.runner/cassandra-opt-spec))
+      (swap! specs into @(resolve 'cassandra.runner/admin-opt-spec)))
+    @specs))
+
 (def ^:private scalardb-opts
   {:storage (atom nil)
    :transaction (atom nil)
@@ -183,10 +162,7 @@
 
 (defn test-cmd
   []
-  {"test" {:opt-spec (->> test-opt-spec
-                          (into cr/cassandra-opt-spec)
-                          (into cr/admin-opt-spec)
-                          (into cli/test-opt-spec))
+  {"test" {:opt-spec (gen-test-opt-spec)
            :opt-fn (fn [parsed] (-> parsed cli/test-opt-fn))
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
@@ -194,7 +170,7 @@
                           db-key (:db options)
                           workload-key (:workload options)
                           faults (:nemesis options)
-                          admin (:admin options)]
+                          admin (or (:admin options) [[]])]
                     (let [test (-> options
                                    (scalardb-test db-key
                                                   workload-key

@@ -135,11 +135,6 @@ jobs:
           namespace: metallb-system
         EOF
 
-    - name: Install dependencies
-      run: |
-        cd cassandra
-        lein install
-
     - name: ${{ matrix.tests.name }}
       run: |
         cd scalardb
