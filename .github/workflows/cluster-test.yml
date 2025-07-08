@@ -35,6 +35,10 @@ on:
           - partition
           - packet
           - clock
+      enable_one_phase_commit:
+        description: 'Enable one phase commit'
+        default: false
+        type: boolean
       enable_group_commit:
         description: 'Enable Group commit'
         default: false
@@ -44,6 +48,7 @@ on:
         type: choice
         default: snapshot
         options:
+          - read-committed
           - snapshot
           - serializable
       consistency_model:
@@ -147,9 +152,14 @@ jobs:
         OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
         OPTS+=" --isolation-level ${{ github.event.inputs.isolation_level }}"
         OPTS+=" --consistency-model ${{ github.event.inputs.consistency_model }}"
+
+        if [ "${{ github.event.inputs.enable_one_phase_commit }}" = "true" ]; then
+          OPTS+=" --enable-one-phase-commit"
+        fi
         if [ "${{ github.event.inputs.enable_group_commit }}" = "true" ]; then
           OPTS+=" --enable-group-commit"
         fi
+
         lein with-profile cluster run test \
           --nodes localhost \
           --db cluster \

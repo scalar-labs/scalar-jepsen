@@ -54,7 +54,11 @@
         new-db-props (-> values
                          (get-in path)
                          (str "\nscalar.db.consensus_commit.isolation_level="
-                              (-> test :isolation-level name str/upper-case)))]
+                              (-> test
+                                  :isolation-level
+                                  name
+                                  str/upper-case
+                                  (str/replace #"-" "_"))))]
     (assoc-in values path new-db-props)))
 
 (defn- install!
