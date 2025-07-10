@@ -53,12 +53,26 @@
   (let [path [:scalardbCluster :scalardbClusterNodeProperties]
         new-db-props (-> values
                          (get-in path)
-                         (str "\nscalar.db.consensus_commit.isolation_level="
-                              (-> test
-                                  :isolation-level
-                                  name
-                                  str/upper-case
-                                  (str/replace #"-" "_"))))]
+                         (str
+                          ;; isolation level
+                          "\nscalar.db.consensus_commit.isolation_level="
+                          (-> test
+                              :isolation-level
+                              name
+                              str/upper-case
+                              (str/replace #"-" "_"))
+                          ;; one phase commit
+                          (when (:enable-one-phase-commit test)
+                            "\nscalar.db.consensus_commit.one_phase_commit.enabled=true")
+                          ;; group commit - set hard-coded configurations for now
+                          (when (:enable-group-commit test)
+                            (str/join
+                             "\n"
+                             ["\nscalar.db.consensus_commit.group_commit.enabled=true"
+                              "scalar.db.consensus_commit.coordinator.group_commit.slot_capacity=4"
+                              "scalar.db.consensus_commit.coordinator.group_commit.old_group_abort_timeout_millis=15000"
+                              "scalar.db.consensus_commit.coordinator.group_commit.delayed_slot_move_timeout_millis=400"
+                              "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled=true"]))))]
     (assoc-in values path new-db-props)))
 
 (defn- install!
