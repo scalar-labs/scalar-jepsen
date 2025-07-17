@@ -11,7 +11,7 @@
                  [clj-commons/clj-yaml "1.0.29"]
                  [com.scalar-labs/scalardb-schema-loader "4.0.0-SNAPSHOT"]
                  [environ "1.2.0"]]
-  :repositories {"sonartype" "https://oss.sonatype.org/content/repositories/snapshots/"}
+  :repositories {"sonartype" "https://central.sonatype.com/repository/maven-snapshots/"}
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
              :use-released {:dependencies [[com.scalar-labs/scalardb "4.0.0-SNAPSHOT"

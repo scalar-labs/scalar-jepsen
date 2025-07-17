@@ -12,7 +12,7 @@
                  [cassandra "0.1.0-SNAPSHOT" :exclusions [org.apache.commons/commons-lang3]]
                  [cc.qbits/alia "4.3.6"]
                  [cc.qbits/hayt "4.1.0" :exclusions [org.apache.commons/commons-lang3]]]
-  :repositories {"sonartype" "https://oss.sonatype.org/content/repositories/snapshots/"}
+  :repositories {"sonartype" "https://central.sonatype.com/repository/maven-snapshots/"}
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}
              :use-released {:dependencies [[com.scalar-labs/scalardl-java-client-sdk "4.0.0-SNAPSHOT"
