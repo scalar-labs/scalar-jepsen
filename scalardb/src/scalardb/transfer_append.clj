@@ -1,6 +1,6 @@
 (ns scalardb.transfer-append
   (:require [clojure.core.reducers :as r]
-            [clojure.tools.logging :refer [info warn]]
+            [clojure.tools.logging :refer [infof warn]]
             [jepsen
              [client :as client]
              [checker :as checker]
@@ -68,7 +68,7 @@
        (.commit tx)))
    [n]))
 
-(defn- get-balance
+(defn get-balance
   [^Result result]
   (-> result (.getValue BALANCE) .get .get))
 
@@ -98,14 +98,15 @@
 
 (defn- tx-transfer
   [tx from to amount]
+  (infof "Transferring %d from %d to %d (tx: %s)" amount from to (.getId tx))
   (let [^Result from-result (scan-for-latest tx (prepare-scan-for-latest from))
         ^Result to-result (scan-for-latest tx (prepare-scan-for-latest to))]
-    (info "fromID:" from "the latest age:" (get-age from-result))
+    (infof "fromID: %d, the latest balance: %d, the latest age: %d (tx: %s)" from (get-balance from-result) (get-age from-result) (.getId tx))
     (->> (prepare-put from
                       (calc-new-age from-result)
                       (calc-new-balance from-result (- amount)))
          (.put tx))
-    (info "toID:" to " the latest age:" (get-age to-result))
+    (infof "toID: %d, the latest balance: %d, the latest age: %d (tx: %s)" to (get-balance to-result) (get-age to-result) (.getId tx))
     (->> (prepare-put to
                       (calc-new-age to-result)
                       (calc-new-balance to-result amount))
