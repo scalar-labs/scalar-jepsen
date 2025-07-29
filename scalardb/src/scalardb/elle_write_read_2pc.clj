@@ -1,5 +1,6 @@
 (ns scalardb.elle-write-read-2pc
-  (:require [jepsen.client :as client]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
             [scalardb.core :as scalar :refer [DEFAULT_TABLE_COUNT]]
@@ -29,8 +30,12 @@
         (scalar/prepare-2pc-service! test))))
 
   (invoke! [_ test op]
-    (let [tx1 (scalar/start-2pc test)
-          tx2 (scalar/join-2pc test (.getId tx1))
+    (let [tx1 (try (scalar/start-2pc test)
+                   (catch Exception e
+                     (warn (.getMessage e))))
+          tx2 (try (scalar/join-2pc test (.getId tx1))
+                   (catch Exception e
+                     (warn (.getMessage e))))
           [seq-id txn] (:value op)]
       (try
         (when (<= @(:table-id test) seq-id)
