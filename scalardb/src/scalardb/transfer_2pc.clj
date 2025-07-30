@@ -10,40 +10,41 @@
 
 (defn- tx-transfer
   [tx1 tx2 from to amount]
-  (try
-    (let [fromResult (.get tx1 (transfer/prepare-get from))
-          toResult (.get tx2 (transfer/prepare-get to))]
-      (->> (transfer/calc-new-balance fromResult (- amount))
-           (transfer/prepare-put from)
-           (.put tx1))
-      (->> (transfer/calc-new-balance toResult amount)
-           (transfer/prepare-put to)
-           (.put tx2)))
-    (scalar/prepare-validate-commit-txs [tx1 tx2])
-    (catch UnknownTransactionStatusException e
-      (throw e))
-    (catch Exception e
-      (scalar/rollback-txs [tx1 tx2])
-      (throw e))))
+  (let [fromResult (.get tx1 (transfer/prepare-get from))
+        toResult (.get tx2 (transfer/prepare-get to))]
+    (->> (transfer/calc-new-balance fromResult (- amount))
+         (transfer/prepare-put from)
+         (.put tx1))
+    (->> (transfer/calc-new-balance toResult amount)
+         (transfer/prepare-put to)
+         (.put tx2)))
+  (scalar/prepare-validate-commit-txs [tx1 tx2]))
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]
   (let [tx1 (try (scalar/start-2pc test)
                  (catch Exception e
                    (warn (.getMessage e))))
-        tx2 (try (scalar/join-2pc test (.getId tx1))
-                 (catch Exception e
-                   (warn (.getMessage e))))]
-    (try
-      (tx-transfer tx1 tx2 from to amount)
-      :commit
-      (catch UnknownTransactionStatusException _
-        (swap! (:unknown-tx test) conj (.getId tx1))
-        (warn "Unknown transaction: " (.getId tx1))
-        :unknown-tx-status)
-      (catch Exception e
-        (warn (.getMessage e))
-        :fail))))
+        tx2 (if tx1
+              (try (scalar/join-2pc test (.getId tx1))
+                   (catch Exception e
+                     (warn (.getMessage e))))
+              nil)]
+    (if (and tx1 tx2)
+      (try
+        (tx-transfer tx1 tx2 from to amount)
+        :commit
+        (catch UnknownTransactionStatusException _
+          (swap! (:unknown-tx test) conj (.getId tx1))
+          (warn "Unknown transaction: " (.getId tx1))
+          :unknown-tx-status)
+        (catch Exception e
+          (warn (.getMessage e))
+          (scalar/rollback-txs [tx1 tx2])
+          :fail))
+      (do
+        (when tx1 (scalar/rollback-txs [tx1]))
+        :start-fail))))
 
 (defrecord TransferClient [initialized? n initial-balance max-txs]
   client/Client

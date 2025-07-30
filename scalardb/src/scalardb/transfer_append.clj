@@ -126,6 +126,7 @@
         :unknown-tx-status)
       (catch Exception e
         (warn (.getMessage e))
+        (scalar/rollback-txs [tx])
         :fail))
     :start-fail))
 

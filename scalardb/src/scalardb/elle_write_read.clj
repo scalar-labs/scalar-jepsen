@@ -92,23 +92,26 @@
         (scalar/prepare-transaction-service! test))))
 
   (invoke! [_ test op]
-    (let [tx (try (scalar/start-transaction test)
-                  (catch Exception e
-                    (warn (.getMessage e))))
-          [seq-id txn] (:value op)]
-      (try
-        (when (<= @(:table-id test) seq-id)
-          ;; add tables for the next sequence
-          (add-tables test (inc seq-id)))
-        (let [txn' (mapv (partial tx-execute seq-id tx) txn)]
-          (.commit tx)
-          (assoc op :type :ok :value (independent/tuple seq-id txn')))
-        (catch UnknownTransactionStatusException _
-          (swap! (:unknown-tx test) conj (.getId tx))
-          (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
-        (catch Exception e
-          (scalar/try-reconnection! test scalar/prepare-transaction-service!)
-          (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
+    (if-let [tx (try (scalar/start-transaction test)
+                     (catch Exception e (warn (.getMessage e))))]
+      (let [[seq-id txn] (:value op)]
+        (try
+          (when (<= @(:table-id test) seq-id)
+            ;; add tables for the next sequence
+            (add-tables test (inc seq-id)))
+          (let [txn' (mapv (partial tx-execute seq-id tx) txn)]
+            (.commit tx)
+            (assoc op :type :ok :value (independent/tuple seq-id txn')))
+          (catch UnknownTransactionStatusException _
+            (swap! (:unknown-tx test) conj (.getId tx))
+            (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
+          (catch Exception e
+            (scalar/rollback-txs [tx])
+            (scalar/try-reconnection! test scalar/prepare-transaction-service!)
+            (assoc op :type :fail :error {:crud-error (.getMessage e)}))))
+      (do
+        (scalar/try-reconnection! test scalar/prepare-transaction-service!)
+        (assoc op :type :fail :error {:tx-error "starting tx failed"}))))
 
   (close! [_ _])
 

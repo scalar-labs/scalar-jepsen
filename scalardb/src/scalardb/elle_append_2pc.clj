@@ -41,24 +41,31 @@
     (let [tx1 (try (scalar/start-2pc test)
                    (catch Exception e
                      (warn (.getMessage e))))
-          tx2 (try (scalar/join-2pc test (.getId tx1))
-                   (catch Exception e
-                     (warn (.getMessage e))))
-          [seq-id txn] (:value op)]
-      (try
-        (when (<= @(:table-id test) seq-id)
-          ;; add tables for the next sequence
-          (append/add-tables test (inc seq-id)))
-        (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
-          (scalar/prepare-validate-commit-txs [tx1 tx2])
-          (assoc op :type :ok :value (independent/tuple seq-id txn')))
-        (catch UnknownTransactionStatusException _
-          (swap! (:unknown-tx test) conj (.getId tx1))
-          (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
-        (catch Exception e
-          (scalar/rollback-txs [tx1 tx2])
+          tx2 (if tx1
+                (try (scalar/join-2pc test (.getId tx1))
+                     (catch Exception e
+                       (warn (.getMessage e))))
+                nil)]
+      (if (and tx1 tx2)
+        (let [[seq-id txn] (:value op)]
+          (try
+            (when (<= @(:table-id test) seq-id)
+              ;; add tables for the next sequence
+              (append/add-tables test (inc seq-id)))
+            (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
+              (scalar/prepare-validate-commit-txs [tx1 tx2])
+              (assoc op :type :ok :value (independent/tuple seq-id txn')))
+            (catch UnknownTransactionStatusException _
+              (swap! (:unknown-tx test) conj (.getId tx1))
+              (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
+            (catch Exception e
+              (scalar/rollback-txs [tx1 tx2])
+              (scalar/try-reconnection! test scalar/prepare-2pc-service!)
+              (assoc op :type :fail :error {:crud-error (.getMessage e)}))))
+        (do
+          (when tx1 (scalar/rollback-txs [tx1]))
           (scalar/try-reconnection! test scalar/prepare-2pc-service!)
-          (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
+          (assoc op :type :fail :error {:tx-error "starting tx failed"})))))
 
   (close! [_ _])
 
