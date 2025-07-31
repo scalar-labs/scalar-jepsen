@@ -62,6 +62,7 @@
 (def mock-transaction
   (reify
     DistributedTransaction
+    (getId [_] "dummy-id")
     (^java.util.List scan [_ ^Scan s] (mock-scan s))
     (^void put [_ ^Put p] (mock-put p))
     (^void commit [_] (swap! commit-count inc))))
@@ -69,6 +70,7 @@
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
+    (getId [_] "dummy-id")
     (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed" nil)))
     (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
     (^void commit [_] (throw (CommitException. "commit failed" nil)))))

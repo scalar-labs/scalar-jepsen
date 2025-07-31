@@ -1,5 +1,5 @@
 (ns scalardb.transfer-2pc
-  (:require [clojure.tools.logging :refer [warn]]
+  (:require [clojure.tools.logging :refer [infof warn]]
             [jepsen
              [client :as client]
              [generator :as gen]]
@@ -11,11 +11,14 @@
 (defn- tx-transfer
   [tx1 tx2 from to amount]
   (try
+    (infof "Transferring %d from %d to %d (tx: %s)" amount from to (.getId tx1))
     (let [fromResult (.get tx1 (transfer/prepare-get from))
           toResult (.get tx2 (transfer/prepare-get to))]
+      (infof "fromID: %d, the balance: %d, the version: %d (tx: %s)" from (transfer/get-balance fromResult) (transfer/get-version fromResult) (.getId tx1))
       (->> (transfer/calc-new-balance fromResult (- amount))
            (transfer/prepare-put from)
            (.put tx1))
+      (infof "toID: %d, the balance: %d, the version: %d (tx: %s)" to (transfer/get-balance toResult) (transfer/get-version toResult) (.getId tx1))
       (->> (transfer/calc-new-balance toResult amount)
            (transfer/prepare-put to)
            (.put tx2)))

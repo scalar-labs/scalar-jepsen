@@ -1,5 +1,5 @@
 (ns scalardb.transfer-append-2pc
-  (:require [clojure.tools.logging :refer [info warn]]
+  (:require [clojure.tools.logging :refer [infof warn]]
             [jepsen
              [client :as client]
              [generator :as gen]]
@@ -13,17 +13,18 @@
 (defn- tx-transfer
   [tx1 tx2 from to amount]
   (try
+    (infof "Transferring %d from %d to %d (tx: %s)" amount from to (.getId tx1))
     (let [^Result from-result
           (t-append/scan-for-latest tx1 (t-append/prepare-scan-for-latest from))
           ^Result to-result
           (t-append/scan-for-latest tx2 (t-append/prepare-scan-for-latest to))]
-      (info "fromID:" from "the latest age:" (t-append/get-age from-result))
+      (infof "fromID: %d, the latest balance: %d, the latest age: %d (tx: %s)" from (t-append/get-balance from-result) (t-append/get-age from-result) (.getId tx1))
       (->> (t-append/prepare-put from
                                  (t-append/calc-new-age from-result)
                                  (t-append/calc-new-balance from-result
                                                             (- amount)))
            (.put tx1))
-      (info "toID:" to "the latest age:" (t-append/get-age to-result))
+      (infof "toID: %d, the latest balance: %d, the latest age: %d (tx: %s)" to (t-append/get-balance to-result) (t-append/get-age to-result) (.getId tx1))
       (->> (t-append/prepare-put to
                                  (t-append/calc-new-age to-result)
                                  (t-append/calc-new-balance to-result amount))
