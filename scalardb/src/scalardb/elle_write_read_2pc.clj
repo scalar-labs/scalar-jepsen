@@ -33,11 +33,10 @@
     (let [tx1 (try (scalar/start-2pc test)
                    (catch Exception e
                      (warn (.getMessage e))))
-          tx2 (if tx1
+          tx2 (when tx1
                 (try (scalar/join-2pc test (.getId tx1))
                      (catch Exception e
-                       (warn (.getMessage e))))
-                nil)]
+                       (warn (.getMessage e)))))]
       (if (and tx1 tx2)
         (let [[seq-id txn] (:value op)]
           (try
