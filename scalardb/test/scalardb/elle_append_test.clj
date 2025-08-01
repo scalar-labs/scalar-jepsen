@@ -20,6 +20,7 @@
 (def ^:dynamic get-count (atom 0))
 (def ^:dynamic put-count (atom 0))
 (def ^:dynamic commit-count (atom 0))
+(def ^:dynamic rollback-count (atom 0))
 
 (defn- key->id
   [^Key k]
@@ -54,14 +55,16 @@
     DistributedTransaction
     (^Optional get [_ ^Get g] (mock-get g))
     (^void put [_ ^Put p] (mock-put p))
-    (^void commit [_] (swap! commit-count inc))))
+    (^void commit [_] (swap! commit-count inc))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-transaction-throws-exception
   (reify
     DistributedTransaction
     (^Optional get [_ ^Get _] (throw (CrudException. "get failed" nil)))
     (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
-    (^void commit [_] (throw (CommitException. "commit failed" nil)))))
+    (^void commit [_] (throw (CommitException. "commit failed" nil)))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-transaction-throws-unknown
   (reify
@@ -69,7 +72,8 @@
     (getId [_] "unknown-state-tx")
     (^Optional get [_ ^Get g] (mock-get g))
     (^void put [_ ^Put p] (mock-put p))
-    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (deftest append-client-init-test
   (with-redefs [scalar/setup-transaction-tables (spy/spy)
@@ -113,19 +117,21 @@
         (is (= :ok (:type result)))))))
 
 (deftest append-client-invoke-crud-exception-test
-  (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
-                scalar/try-reconnection! (spy/spy)]
-    (let [client (client/open! (elle-append/->AppendClient (atom false))
-                               nil nil)
-          result (client/invoke! client
-                                 {:isolation-level :serializable
-                                  :table-id (atom 1)}
-                                 {:type :invoke
-                                  :f :txn
-                                  :value [0 [[:r 1 nil]]]})]
-      (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection!))
-      (is (= :fail (:type result))))))
+  (binding [rollback-count (atom 0)]
+    (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (elle-append/->AppendClient (atom false))
+                                 nil nil)
+            result (client/invoke! client
+                                   {:isolation-level :serializable
+                                    :table-id (atom 1)}
+                                   {:type :invoke
+                                    :f :txn
+                                    :value [0 [[:r 1 nil]]]})]
+        (is (spy/called-once? scalar/start-transaction))
+        (is (spy/called-once? scalar/try-reconnection!))
+        (is (= 1 @rollback-count))
+        (is (= :fail (:type result)))))))
 
 (deftest append-client-invoke-unknown-exception-test
   (binding [get-count (atom 0)

@@ -27,6 +27,7 @@
 (def ^:dynamic scan-count (atom 0))
 (def ^:dynamic put-count (atom 0))
 (def ^:dynamic commit-count (atom 0))
+(def ^:dynamic rollback-count (atom 0))
 
 (defn- key->id
   [^Key k]
@@ -65,7 +66,8 @@
     (getId [_] "dummy-id")
     (^java.util.List scan [_ ^Scan s] (mock-scan s))
     (^void put [_ ^Put p] (mock-put p))
-    (^void commit [_] (swap! commit-count inc))))
+    (^void commit [_] (swap! commit-count inc))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-transaction-throws-exception
   (reify
@@ -73,7 +75,8 @@
     (getId [_] "dummy-id")
     (^java.util.List scan [_ ^Scan _] (throw (CrudException. "scan failed" nil)))
     (^void put [_ ^Put _] (throw (CrudException. "put failed" nil)))
-    (^void commit [_] (throw (CommitException. "commit failed" nil)))))
+    (^void commit [_] (throw (CommitException. "commit failed" nil)))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (def mock-transaction-throws-unknown
   (reify
@@ -81,7 +84,8 @@
     (getId [_] "unknown-state-tx")
     (^java.util.List scan [_ ^Scan s] (mock-scan s))
     (^void put [_ ^Put p] (mock-put p))
-    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))))
+    (^void commit [_] (throw (UnknownTransactionStatusException. "unknown state" nil)))
+    (^void rollback [_] (swap! rollback-count inc))))
 
 (deftest transfer-client-init-test
   (binding [test-records (atom {})
@@ -156,16 +160,18 @@
       (is (= :fail (:type result))))))
 
 (deftest transfer-client-transfer-crud-exception-test
-  (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
-                scalar/try-reconnection! (spy/spy)]
-    (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
-                               nil nil)
-          result (client/invoke! client
-                                 nil
-                                 (t/transfer {:client client} nil))]
-      (is (spy/called-once? scalar/start-transaction))
-      (is (spy/called-once? scalar/try-reconnection!))
-      (is (= :fail (:type result))))))
+  (binding [rollback-count (atom 0)]
+    (with-redefs [scalar/start-transaction (spy/stub mock-transaction-throws-exception)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (transfer/->TransferClient (atom false) 5 100 1)
+                                 nil nil)
+            result (client/invoke! client
+                                   nil
+                                   (t/transfer {:client client} nil))]
+        (is (spy/called-once? scalar/start-transaction))
+        (is (spy/called-once? scalar/try-reconnection!))
+        (is (= 1 @rollback-count))
+        (is (= :fail (:type result)))))))
 
 (deftest transfer-client-transfer-unknown-exception-test
   (binding [scan-count (atom 0)

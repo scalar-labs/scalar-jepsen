@@ -171,7 +171,8 @@
 (defn rollback-txs
   "Given transactions as a vector are rollbacked."
   [txs]
-  (doseq [tx txs] (.rollback tx)))
+  (doseq [tx txs] (try (.rollback tx)
+                       (catch Exception e (warn (.getMessage e))))))
 
 (defmacro with-retry
   "If the result of the body is nil, it retries it"

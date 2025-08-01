@@ -1,5 +1,6 @@
 (ns scalardb.elle-write-read-2pc
-  (:require [jepsen.client :as client]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.client :as client]
             [jepsen.generator :as gen]
             [jepsen.independent :as independent]
             [scalardb.core :as scalar :refer [DEFAULT_TABLE_COUNT]]
@@ -29,23 +30,33 @@
         (scalar/prepare-2pc-service! test))))
 
   (invoke! [_ test op]
-    (let [tx1 (scalar/start-2pc test)
-          tx2 (scalar/join-2pc test (.getId tx1))
-          [seq-id txn] (:value op)]
-      (try
-        (when (<= @(:table-id test) seq-id)
-          ;; add tables for the next sequence
-          (wr/add-tables test (inc seq-id)))
-        (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
-          (scalar/prepare-validate-commit-txs [tx1 tx2])
-          (assoc op :type :ok :value (independent/tuple seq-id txn')))
-        (catch UnknownTransactionStatusException _
-          (swap! (:unknown-tx test) conj (.getId tx1))
-          (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
-        (catch Exception e
-          (scalar/rollback-txs [tx1 tx2])
+    (let [tx1 (try (scalar/start-2pc test)
+                   (catch Exception e
+                     (warn (.getMessage e))))
+          tx2 (when tx1
+                (try (scalar/join-2pc test (.getId tx1))
+                     (catch Exception e
+                       (warn (.getMessage e)))))]
+      (if (and tx1 tx2)
+        (let [[seq-id txn] (:value op)]
+          (try
+            (when (<= @(:table-id test) seq-id)
+              ;; add tables for the next sequence
+              (wr/add-tables test (inc seq-id)))
+            (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
+              (scalar/prepare-validate-commit-txs [tx1 tx2])
+              (assoc op :type :ok :value (independent/tuple seq-id txn')))
+            (catch UnknownTransactionStatusException _
+              (swap! (:unknown-tx test) conj (.getId tx1))
+              (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
+            (catch Exception e
+              (scalar/rollback-txs [tx1 tx2])
+              (scalar/try-reconnection! test scalar/prepare-2pc-service!)
+              (assoc op :type :fail :error {:crud-error (.getMessage e)}))))
+        (do
+          (when tx1 (scalar/rollback-txs [tx1]))
           (scalar/try-reconnection! test scalar/prepare-2pc-service!)
-          (assoc op :type :fail :error {:crud-error (.getMessage e)})))))
+          (assoc op :type :fail :error {:tx-error "starting tx failed"})))))
 
   (close! [_ _])
 
