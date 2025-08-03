@@ -16,10 +16,14 @@
 (def ^:private ^:const DEFAULT_HELM_CHART_VERSION "1.7.2")
 (def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.2")
 
+(def ^:private ^:const DEFAULT_CLUSTER_NODE_COUNT 3)
+(def ^:private ^:const DEFAULT_CASSANDRA_REPLICA_COUNT 3)
+
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
+(def ^:private ^:const CASSANDRA_NODE_NAME "cassandra-scalardb-cluster")
 
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
@@ -30,18 +34,13 @@
             :tag (or (some-> (env :scalardb-cluster-version) not-empty)
                      DEFAULT_SCALARDB_CLUSTER_VERSION)}
 
+    ;; Storage configurations will be set later
     :scalardbClusterNodeProperties
     (str/join "\n"
               ;; ScalarDB Cluster configurations
               ["scalar.db.cluster.membership.type=KUBERNETES"
                "scalar.db.cluster.membership.kubernetes.endpoint.namespace_name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAMESPACE_NAME}"
                "scalar.db.cluster.membership.kubernetes.endpoint.name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAME}"
-               ""
-               ;; Storage configurations
-               "scalar.db.storage=jdbc"
-               "scalar.db.contact_points=jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
-               "scalar.db.username=postgres"
-               "scalar.db.password=postgres"
                ""
                ;; Set to true to include transaction metadata in the records
                "scalar.db.consensus_commit.include_metadata.enabled=true"])
@@ -51,16 +50,39 @@
 (defn- update-cluster-values
   [test values]
   (let [path [:scalardbCluster :scalardbClusterNodeProperties]
+        [storage contact-points user-pass]
+        (case (:db-type test)
+          :cluster           ["jdbc"
+                              "jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
+                              "postgres"]
+          :cluster-cassandra ["cassandra"
+                              (->> (map #(str "cassandra-scalardb-cluster-"
+                                              %
+                                              ".cassandra-scalardb-cluster-headless.default.svc.cluster.local")
+                                        (range DEFAULT_CASSANDRA_REPLICA_COUNT))
+                                   (str/join ","))
+                              "cassandra"]
+          (throw (ex-info "Unsupported DB type" {:db-type (:db-type test)})))
+        isolation-level (-> test
+                            :isolation-level
+                            name
+                            str/upper-case
+                            (str/replace #"-" "_"))
         new-db-props (-> values
                          (get-in path)
                          (str
+                          ;; storage
+                          "\nscalar.db.storage="
+                          storage
+                          "\nscalar.db.contact_points="
+                          contact-points
+                          "\nscalar.db.username="
+                          user-pass
+                          "\nscalar.db.password="
+                          user-pass
                           ;; isolation level
                           "\nscalar.db.consensus_commit.isolation_level="
-                          (-> test
-                              :isolation-level
-                              name
-                              str/upper-case
-                              (str/replace #"-" "_"))
+                          isolation-level
                           ;; one phase commit
                           (when (:enable-one-phase-commit test)
                             "\nscalar.db.consensus_commit.one_phase_commit.enabled=true")
@@ -109,20 +131,31 @@
 
 (defn- start!
   [test]
-  ;; postgresql
-  (c/exec
-   :helm :install "postgresql-scalardb-cluster" "bitnami/postgresql"
-   :--set "auth.postgresPassword=postgres"
-   :--set "primary.persistence.enabled=true"
-   ;; Need an external IP for storage APIs
-   :--set "service.type=LoadBalancer"
-   :--set "primary.service.type=LoadBalancer"
-   ;; Use legacy images
-   :--set "image.repository=bitnamilegacy/postgresql"
-   :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-   :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
-   :--set "global.security.allowInsecureImages=true"
-   :--version "16.7.0")
+  ;; postgre or cassandra
+  (case (:db-type test)
+    :cluster           (c/exec
+                        :helm :install "postgresql-scalardb-cluster" "bitnami/postgresql"
+                        :--set "auth.postgresPassword=postgres"
+                        :--set "primary.persistence.enabled=true"
+                         ;; Need an external IP for storage APIs
+                        :--set "service.type=LoadBalancer"
+                        :--set "primary.service.type=LoadBalancer"
+                        ;; Use legacy images
+                        :--set "image.repository=bitnamilegacy/postgresql"
+                        :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
+                        :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
+                        :--set "global.security.allowInsecureImages=true"
+                        :--version "16.7.0")
+    :cluster-cassandra (c/exec
+                        :helm :install "cassandra-scalardb-cluster" "bitnami/cassandra"
+                        :--set "dbUser.user=cassandra"
+                        :--set "dbUser.user=cassandra"
+                        :--set "dbUser.password=cassandra"
+                        :--set (str "replicaCount=" DEFAULT_CASSANDRA_REPLICA_COUNT)
+                        ;; Need an external IP for storage APIs
+                        :--set "service.type=LoadBalancer"
+                        :--set "primary.service.type=LoadBalancer")
+    (throw (ex-info "Unsupported DB type" {:db-type (:db-type test)})))
 
   ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
@@ -145,7 +178,8 @@
           :--version DEFAULT_CHAOS_MESH_VERSION))
 
 (defn- wipe!
-  []
+  [test]
+  ;; ignore errors because these files or pods might not exist
   (try
     (info "wiping old logs...")
     (binding [c/*dir* (System/getProperty "user.dir")]
@@ -153,13 +187,24 @@
                (filter #(re-matches #"scalardb-cluster-node-.*\.log" %))
                seq
                (apply c/exec :rm :-f)))
-    (info "wiping the pods...")
-    (c/exec :helm :uninstall :postgresql-scalardb-cluster)
+    (catch Exception _))
+  (info "wiping the pods...")
+  (try
+    (c/exec :helm :uninstall
+            (case (:db-type test)
+              :cluster :postgresql-scalardb-cluster
+              :cluster-cassandra :cassandra-scalardb-cluster))
+    (catch Exception _))
+  (try
     (c/exec :kubectl :delete
             :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
+    (catch Exception _))
+  (try
     (c/exec :helm :uninstall :scalardb-cluster)
+    (catch Exception _))
+  (try
     (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
-    (catch Exception _ nil)))
+    (catch Exception _)))
 
 (defn- get-pod-list
   [name]
@@ -188,7 +233,7 @@
        first))
 
 (defn get-postgres-ip
-  "Get the IP of the load balancer"
+  "Get the IP of the Postgres"
   []
   (->> (c/exec :kubectl :get :svc)
        str/split-lines
@@ -197,20 +242,29 @@
        (map #(nth (str/split % #"\s+") 3))
        first))
 
+(defn get-cassandra-ip
+  "Get one IP of the Cassandra nodes"
+  []
+  (->> (c/exec :kubectl :get :svc)
+       str/split-lines
+       (filter #(str/includes? % "cassandra-scalardb-cluster"))
+       (filter #(str/includes? % "LoadBalancer"))
+       (map #(nth (str/split % #"\s+") 3))
+       first))
+
 (defn- running-pods?
-  "Check a live node."
-  [test]
+  "Check if nodes are running."
+  [test prefix num]
   (-> test
       :nodes
       first
-      (c/on (get-pod-list CLUSTER_NODE_NAME))
+      (c/on (get-pod-list prefix))
       count
-      ;; TODO: check the number of pods
-      (= 3)))
+      (= num)))
 
 (defn- cluster-nodes-ready?
   [test]
-  (and (running-pods? test)
+  (and (running-pods? test CLUSTER_NODE_NAME DEFAULT_CLUSTER_NODE_COUNT)
        (try
          (c/on (-> test :nodes first)
                (->> (get-pod-list CLUSTER_NODE_NAME)
@@ -223,12 +277,30 @@
            (warn e "An error occurred")
            false))))
 
+(defn- cassandra-nodes-ready?
+  [test]
+  (or (not= (:db-type test) :cluster-cassandra)
+      (and (running-pods? test
+                          CASSANDRA_NODE_NAME
+                          DEFAULT_CASSANDRA_REPLICA_COUNT)
+           (try
+             (c/on (-> test :nodes first)
+                   (->> (get-pod-list CASSANDRA_NODE_NAME)
+                        (mapv #(c/exec :kubectl :wait
+                                       "--for=condition=Ready"
+                                       "--timeout=120s"
+                                       (str "pod/" %)))))
+             true
+             (catch Exception e
+               (warn (.getMessage e))
+               false)))))
+
 (defn- wait-for-recovery
   "Wait for the node bootstrapping."
   ([test]
    (wait-for-recovery TIMEOUT_SEC INTERVAL_SEC test))
   ([timeout-sec interval-sec test]
-   (when-not (cluster-nodes-ready? test)
+   (when-not (and (cassandra-nodes-ready? test) (cluster-nodes-ready? test))
      (Thread/sleep (* interval-sec 1000))
      (if (>= timeout-sec interval-sec)
        (wait-for-recovery (- timeout-sec interval-sec) interval-sec test)
@@ -242,7 +314,7 @@
     db/DB
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe!))
+        (wipe! test))
       (install!)
       (configure! test)
       (start! test)
@@ -251,7 +323,7 @@
 
     (teardown! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe!)))
+        (wipe! test)))
 
     db/Primary
     (primaries [_ test] (:nodes test))
@@ -276,7 +348,9 @@
 (defrecord ExtCluster []
   ext/DbExtension
   (get-db-type [_] :cluster)
-  (live-nodes [_ test] (running-pods? test))
+  (live-nodes [_ test] (running-pods? test
+                                      CLUSTER_NODE_NAME
+                                      DEFAULT_CLUSTER_NODE_COUNT))
   (wait-for-recovery [_ test] (wait-for-recovery test))
   (create-table-opts [_ _] {})
   (create-properties
@@ -294,13 +368,23 @@
                (ext/set-common-properties test)))))
   (create-storage-properties [_ _]
     (let [node (-> test :nodes first)
-          ip (c/on node (get-postgres-ip))]
+          db-type (:db-type test)
+          [storage contact-points user-pass]
+          (c/on node (case db-type
+                       :cluster ["jdbc"
+                                 (str "jdbc:postgresql://"
+                                      (get-postgres-ip)
+                                      ":5432/postgres")
+                                 "postgres"]
+                       :cluster-cassandra ["cassandra"
+                                           (get-cassandra-ip)
+                                           "cassandra"]
+                       (throw (ex-info "Unsupported DB type" {:db-type db-type}))))]
       (doto (Properties.)
-        (.setProperty "scalar.db.storage" "jdbc")
-        (.setProperty "scalar.db.contact_points"
-                      (str "jdbc:postgresql://" ip ":5432/postgres"))
-        (.setProperty "scalar.db.username" "postgres")
-        (.setProperty "scalar.db.password" "postgres")))))
+        (.setProperty "scalar.db.storage" storage)
+        (.setProperty "scalar.db.contact_points" contact-points)
+        (.setProperty "scalar.db.username" user-pass)
+        (.setProperty "scalar.db.password" user-pass)))))
 
 (defn gen-db
   [faults admin]
