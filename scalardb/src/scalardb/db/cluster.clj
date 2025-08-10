@@ -19,7 +19,7 @@
 (def ^:private ^:const DEFAULT_CLUSTER_NODE_COUNT 3)
 (def ^:private ^:const DEFAULT_CASSANDRA_REPLICA_COUNT 3)
 
-(def ^:private ^:const TIMEOUT_SEC 600)
+(def ^:private ^:const TIMEOUT_SEC 900)
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
