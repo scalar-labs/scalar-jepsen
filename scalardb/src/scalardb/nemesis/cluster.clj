@@ -15,6 +15,8 @@
 (def ^:private ^:const PARTITION_YAML "./partition.yaml")
 (def ^:private ^:const PACKET_FAULT_YAML "./packet-fault.yaml")
 
+(def ^:private ^:const MAX_FAULT_POD_NUM 3)
+
 (defn- time-fault-yaml
   [pod-name]
   (str "./time-fault-" pod-name ".yaml"))
@@ -37,12 +39,8 @@
   (if (contains? #{:pause :kill} pod-fault)
     (binding [c/*dir* (System/getProperty "user.dir")]
       (let [targets (->> (get-pod-list)
-                         ;; choose envoy or cluster nodes
-                         ;(filter #(str/starts-with? % "scalardb-"))
-                         ;; TODO: test failed when killing a postgres pod
-                         (filter #(str/starts-with? % "postgresql-"))
                          shuffle
-                         (take (inc (rand-int 3))))
+                         (take (inc (rand-int MAX_FAULT_POD_NUM))))
             action (case pod-fault
                      :pause "pod-failure"
                      :kill "pod-kill")
@@ -196,7 +194,7 @@
         :start (c/on (-> test :nodes first)
                      (let [grudge (->> (get-pod-list)
                                        shuffle
-                                       (take (inc (rand-int 3))))]
+                                       (take (inc (rand-int MAX_FAULT_POD_NUM))))]
                        (apply-partition-exp grudge)
                        (assoc op :value [:isolated grudge])))
         :stop  (do (c/on (-> test :nodes first) (delete-partition-exp))
@@ -274,7 +272,7 @@
                         (->> (c/on (-> test :nodes first)
                                    (get-cluster-node-pods))
                              shuffle
-                             (take (inc (rand-int 3)))))
+                             (take (inc (rand-int MAX_FAULT_POD_NUM)))))
         clock-gen (gen/mix [(nt/reset-gen-select target-select)
                             (nt/bump-gen-select  target-select)])
         gen (->> clock-gen

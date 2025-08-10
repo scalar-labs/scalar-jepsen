@@ -196,8 +196,11 @@
               :cluster-cassandra :cassandra-scalardb-cluster))
     (catch Exception _))
   (try
-    (c/exec :kubectl :delete
-            :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
+    (c/exec :kubectl :delete :pvc :-l
+            (str "app.kubernetes.io/instance="
+                 (case (:db-type test)
+                   :cluster "postgresql-scalardb-cluster"
+                   :cluster-cassandra "cassandra-scalardb-cluster")))
     (catch Exception _))
   (try
     (c/exec :helm :uninstall :scalardb-cluster)
