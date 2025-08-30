@@ -19,7 +19,7 @@
 (def ^:private ^:const DEFAULT_CLUSTER_NODE_COUNT 3)
 (def ^:private ^:const DEFAULT_CASSANDRA_REPLICA_COUNT 3)
 
-(def ^:private ^:const TIMEOUT_SEC 900)
+(def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
@@ -152,6 +152,8 @@
                         :--set "dbUser.user=cassandra"
                         :--set "dbUser.password=cassandra"
                         :--set (str "replicaCount=" DEFAULT_CASSANDRA_REPLICA_COUNT)
+                        ;; TODO: config cassandra.yaml for commitlog_sync
+                        :--set "persistence.enabled=true"
                         ;; Need an external IP for storage APIs
                         :--set "service.type=LoadBalancer"
                         :--set "primary.service.type=LoadBalancer")
@@ -258,6 +260,7 @@
 (defn- running-pods?
   "Check if nodes are running."
   [test prefix num]
+  (info "DEBUG:" (-> test :nodes first (c/on (c/exec :kubectl :describe :pod "cassandra-scalardb-cluster-0"))))
   (-> test
       :nodes
       first
