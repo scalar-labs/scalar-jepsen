@@ -260,7 +260,7 @@
 (defn- running-pods?
   "Check if nodes are running."
   [test prefix num]
-  (info "DEBUG:" (-> test :nodes first (c/on (c/exec :kubectl :describe :pod "cassandra-scalardb-cluster-0"))))
+  (info "DEBUG:" (-> test :nodes first (c/on (c/exec :kubectl :get :pods))))
   (-> test
       :nodes
       first
