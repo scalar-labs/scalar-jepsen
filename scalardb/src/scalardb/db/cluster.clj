@@ -96,10 +96,11 @@
       (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
       ;; ignore the failure when the secret doesn't exist
       (catch Exception _))
-    (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
-            "--docker-server=ghcr.io"
-            (str "--docker-username=" (:docker-username test))
-            (str "--docker-password=" (:docker-access-token test))))
+    (when-let [docker-username (:docker-username test)]
+      (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
+              "--docker-server=ghcr.io"
+              (str "--docker-username=" docker-username)
+              (str "--docker-password=" (:docker-access-token test)))))
 
   ;; Chaos Mesh
   (try

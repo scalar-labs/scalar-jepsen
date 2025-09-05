@@ -28,7 +28,8 @@
                                (t-append/calc-new-age to-result)
                                (t-append/calc-new-balance to-result amount))
          (.put tx2)))
-  (scalar/prepare-validate-commit-txs [tx1 tx2]))
+  (scalar/prepare-validate-commit-txs [tx1 tx2])
+  (infof "Transferring %d from %d to %d succeeded (tx: %s)" amount from to (.getId tx1)))
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]

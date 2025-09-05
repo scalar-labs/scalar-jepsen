@@ -19,8 +19,7 @@
                                             :exclusions [software.amazon.awssdk/*
                                                          com.oracle.database.jdbc/ojdbc8-production
                                                          com.azure/azure-cosmos
-                                                         io.grpc/grpc-core
-                                                         com.scalar-labs/scalardb-rpc]]]}
+                                                         io.grpc/grpc-core]]]}
              :cassandra {:dependencies [[cassandra "0.1.0-SNAPSHOT"
                                          :exclusions [org.apache.commons/commons-lang3]]]
                          :env {:cassandra? "true"}}
@@ -28,8 +27,7 @@
                                        ;; avoid the netty dependency issue
                                        :exclusions [software.amazon.awssdk/*
                                                     com.oracle.database.jdbc/ojdbc8-production
-                                                    com.azure/azure-cosmos
-                                                    com.scalar-labs/scalardb-rpc]]]
+                                                    com.azure/azure-cosmos]]]
                        :env {:scalardb-cluster-version "4.0.0-SNAPSHOT"
                              :helm-chart-version "1.7.2"}}
              :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]

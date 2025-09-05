@@ -88,9 +88,11 @@
 
    [nil "--docker-username DOCKER_USERNAME"
     "Username to pull ScalarDB Cluster node image in ghcr.io."
-    :default ""]
+    :default nil]
+
    [nil "--docker-access-token DOCKER_ACCESS_TOKEN"
-    "Access token to pull ScalarDB Cluster node image in ghcr.io."]])
+    "Access token to pull ScalarDB Cluster node image in ghcr.io."
+    :default nil]])
 
 (defn- test-name
   [workload-key faults admin]
