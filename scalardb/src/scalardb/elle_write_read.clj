@@ -93,7 +93,7 @@
 
   (invoke! [_ test op]
     (if-let [tx (try (scalar/start-transaction test)
-                     (catch Exception e (warn (.getMessage e))))]
+                     (catch Exception e (warn e "Starting tx failed")))]
       (let [[seq-id txn] (:value op)]
         (try
           (when (<= @(:table-id test) seq-id)
@@ -102,10 +102,12 @@
           (let [txn' (mapv (partial tx-execute seq-id tx) txn)]
             (.commit tx)
             (assoc op :type :ok :value (independent/tuple seq-id txn')))
-          (catch UnknownTransactionStatusException _
+          (catch UnknownTransactionStatusException e
             (swap! (:unknown-tx test) conj (.getId tx))
+            (warn e "Unknown transaction: " (.getId tx))
             (assoc op :type :info :error {:unknown-tx-status (.getId tx)}))
           (catch Exception e
+            (warn e "An error occurred during the transaction")
             (scalar/rollback-txs [tx])
             (scalar/try-reconnection! test scalar/prepare-transaction-service!)
             (assoc op :type :fail :error {:crud-error (.getMessage e)}))))

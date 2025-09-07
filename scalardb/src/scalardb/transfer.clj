@@ -103,16 +103,16 @@
   [test {:keys [from to amount]}]
   (if-let [tx (try (scalar/start-transaction test)
                    (catch Exception e
-                     (warn (.getMessage e))))]
+                     (warn e "Starting a transaction failed")))]
     (try
       (tx-transfer tx from to amount)
       :commit
-      (catch UnknownTransactionStatusException _
+      (catch UnknownTransactionStatusException e
         (swap! (:unknown-tx test) conj (.getId tx))
-        (warn "Unknown transaction: " (.getId tx))
+        (warn e "Unknown transaction: " (.getId tx))
         :unknown-tx-status)
       (catch Exception e
-        (warn (.getMessage e))
+        (warn e "An error occurred during the transaction")
         (scalar/rollback-txs [tx])
         :fail))
     :start-fail))
@@ -143,7 +143,7 @@
       (.commit tx)
       results)
     (catch Exception e
-      (warn "read-all failed:" (.getMessage e))
+      (warn e "read-all failed.")
       nil)))
 
 (defn read-all-with-retry

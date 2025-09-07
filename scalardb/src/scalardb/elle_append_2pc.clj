@@ -39,12 +39,10 @@
 
   (invoke! [_ test op]
     (let [tx1 (try (scalar/start-2pc test)
-                   (catch Exception e
-                     (warn (.getMessage e))))
+                   (catch Exception e (warn e "Starting a transaction failed")))
           tx2 (when tx1
                 (try (scalar/join-2pc test (.getId tx1))
-                     (catch Exception e
-                       (warn (.getMessage e)))))]
+                     (catch Exception e (warn e "Starting a transaction failed"))))]
       (if (and tx1 tx2)
         (let [[seq-id txn] (:value op)]
           (try
@@ -54,10 +52,12 @@
             (let [txn' (mapv (partial tx-execute seq-id tx1 tx2) txn)]
               (scalar/prepare-validate-commit-txs [tx1 tx2])
               (assoc op :type :ok :value (independent/tuple seq-id txn')))
-            (catch UnknownTransactionStatusException _
+            (catch UnknownTransactionStatusException e
               (swap! (:unknown-tx test) conj (.getId tx1))
+              (warn e "Unknown transaction: " (.getId tx1))
               (assoc op :type :info :error {:unknown-tx-status (.getId tx1)}))
             (catch Exception e
+              (warn e "An error occurred during the transaction")
               (scalar/rollback-txs [tx1 tx2])
               (scalar/try-reconnection! test scalar/prepare-2pc-service!)
               (assoc op :type :fail :error {:crud-error (.getMessage e)}))))

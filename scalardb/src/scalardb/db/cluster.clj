@@ -121,7 +121,7 @@
   ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
                           DEFAULT_HELM_CHART_VERSION)]
-    (info "helm chart version:" chart-version)
+    (info "helm chart version: " chart-version)
     (binding [c/*dir* (System/getProperty "user.dir")]
       (->> CLUSTER_VALUES
            (update-cluster-values test)
@@ -214,7 +214,7 @@
                                    (str "pod/" %)))))
          true
          (catch Exception e
-           (warn (.getMessage e))
+           (warn e "An error occurred")
            false))))
 
 (defn- wait-for-recovery
@@ -299,5 +299,5 @@
 (defn gen-db
   [faults admin]
   (when (seq admin)
-    (warn "The admin operations are ignored:" admin))
+    (warn "The admin operations are ignored: " admin))
   [(ext/extend-db (db) (->ExtCluster)) (n/nemesis-package db 60 faults) 1])

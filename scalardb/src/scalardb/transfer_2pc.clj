@@ -26,22 +26,20 @@
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]
   (let [tx1 (try (scalar/start-2pc test)
-                 (catch Exception e
-                   (warn (.getMessage e))))
+                 (catch Exception e (warn e "Starting a transaction failed")))
         tx2 (when tx1
               (try (scalar/join-2pc test (.getId tx1))
-                   (catch Exception e
-                     (warn (.getMessage e)))))]
+                   (catch Exception e (warn e "Starting a transaction failed"))))]
     (if (and tx1 tx2)
       (try
         (tx-transfer tx1 tx2 from to amount)
         :commit
-        (catch UnknownTransactionStatusException _
+        (catch UnknownTransactionStatusException e
           (swap! (:unknown-tx test) conj (.getId tx1))
-          (warn "Unknown transaction: " (.getId tx1))
+          (warn e "Unknown transaction: " (.getId tx1))
           :unknown-tx-status)
         (catch Exception e
-          (warn (.getMessage e))
+          (warn e "An error occurred during the transaction")
           (scalar/rollback-txs [tx1 tx2])
           :fail))
       (do
