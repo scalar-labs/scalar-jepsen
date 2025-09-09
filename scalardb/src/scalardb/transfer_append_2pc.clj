@@ -36,7 +36,7 @@
                  (catch Exception e (warn e "Starting a transaction failed")))
         tx2 (if tx1
               (try (scalar/join-2pc test (.getId tx1))
-                   (catch Exception e (warn e "Joining a transaction failed")))
+                   (catch Exception e (warn e "Joining the transaction failed")))
               nil)]
     (if (and tx1 tx2)
       (try

@@ -29,7 +29,7 @@
                  (catch Exception e (warn e "Starting a transaction failed")))
         tx2 (when tx1
               (try (scalar/join-2pc test (.getId tx1))
-                   (catch Exception e (warn e "Joining a transaction failed"))))]
+                   (catch Exception e (warn e "Joining the transaction failed"))))]
     (if (and tx1 tx2)
       (try
         (tx-transfer tx1 tx2 from to amount)
