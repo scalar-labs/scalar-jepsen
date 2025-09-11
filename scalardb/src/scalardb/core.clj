@@ -40,13 +40,13 @@
           (exponential-backoff (- RETRIES retries))
           (try
             (SchemaLoader/repairAll properties schema options true)
-            (catch Exception e (warn (.getMessage e))))
+            (catch Exception e (warn e "Repairing the schema failed")))
           (exponential-backoff (- RETRIES retries)))
         (let [result (try
                        (SchemaLoader/load properties schema options true)
                        :success
                        (catch Exception e
-                         (warn (.getMessage e))
+                         (warn e "Loading the schema failed")
                          :fail))]
           (when (= result :fail)
             (recur (dec retries))))))))
@@ -97,7 +97,7 @@
                [(.getTwoPhaseCommitTransactionManager factory)
                 (.getTwoPhaseCommitTransactionManager factory)]))
       (catch Exception e
-        (warn "Failed to create a service instance" mode \: (.getMessage e))))))
+        (warn e "Failed to create a service instance: " mode)))))
 
 (defn- prepare-service!
   [test mode]
@@ -172,7 +172,7 @@
   "Given transactions as a vector are rollbacked."
   [txs]
   (doseq [tx txs] (try (.rollback tx)
-                       (catch Exception e (warn (.getMessage e))))))
+                       (catch Exception e (warn e "Rolling back the transaction failed")))))
 
 (defmacro with-retry
   "If the result of the body is nil, it retries it"
@@ -199,7 +199,7 @@
                        {:exception e})))]
       (if-let [e (:exception res)]
         (do
-          (warn e)
+          (warn e "An error occurred")
           (when fallback (fallback))
           (exponential-backoff (- RETRIES tries))
           (recur (dec tries) f args fallback))

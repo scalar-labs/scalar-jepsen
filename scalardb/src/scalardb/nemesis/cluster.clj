@@ -52,14 +52,14 @@
             spec (if (= pod-fault :pause)
                    (assoc base-spec :duration "60s")
                    base-spec)]
-        (info "Try" action "nodes:" targets)
+        (info "Try" action "nodes: " targets)
         (->> (yaml/generate-string
               {:apiVersion "chaos-mesh.org/v1alpha1"
                :kind "PodChaos"
                :metadata {:name action :namespace "chaos-mesh"}
                :spec spec})
              (spit POD_FAULT_YAML))
-        (info "DEBUG:" (slurp POD_FAULT_YAML))
+        (info "DEBUG: " (slurp POD_FAULT_YAML))
         (c/exec :kubectl :apply :-f POD_FAULT_YAML)
         targets))
     (error "Unexpected pod-fault type")))
@@ -79,7 +79,7 @@
                     :target {:mode "all"
                              :selector {:pods {"default" grudge}}}}})
            (spit PARTITION_YAML))
-      (info "DEBUG:" (slurp PARTITION_YAML))
+      (info "DEBUG: " (slurp PARTITION_YAML))
       (c/exec :kubectl :apply :-f PARTITION_YAML))))
 
 (defn- apply-packet-fault-exp
@@ -120,7 +120,7 @@
       (->> (assoc-in base [:spec (if (= kind :rate) :rate action)] fault-spec)
            yaml/generate-string
            (spit PACKET_FAULT_YAML))
-      (info "DEBUG:" (slurp PACKET_FAULT_YAML))
+      (info "DEBUG: " (slurp PACKET_FAULT_YAML))
       (c/exec :kubectl :apply :-f PACKET_FAULT_YAML))))
 
 (defn- delete-chaos-exp

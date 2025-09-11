@@ -11,9 +11,6 @@
                               TwoPhaseCommitTransactionManager
                               Get
                               Result)
-           (com.scalar.db.io BigIntValue
-                             IntValue
-                             TextValue)
            (java.util Optional)))
 
 (defn- mock-result
@@ -21,13 +18,21 @@
   [id]
   (reify
     Result
-    (getValue [_ column]
+    (getText [_ column]
       (condp = column
-        "tx_id" (Optional/of (TextValue. column id))
-        "tx_created_at" (Optional/of (BigIntValue. column (long 1566376246)))
-        "tx_state" (Optional/of (IntValue. column (Integer/parseInt id)))
-        ;; for the coordinator table
-        "tx_child_ids" (Optional/empty)))))
+        "tx_id" id
+        "tx_child_ids" nil))
+    (getInt [_ column]
+      (condp = column
+        "tx_state" (Integer/parseInt id)))
+    (getBigInt [_ column]
+      (condp = column
+        "tx_created_at" (long 1566376246)))
+    (isNull [_ column]
+      (condp = column
+        "tx_id" false
+        "tx_state" false
+        "tx_created_at" false))))
 
 (def mock-db
   (reify
