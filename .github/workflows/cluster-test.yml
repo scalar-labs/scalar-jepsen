@@ -170,9 +170,23 @@ jobs:
           --docker-access-token ${{ secrets.CR_PAT }} \
           ${OPTS}
 
+    - name: Dump PostgreSQL
+      if: always()
+      run: |
+        mkdir dumps
+        kubectl exec postgresql-scalardb-cluster-0 -- bash -c 'PGPASSWORD=postgres psql -U postgres -c "SELECT * FROM coordinator.state"' > dumps/coordinator_dump.txt
+        kubectl exec postgresql-scalardb-cluster-0 -- bash -c 'PGPASSWORD=postgres psql -U postgres -c "SELECT * FROM jepsen.transfer"' > dumps/jepsen_dump.txt
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: jepsen-logs
         path: scalardb/store
+
+    - name: Upload dumps
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: dumps
+        path: dumps
