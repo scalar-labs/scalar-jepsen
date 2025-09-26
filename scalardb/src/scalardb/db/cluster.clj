@@ -109,14 +109,20 @@
 
 (defn- start!
   [test]
-  ;; postgre
+  ;; postgresql
   (c/exec
    :helm :install "postgresql-scalardb-cluster" "bitnami/postgresql"
    :--set "auth.postgresPassword=postgres"
    :--set "primary.persistence.enabled=true"
    ;; Need an external IP for storage APIs
    :--set "service.type=LoadBalancer"
-   :--set "primary.service.type=LoadBalancer")
+   :--set "primary.service.type=LoadBalancer"
+   ;; Use legacy images
+   :--set "image.repository=bitnamilegacy/postgresql"
+   :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
+   :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
+   :--set "global.security.allowInsecureImages=true"
+   :--version "16.7.0")
 
   ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
