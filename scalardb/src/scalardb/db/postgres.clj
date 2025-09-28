@@ -140,7 +140,6 @@
 
 (defrecord ExtPostgres []
   ext/DbExtension
-  (get-db-type [_] :postgres)
   (live-nodes [_ test] (live-node? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
   (create-table-opts [_ _] {})

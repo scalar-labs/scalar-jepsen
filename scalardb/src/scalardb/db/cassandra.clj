@@ -11,7 +11,6 @@
 
 (defrecord ExtCassandra []
   ext/DbExtension
-  (get-db-type [_] :cassandra)
   (live-nodes [_ test] (cassandra/live-nodes test))
   (wait-for-recovery [_ test] (cassandra/wait-rf-nodes test))
   (create-table-opts

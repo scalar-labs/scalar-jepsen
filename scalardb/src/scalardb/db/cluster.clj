@@ -357,7 +357,6 @@
 
 (defrecord ExtCluster []
   ext/DbExtension
-  (get-db-type [_] :cluster)
   (live-nodes [_ test] (running-pods? test
                                       CLUSTER_NODE_NAME
                                       DEFAULT_CLUSTER_NODE_COUNT))
@@ -376,7 +375,7 @@
                  (.setProperty "scalar.db.sql.cluster_mode.contact_points"
                                (str "indirect:" ip)))
                (ext/set-common-properties test)))))
-  (create-storage-properties [_ _]
+  (create-storage-properties [_ test]
     (let [node (-> test :nodes first)
           db-type (:db-type test)
           [storage contact-points user-pass]
