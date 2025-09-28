@@ -17,7 +17,7 @@
 (def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.2")
 
 (def ^:private ^:const DEFAULT_CLUSTER_NODE_COUNT 3)
-(def ^:private ^:const DEFAULT_CASSANDRA_REPLICA_COUNT 3)
+(def ^:private ^:const DEFAULT_CASSANDRA_REPLICA_COUNT 1)
 
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
