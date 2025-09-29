@@ -56,7 +56,7 @@ on:
           - snapshot
           - serializable
       consistency_model:
-        description: 'Cosnsistency model for Jepsen checking'
+        description: 'Consistency model for Jepsen checking'
         type: choice
         default: cursor-stability
         options:
