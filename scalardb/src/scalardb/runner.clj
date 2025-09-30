@@ -19,11 +19,12 @@
              [elle-write-read-2pc]]
             [clojure.core :as c]))
 
-(def db-keys
+(def db-types
   "The map of test DBs."
   {"cassandra" :cassandra
    "postgres" :postgres
-   "cluster" :cluster})
+   "cluster" :cluster
+   "cluster-cassandra" :cluster-cassandra})
 
 (def workload-keys
   "A map of test workload keys."
@@ -58,7 +59,7 @@
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"
-                     [:cassandra] db-keys)
+                     [:cassandra] db-types)
 
    (cli/repeated-opt nil "--workload NAME" "Test(s) to run" [] workload-keys)
 
@@ -101,21 +102,24 @@
       (into (map name admin))
       (->> (remove nil?) (string/join "-"))))
 
-(defn- load-module
-  [db-key]
-  (case db-key
-    :cassandra (require 'scalardb.db.cassandra)
-    :postgres  (require 'scalardb.db.postgres)
-    :cluster  (require 'scalardb.db.cluster)
-    (throw (ex-info "Unsupported DB" {:db db-key}))))
+(def ^:private db->gen-namespace
+  {:cassandra          'scalardb.db.cassandra
+   :postgres           'scalardb.db.postgres
+   :cluster            'scalardb.db.cluster
+   :cluster-cassandra  'scalardb.db.cluster})
+
+(defn- load-gen-db-fn
+  [db-type]
+  (if-let [ns-sym (db->gen-namespace db-type)]
+    (do
+      (require ns-sym)
+      (-> ns-sym str (symbol "gen-db") resolve))
+    (throw (ex-info "Unsupported DB" {:db db-type}))))
 
 (defn- gen-db
   "Returns [extended-db constructed-nemesis num-max-nodes]."
-  [db-key faults admin]
-  (load-module db-key)
-  (let [gen-db-sym (symbol (str "scalardb.db." (name db-key)) "gen-db")
-        gen-db-fn (resolve gen-db-sym)]
-    (gen-db-fn faults admin)))
+  [db-type faults admin]
+  ((load-gen-db-fn db-type) faults admin))
 
 (defn- gen-test-opt-spec
   []
@@ -136,8 +140,8 @@
    :decommissioned (atom #{})})
 
 (defn scalardb-test
-  [base-opts db-key workload-key faults admin]
-  (let [[db nemesis max-nodes] (gen-db db-key faults admin)
+  [base-opts db-type workload-key faults admin]
+  (let [[db nemesis max-nodes] (gen-db db-type faults admin)
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
                              scalardb-opts
@@ -148,6 +152,7 @@
            workload-opts
            {:name (test-name workload-key faults admin)
             :client (:client workload)
+            :db-type db-type
             :db db
             :pure-generators true
             :generator (gen/phases
@@ -169,12 +174,12 @@
            :usage (cli/test-usage)
            :run (fn [{:keys [options]}]
                   (doseq [_ (range (:test-count options))
-                          db-key (:db options)
+                          db-type (:db options)
                           workload-key (:workload options)
                           faults (:nemesis options)
                           admin (or (:admin options) [[]])]
                     (let [test (-> options
-                                   (scalardb-test db-key
+                                   (scalardb-test db-type
                                                   workload-key
                                                   faults
                                                   admin)

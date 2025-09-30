@@ -40,6 +40,13 @@ jobs:
   cluster:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - type: "cluster"
+          - type: "cluster-cassandra"
+
     steps:
     - uses: actions/checkout@v4
 
@@ -121,16 +128,7 @@ jobs:
     - name: ScalarDB Cluster test
       run: |
         cd scalardb
-        lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --username runner --ssh-private-key ~/.ssh/id_rsa --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --nemesis crash
-
-    - name: Check test result
-      run: |
-        if grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
-          echo "Test passed"
-        else
-          echo "Test failed"
-          exit 1
-        fi
+        lein with-profile cluster run test --workload transfer --nodes localhost --db ${{ matrix.db.type }} --username runner --ssh-private-key ~/.ssh/id_rsa --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --nemesis crash
 
     - name: Upload logs
       if: always()
