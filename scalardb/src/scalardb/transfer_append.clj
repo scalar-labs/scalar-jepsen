@@ -111,7 +111,8 @@
                       (calc-new-age to-result)
                       (calc-new-balance to-result amount))
          (.put tx))
-    (.commit tx)))
+    (.commit tx)
+    (infof "Transferring %d from %d to %d succeeded (tx: %s)" amount from to (.getId tx))))
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]

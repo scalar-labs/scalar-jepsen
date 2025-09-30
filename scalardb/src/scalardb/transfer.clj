@@ -97,7 +97,8 @@
     (->> (calc-new-balance toResult amount)
          (prepare-put to)
          (.put tx))
-    (.commit tx)))
+    (.commit tx)
+    (infof "Transferring %d from %d to %d succeeded (tx: %s)" amount from to (.getId tx))))
 
 (defn- try-tx-transfer
   [test {:keys [from to amount]}]

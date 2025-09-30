@@ -3,6 +3,10 @@ name: ScalarDB Cluster Test (dispatch)
 on:
   workflow_dispatch:
     inputs:
+      scalardb_cluster_ref:
+        description: 'ScalarDB Cluster branch, tag or commit SHA to checkout'
+        type: string
+        default: "main"
       scalardb_cluster_version:
         description: 'ScalarDB Cluster version'
         type: string
@@ -52,10 +56,11 @@ on:
           - snapshot
           - serializable
       consistency_model:
-        description: 'Cosnsistency model for Jepsen checking'
+        description: 'Consistency model for Jepsen checking'
         type: choice
-        default: snapshot-isolation
+        default: cursor-stability
         options:
+          - cursor-stability
           - snapshot-isolation
           - strict-serializable
 
@@ -63,11 +68,11 @@ jobs:
   cluster:
     runs-on: ubuntu-latest
 
-    env:
-      SCALARDB_CLUSTER_VERSION: ${{ github.event.inputs.scalardb_cluster_version }}
-
     steps:
-    - uses: actions/checkout@v4
+    - name: Display inputs
+      run: echo "${{ toJSON(github.event.inputs) }}"
+
+    - uses: actions/checkout@v5
 
     # Need ssh to the localhost
     - name: Install SSH server
@@ -87,7 +92,7 @@ jobs:
         sudo service ssh restart
 
     - name: Setup Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v5
       with:
         java-version: '11'
         distribution: 'temurin'
@@ -104,9 +109,6 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
         restore-keys: |
           ${{ runner.os }}-m2-
-
-    - name: Set up Docker
-      uses: docker/setup-buildx-action@v3
 
     - name: Set up Kind cluster
       uses: helm/kind-action@v1.12.0
@@ -144,9 +146,39 @@ jobs:
           namespace: metallb-system
         EOF
 
-    - name: ScalarDB Cluster test
+    - name: Checkout ScalarDB Cluster repository
+      uses: actions/checkout@v5
+      with:
+        repository: scalar-labs/scalardb-cluster
+        ref: ${{ github.event.inputs.scalardb_cluster_ref }}
+        token: ${{ secrets.CR_PAT }}
+        path: scalardb-cluster
+
+    - name: Build ScalarDB Cluster Node Docker image
+      run: |
+        cd scalardb-cluster
+        ./gradlew :node:docker \
+          -PgprUsername="${{ github.repository_owner }}" \
+          -PgprPassword="${{ secrets.CR_PAT }}"
+
+    - name: Load ScalarDB Cluster Node Docker image to Kind cluster
+      run: |
+        kind load docker-image ghcr.io/scalar-labs/scalardb-cluster-node:${{ github.event.inputs.scalardb_cluster_version }} --name test-cluster
+
+    - name: Publish ScalarDB Cluster Java SDKs to Maven Local
+      run: |
+        cd scalardb-cluster
+        ./gradlew publishToMavenLocal \
+          -PgprUsername="${{ github.repository_owner }}" \
+          -PgprPassword="${{ secrets.CR_PAT }}"
+
+    - name: Run ScalarDB Cluster test
       run: |
         cd scalardb
+
+        # Replace the ScalarDB Cluster version in project.clj
+        sed -i "s/4.0.0-SNAPSHOT/${{ github.event.inputs.scalardb_cluster_version }}/g" project.clj
+
         OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
         OPTS+=" --workload ${{ github.event.inputs.workload }}"
         OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
@@ -166,8 +198,6 @@ jobs:
           --concurrency 5 \
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
-          --docker-username ${{ github.repository_owner }} \
-          --docker-access-token ${{ secrets.CR_PAT }} \
           ${OPTS}
 
     - name: Upload logs
