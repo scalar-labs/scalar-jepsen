@@ -30,7 +30,8 @@
 
 (defn setup-transaction-tables
   [test schemata]
-  (let [properties (ext/create-properties (:db test) test)
+  (let [created (ext/create-properties (:db test) test)
+        properties (if (vector? created) (first created) created)
         options (ext/create-table-opts (:db test) test)]
     (doseq [schema (map cheshire/generate-string schemata)]
       (loop [retries RETRIES]
@@ -85,17 +86,18 @@
 
 (defn- create-service-instance
   [test mode]
-  (when-let [properties (ext/create-properties (:db test) test)]
+  (let [created (ext/create-properties (:db test) test)
+        [properties properties2] (if (vector? created) created [created nil])]
     (try
       (condp = mode
         :storage (.getStorage (StorageFactory/create
                                (ext/create-storage-properties (:db test) test)))
         :transaction (.getTransactionManager
                       (TransactionFactory/create properties))
-        :2pc (let [factory (TransactionFactory/create properties)]
-               ; create two Two-phase commit transaction managers
-               [(.getTwoPhaseCommitTransactionManager factory)
-                (.getTwoPhaseCommitTransactionManager factory)]))
+        :2pc (mapv #(-> %
+                        TransactionFactory/create
+                        .getTwoPhaseCommitTransactionManager)
+                   [properties properties2]))
       (catch Exception e
         (warn e "Failed to create a service instance: " mode)))))
 
@@ -129,11 +131,6 @@
 (defn prepare-2pc-service!
   [test]
   (prepare-service! test :2pc))
-
-(defn check-storage-connection!
-  [test]
-  (when-not @(:storage test)
-    (prepare-storage-service! test)))
 
 (defn check-transaction-connection!
   [test]

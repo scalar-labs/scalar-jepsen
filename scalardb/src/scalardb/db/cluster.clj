@@ -20,6 +20,7 @@
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
+(def ^:private ^:const CLUSTER2_NODE_NAME "scalardb-cluster-2-node")
 
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
@@ -74,6 +75,10 @@
                               "scalar.db.consensus_commit.coordinator.group_commit.delayed_slot_move_timeout_millis=400"
                               "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled=true"]))))]
     (assoc-in values path new-db-props)))
+
+(defn- need-two-clusters?
+  [test]
+  (str/includes? (:name test) "2pc"))
 
 (defn- install!
   "Install prerequisites.
@@ -138,6 +143,11 @@
               :-f CLUSTER_VALUES_YAML
               :--version chart-version
               :-n "default")
+      (when (need-two-clusters? test)
+        (c/exec :helm :install "scalardb-cluster-2" "scalar-labs/scalardb-cluster"
+                :-f CLUSTER_VALUES_YAML
+                :--version chart-version
+                :-n "default"))
       (-> CLUSTER_VALUES_YAML File. .delete)))
 
   ;; Chaos mesh
@@ -159,6 +169,7 @@
     (c/exec :kubectl :delete
             :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
     (c/exec :helm :uninstall :scalardb-cluster)
+    (c/exec :helm :uninstall :scalardb-cluster-2)
     (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
     (catch Exception _ nil)))
 
@@ -173,27 +184,18 @@
 (defn- get-logs
   [_test]
   (binding [c/*dir* (System/getProperty "user.dir")]
-    (let [pods (get-pod-list CLUSTER_NODE_NAME)
+    (let [pods (concat (get-pod-list CLUSTER_NODE_NAME)
+                       (get-pod-list CLUSTER2_NODE_NAME))
           logs (map #(str c/*dir* \/ % ".log") pods)]
       (mapv #(spit %1 (c/exec :kubectl :logs %2)) logs pods)
       logs)))
 
-(defn get-load-balancer-ip
+(defn- get-load-balancer-ip
   "Get the IP of the load balancer"
-  []
+  [prefix]
   (->> (c/exec :kubectl :get :svc)
        str/split-lines
-       (filter #(str/includes? % "scalardb-cluster-envoy"))
-       (filter #(str/includes? % "LoadBalancer"))
-       (map #(nth (str/split % #"\s+") 3))
-       first))
-
-(defn get-postgres-ip
-  "Get the IP of the load balancer"
-  []
-  (->> (c/exec :kubectl :get :svc)
-       str/split-lines
-       (filter #(str/includes? % "postgresql-scalardb-cluster"))
+       (filter #(str/includes? % prefix))
        (filter #(str/includes? % "LoadBalancer"))
        (map #(nth (str/split % #"\s+") 3))
        first))
@@ -204,17 +206,18 @@
   (-> test
       :nodes
       first
-      (c/on (get-pod-list CLUSTER_NODE_NAME))
+      (c/on (concat (get-pod-list CLUSTER_NODE_NAME)
+                    (get-pod-list CLUSTER2_NODE_NAME)))
       count
-      ;; TODO: check the number of pods
-      (= 3)))
+      (= (if (need-two-clusters? test) 6 3))))
 
 (defn- cluster-nodes-ready?
   [test]
   (and (running-pods? test)
        (try
          (c/on (-> test :nodes first)
-               (->> (get-pod-list CLUSTER_NODE_NAME)
+               (->> (concat (get-pod-list CLUSTER_NODE_NAME)
+                            (get-pod-list CLUSTER2_NODE_NAME))
                     (mapv #(c/exec :kubectl :wait
                                    "--for=condition=Ready"
                                    "--timeout=120s"
@@ -284,18 +287,20 @@
     [_ test]
     (or (ext/load-config test)
         (let [node (-> test :nodes first)
-              ip (c/on node (get-load-balancer-ip))]
-          (->> (doto (Properties.)
-                 (.setProperty "scalar.db.transaction_manager" "cluster")
-                 (.setProperty "scalar.db.contact_points"
-                               (str "indirect:" ip))
-                 (.setProperty "scalar.db.sql.connection_mode" "cluster")
-                 (.setProperty "scalar.db.sql.cluster_mode.contact_points"
-                               (str "indirect:" ip)))
-               (ext/set-common-properties test)))))
+              ip (c/on node (get-load-balancer-ip "scalardb-cluster-envoy"))
+              ip2 (c/on node (get-load-balancer-ip "scalardb-cluster-2-envoy"))
+              create-fn
+              (fn [ip]
+                (->> (doto (Properties.)
+                       (.setProperty "scalar.db.transaction_manager" "cluster")
+                       (.setProperty "scalar.db.contact_points" (str "indirect:" ip)))
+                     (ext/set-common-properties test)))]
+          (if (need-two-clusters? test)
+            (mapv create-fn [ip ip2])
+            (create-fn ip)))))
   (create-storage-properties [_ _]
     (let [node (-> test :nodes first)
-          ip (c/on node (get-postgres-ip))]
+          ip (c/on node (get-load-balancer-ip "postgresql-scalardb-cluster"))]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"
