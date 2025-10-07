@@ -139,15 +139,13 @@
            (update-cluster-values test)
            yaml/generate-string
            (spit CLUSTER_VALUES_YAML))
-      (c/exec :helm :install "scalardb-cluster" "scalar-labs/scalardb-cluster"
-              :-f CLUSTER_VALUES_YAML
-              :--version chart-version
-              :-n "default")
-      (when (need-two-clusters? test)
-        (c/exec :helm :install "scalardb-cluster-2" "scalar-labs/scalardb-cluster"
-                :-f CLUSTER_VALUES_YAML
-                :--version chart-version
-                :-n "default"))
+      (mapv #(c/exec :helm :install % "scalar-labs/scalardb-cluster"
+                     :-f CLUSTER_VALUES_YAML
+                     :--version chart-version
+                     :-n "default")
+            (if (need-two-clusters? test)
+              ["scalardb-cluster" "scalardb-cluster-2"]
+              ["scalardb-cluster"]))
       (-> CLUSTER_VALUES_YAML File. .delete)))
 
   ;; Chaos mesh
