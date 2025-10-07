@@ -19,8 +19,12 @@
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
 
-(def ^:private ^:const CLUSTER_NODE_NAME "scalardb-cluster-node")
-(def ^:private ^:const CLUSTER2_NODE_NAME "scalardb-cluster-2-node")
+(def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
+
+(def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
+(def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
+(def ^:private ^:const CLUSTER_NODE_NAME (str CLUSTER_NAME "-node"))
+(def ^:private ^:const CLUSTER2_NODE_NAME (str CLUSTER2_NAME "-node"))
 
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
@@ -117,7 +121,7 @@
   [test]
   ;; postgresql
   (c/exec
-   :helm :install "postgresql-scalardb-cluster" "bitnami/postgresql"
+   :helm :install POSTGRESQL_NAME "bitnami/postgresql"
    :--set "auth.postgresPassword=postgres"
    :--set "primary.persistence.enabled=true"
    ;; Need an external IP for storage APIs
@@ -163,11 +167,11 @@
                seq
                (apply c/exec :rm :-f)))
     (info "wiping the pods...")
-    (c/exec :helm :uninstall :postgresql-scalardb-cluster)
+    (c/exec :helm :uninstall POSTGRESQL_NAME)
     (c/exec :kubectl :delete
             :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
-    (c/exec :helm :uninstall :scalardb-cluster)
-    (c/exec :helm :uninstall :scalardb-cluster-2)
+    (c/exec :helm :uninstall CLUSTER_NAME)
+    (c/exec :helm :uninstall CLUSTER2_NAME)
     (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
     (catch Exception _ nil)))
 
@@ -285,8 +289,8 @@
     [_ test]
     (or (ext/load-config test)
         (let [node (-> test :nodes first)
-              ip (c/on node (get-load-balancer-ip "scalardb-cluster-envoy"))
-              ip2 (c/on node (get-load-balancer-ip "scalardb-cluster-2-envoy"))
+              ip (c/on node (get-load-balancer-ip (str CLUSTER_NAME "-envoy")))
+              ip2 (c/on node (get-load-balancer-ip (str CLUSTER2_NAME "-envoy")))
               create-fn
               (fn [ip]
                 (->> (doto (Properties.)
@@ -298,7 +302,7 @@
             (create-fn ip)))))
   (create-storage-properties [_ _]
     (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip "postgresql-scalardb-cluster"))]
+          ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

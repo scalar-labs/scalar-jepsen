@@ -30,8 +30,8 @@
 
 (defn setup-transaction-tables
   [test schemata]
-  (let [created (ext/create-properties (:db test) test)
-        properties (if (vector? created) (first created) created)
+  (let [props (ext/create-properties (:db test) test)
+        properties (if (vector? props) (first props) props)
         options (ext/create-table-opts (:db test) test)]
     (doseq [schema (map cheshire/generate-string schemata)]
       (loop [retries RETRIES]
@@ -86,18 +86,31 @@
 
 (defn- create-service-instance
   [test mode]
-  (let [created (ext/create-properties (:db test) test)
-        [properties properties2] (if (vector? created) created [created nil])]
+  (let [db (:db test)
+        props (ext/create-properties db test)]
     (try
-      (condp = mode
-        :storage (.getStorage (StorageFactory/create
-                               (ext/create-storage-properties (:db test) test)))
-        :transaction (.getTransactionManager
-                      (TransactionFactory/create properties))
-        :2pc (mapv #(-> %
-                        TransactionFactory/create
-                        .getTwoPhaseCommitTransactionManager)
-                   [properties properties2]))
+      (case mode
+        :storage
+        (-> (ext/create-storage-properties db test)
+            StorageFactory/create
+            .getStorage)
+
+        :transaction
+        (-> (if (vector? props) (first props) props)
+            TransactionFactory/create
+            .getTransactionManager)
+
+        :2pc
+        (do
+          (when-not (vector? props)
+            (throw (ex-info "2PC mode requires a vector of properties"
+                            {:props props})))
+          (mapv #(-> %
+                     TransactionFactory/create
+                     .getTwoPhaseCommitTransactionManager)
+                props))
+
+        (throw (ex-info (str "Unknown mode: " mode) {:mode mode})))
       (catch Exception e
         (warn e "Failed to create a service instance: " mode)))))
 
