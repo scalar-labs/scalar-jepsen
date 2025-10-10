@@ -148,8 +148,8 @@
                      :--version chart-version
                      :-n "default")
             (if (need-two-clusters? test)
-              ["scalardb-cluster" "scalardb-cluster-2"]
-              ["scalardb-cluster"]))
+              [CLUSTER_NAME CLUSTER2_NAME]
+              [CLUSTER_NAME]))
       (-> CLUSTER_VALUES_YAML File. .delete)))
 
   ;; Chaos mesh
@@ -163,7 +163,7 @@
     (info "wiping old logs...")
     (binding [c/*dir* (System/getProperty "user.dir")]
       (some->> (-> (c/exec :ls) (str/split #"\s+"))
-               (filter #(re-matches #"scalardb-cluster-node-.*\.log" %))
+               (filter #(re-matches #"scalardb-cluster-.*\.log" %))
                seq
                (apply c/exec :rm :-f)))
     (info "wiping the pods...")
