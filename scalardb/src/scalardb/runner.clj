@@ -84,15 +84,7 @@
 
    [nil "--config-file CONFIG_FILE"
     "ScalarDB config file. When this is given, other configuration options are ignored."
-    :default ""]
-
-   [nil "--docker-username DOCKER_USERNAME"
-    "Username to pull ScalarDB Cluster node image in ghcr.io."
-    :default nil]
-
-   [nil "--docker-access-token DOCKER_ACCESS_TOKEN"
-    "Access token to pull ScalarDB Cluster node image in ghcr.io."
-    :default nil]])
+    :default ""]])
 
 (defn- test-name
   [workload-key faults admin]

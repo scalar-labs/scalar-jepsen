@@ -99,17 +99,16 @@
   (c/exec :helm :repo :update))
 
 (defn- configure!
-  [test]
+  []
   (binding [c/*dir* (System/getProperty "user.dir")]
     (try
       (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
       ;; ignore the failure when the secret doesn't exist
       (catch Exception _))
-    (when-let [docker-username (:docker-username test)]
-      (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
-              "--docker-server=ghcr.io"
-              (str "--docker-username=" docker-username)
-              (str "--docker-password=" (:docker-access-token test)))))
+    (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
+            "--docker-server=ghcr.io"
+            (str "--docker-username=" (env :docker-username))
+            (str "--docker-password=" (env :docker-access-token))))
 
   ;; Chaos Mesh
   (try
@@ -252,7 +251,7 @@
       (when-not (:leave-db-running? test)
         (wipe!))
       (install!)
-      (configure! test)
+      (configure!)
       (start! test)
       ;; wait for the pods
       (wait-for-recovery test))
