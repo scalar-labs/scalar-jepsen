@@ -99,17 +99,16 @@
   (c/exec :helm :repo :update))
 
 (defn- configure!
-  [test]
+  []
   (binding [c/*dir* (System/getProperty "user.dir")]
     (try
       (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
       ;; ignore the failure when the secret doesn't exist
       (catch Exception _))
-    (when-let [docker-username (:docker-username test)]
-      (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
-              "--docker-server=ghcr.io"
-              (str "--docker-username=" docker-username)
-              (str "--docker-password=" (:docker-access-token test)))))
+    (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
+            "--docker-server=ghcr.io"
+            (str "--docker-username=" (env :docker-username))
+            (str "--docker-password=" (env :docker-access-token))))
 
   ;; Chaos Mesh
   (try
@@ -159,21 +158,23 @@
 
 (defn- wipe!
   []
-  (try
-    (info "wiping old logs...")
-    (binding [c/*dir* (System/getProperty "user.dir")]
+  (info "wiping old logs...")
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (try
       (some->> (-> (c/exec :ls) (str/split #"\s+"))
                (filter #(re-matches #"scalardb-cluster-.*\.log" %))
                seq
-               (apply c/exec :rm :-f)))
-    (info "wiping the pods...")
-    (c/exec :helm :uninstall POSTGRESQL_NAME)
-    (c/exec :kubectl :delete
-            :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
-    (c/exec :helm :uninstall CLUSTER_NAME)
-    (c/exec :helm :uninstall CLUSTER2_NAME)
-    (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
-    (catch Exception _ nil)))
+               (apply c/exec :rm :-f))
+      (catch Exception _ nil)))
+  (info "wiping the pods...")
+  (try (c/exec :helm :uninstall POSTGRESQL_NAME) (catch Exception _ nil))
+  (try (c/exec :kubectl :delete
+               :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
+       (catch Exception _ nil))
+  (try (c/exec :helm :uninstall CLUSTER_NAME) (catch Exception _ nil))
+  (try (c/exec :helm :uninstall CLUSTER2_NAME) (catch Exception _ nil))
+  (try (c/exec :helm :uninstall "chaos-mesh" :-n "chaos-mesh")
+       (catch Exception _ nil)))
 
 (defn- get-pod-list
   [name]
@@ -250,7 +251,7 @@
       (when-not (:leave-db-running? test)
         (wipe!))
       (install!)
-      (configure! test)
+      (configure!)
       (start! test)
       ;; wait for the pods
       (wait-for-recovery test))
