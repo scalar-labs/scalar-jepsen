@@ -110,7 +110,7 @@
     (binding [c/*dir* (System/getProperty "user.dir")]
       (try
         (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
-      ;; ignore the failure when the secret doesn't exist
+        ;; ignore the failure when the secret doesn't exist
         (catch Exception _))
       (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
               "--docker-server=ghcr.io"
