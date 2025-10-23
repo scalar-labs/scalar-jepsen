@@ -159,21 +159,23 @@
 
 (defn- wipe!
   []
-  (try
-    (info "wiping old logs...")
-    (binding [c/*dir* (System/getProperty "user.dir")]
+  (info "wiping old logs...")
+  (binding [c/*dir* (System/getProperty "user.dir")]
+    (try
       (some->> (-> (c/exec :ls) (str/split #"\s+"))
                (filter #(re-matches #"scalardb-cluster-.*\.log" %))
                seq
-               (apply c/exec :rm :-f)))
-    (info "wiping the pods...")
-    (c/exec :helm :uninstall POSTGRESQL_NAME)
-    (c/exec :kubectl :delete
-            :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
-    (c/exec :helm :uninstall CLUSTER_NAME)
-    (c/exec :helm :uninstall CLUSTER2_NAME)
-    (c/exec :helm :uninstall :chaos-mesh :-n "chaos-mesh")
-    (catch Exception _ nil)))
+               (apply c/exec :rm :-f))
+      (catch Exception _ nil)))
+  (info "wiping the pods...")
+  (try (c/exec :helm :uninstall POSTGRESQL_NAME) (catch Exception _ nil))
+  (try (c/exec :kubectl :delete
+               :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
+       (catch Exception _ nil))
+  (try (c/exec :helm :uninstall CLUSTER_NAME) (catch Exception _ nil))
+  (try (c/exec :helm :uninstall CLUSTER2_NAME) (catch Exception _ nil))
+  (try (c/exec :helm :uninstall "chaos-mesh" :-n "chaos-mesh")
+       (catch Exception _ nil)))
 
 (defn- get-pod-list
   [name]
