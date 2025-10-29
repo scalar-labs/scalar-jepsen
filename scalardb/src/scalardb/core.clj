@@ -101,14 +101,10 @@
             .getTransactionManager)
 
         :2pc
-        (do
-          (when-not (vector? props)
-            (throw (ex-info "2PC mode requires a vector of properties"
-                            {:props props})))
-          (mapv #(-> %
-                     TransactionFactory/create
-                     .getTwoPhaseCommitTransactionManager)
-                props))
+        (->> (if (vector? props) props [props props])
+             (mapv #(-> %
+                        TransactionFactory/create
+                        .getTwoPhaseCommitTransactionManager)))
 
         (throw (ex-info (str "Unknown mode: " mode) {:mode mode})))
       (catch Exception e
