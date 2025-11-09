@@ -87,9 +87,11 @@
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
-  []
-  ;; postgre
-  (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami")
+  [test db-type]
+  (case db-type
+    :postgres (c/exec :helm :repo :add
+                      "bitnami" "https://charts.bitnami.com/bitnami")
+    (throw (ex-info "Unsupported DB for ScalarDB Cluster" {:db db-type})))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
           "scalar-labs" "https://scalar-labs.github.io/helm-charts")
@@ -117,21 +119,22 @@
       (c/exec :kubectl :create :ns "chaos-mesh"))))
 
 (defn- start!
-  [test]
-  ;; postgresql
-  (c/exec
-   :helm :install POSTGRESQL_NAME "bitnami/postgresql"
-   :--set "auth.postgresPassword=postgres"
-   :--set "primary.persistence.enabled=true"
-   ;; Need an external IP for storage APIs
-   :--set "service.type=LoadBalancer"
-   :--set "primary.service.type=LoadBalancer"
-   ;; Use legacy images
-   :--set "image.repository=bitnamilegacy/postgresql"
-   :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-   :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
-   :--set "global.security.allowInsecureImages=true"
-   :--version "16.7.0")
+  [test db-type]
+  (case db-type
+    :postgres (c/exec
+               :helm :install POSTGRESQL_NAME "bitnami/postgresql"
+               :--set "auth.postgresPassword=postgres"
+               :--set "primary.persistence.enabled=true"
+               ;; Need an external IP for storage APIs
+               :--set "service.type=LoadBalancer"
+               :--set "primary.service.type=LoadBalancer"
+               ;; Use legacy images
+               :--set "image.repository=bitnamilegacy/postgresql"
+               :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
+               :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
+               :--set "global.security.allowInsecureImages=true"
+               :--version "16.7.0")
+    (throw (ex-info "Unsupported DB for ScalarDB Cluster" {:db db-type})))
 
   ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
@@ -244,15 +247,15 @@
 
 (defn db
   "Setup ScalarDB Cluster."
-  []
+  [db-type]
   (reify
     db/DB
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
         (wipe!))
-      (install!)
+      (install! test db-type)
       (configure!)
-      (start! test)
+      (start! test db-type)
       ;; wait for the pods
       (wait-for-recovery test))
 
@@ -280,9 +283,8 @@
     (log-files [_ test _]
       (get-logs test))))
 
-(defrecord ExtCluster []
+(defrecord ExtCluster [db-type]
   ext/DbExtension
-  (get-db-type [_] :cluster)
   (live-nodes [_ test] (running-pods? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
   (create-table-opts [_ _] {})
@@ -303,7 +305,11 @@
             (create-fn ip)))))
   (create-storage-properties [_ _]
     (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
+          db-name (case db-type
+                    :postgres POSTGRESQL_NAME
+                    (throw (ex-info "Unsupported DB for ScalarDB Cluster"
+                                    {:db db-type})))
+          ip (c/on node (get-load-balancer-ip db-name))]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"
@@ -312,7 +318,7 @@
         (.setProperty "scalar.db.password" "postgres")))))
 
 (defn gen-db
-  [faults admin]
+  [faults admin db-type]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
-  [(ext/extend-db (db) (->ExtCluster)) (n/nemesis-package db 60 faults) 1])
+  [(ext/extend-db (db db-type) (->ExtCluster db-type)) (n/nemesis-package db 60 faults) 1])

@@ -121,7 +121,7 @@ jobs:
     - name: ScalarDB Cluster test
       run: |
         cd scalardb
-        lein with-profile cluster run test --workload transfer --nodes localhost --db cluster --username runner --ssh-private-key ~/.ssh/id_rsa --docker-username ${{ github.repository_owner }} --docker-access-token ${{ secrets.CR_PAT }} --nemesis crash
+        DOCKER_USERNAME=${{ github.repository_owner }} DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} lein with-profile cluster run test --workload transfer --nodes localhost --db postgres --username runner --ssh-private-key ~/.ssh/id_rsa --nemesis crash
 
     - name: Check test result
       run: |
