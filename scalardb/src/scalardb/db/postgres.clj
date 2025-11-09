@@ -140,7 +140,6 @@
 
 (defrecord ExtPostgres []
   ext/DbExtension
-  (get-db-type [_] :postgres)
   (live-nodes [_ test] (live-node? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
   (create-table-opts [_ _] {})
@@ -159,7 +158,7 @@
   (create-storage-properties [this test] (ext/create-properties this test)))
 
 (defn gen-db
-  [faults admin]
+  [faults admin & _]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
   [(ext/extend-db (db) (->ExtPostgres))
