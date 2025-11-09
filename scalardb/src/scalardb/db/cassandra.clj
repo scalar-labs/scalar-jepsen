@@ -11,7 +11,6 @@
 
 (defrecord ExtCassandra []
   ext/DbExtension
-  (get-db-type [_] :cassandra)
   (live-nodes [_ test] (cassandra/live-nodes test))
   (wait-for-recovery [_ test] (cassandra/wait-rf-nodes test))
   (create-table-opts
@@ -37,7 +36,7 @@
   (create-storage-properties [this test] (ext/create-properties this test)))
 
 (defn gen-db
-  [faults admin]
+  [faults admin & _]
   (let [db (ext/extend-db (cassandra/db) (->ExtCassandra))
         ;; replace :kill nemesis with :crash for Cassandra
         faults (mapv #(if (= % :kill) :crash %) faults)]

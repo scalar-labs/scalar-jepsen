@@ -194,7 +194,7 @@ jobs:
 
         lein with-profile cluster run test \
           --nodes localhost \
-          --db cluster \
+          --db postgres \
           --concurrency 5 \
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
