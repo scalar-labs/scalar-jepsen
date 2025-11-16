@@ -87,7 +87,7 @@
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
-  [test db-type]
+  [db-type]
   (case db-type
     :postgres (c/exec :helm :repo :add
                       "bitnami" "https://charts.bitnami.com/bitnami")
@@ -253,7 +253,7 @@
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
         (wipe!))
-      (install! test db-type)
+      (install! db-type)
       (configure!)
       (start! test db-type)
       ;; wait for the pods
@@ -304,18 +304,17 @@
             (mapv create-fn [ip ip2])
             (create-fn ip)))))
   (create-storage-properties [_ _]
-    (let [node (-> test :nodes first)
-          db-name (case db-type
-                    :postgres POSTGRESQL_NAME
-                    (throw (ex-info "Unsupported DB for ScalarDB Cluster"
-                                    {:db db-type})))
-          ip (c/on node (get-load-balancer-ip db-name))]
-      (doto (Properties.)
-        (.setProperty "scalar.db.storage" "jdbc")
-        (.setProperty "scalar.db.contact_points"
-                      (str "jdbc:postgresql://" ip ":5432/postgres"))
-        (.setProperty "scalar.db.username" "postgres")
-        (.setProperty "scalar.db.password" "postgres")))))
+    (let [node (-> test :nodes first)]
+      (case db-type
+        :postgres (let [ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
+                    (doto (Properties.)
+                      (.setProperty "scalar.db.storage" "jdbc")
+                      (.setProperty "scalar.db.contact_points"
+                                    (str "jdbc:postgresql://" ip ":5432/postgres"))
+                      (.setProperty "scalar.db.username" "postgres")
+                      (.setProperty "scalar.db.password" "postgres")))
+        (throw (ex-info "Unsupported DB for ScalarDB Cluster"
+                        {:db db-type}))))))
 
 (defn gen-db
   [faults admin db-type]

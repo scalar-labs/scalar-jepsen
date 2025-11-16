@@ -191,15 +191,15 @@ jobs:
         if [ "${{ matrix.tests.enable_group_commit }}" = "true" ]; then
           OPTS+=" --enable-group-commit"
         fi
+        DOCKER_USERNAME=${{ github.repository_owner }} \
+        DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} \
         lein with-profile cluster run test \
           --time-limit ${{ matrix.tests.time_limit }} \
           --nodes localhost \
-          --db cluster \
+          --db postgres \
           --concurrency 5 \
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
-          --docker-username ${{ github.repository_owner }} \
-          --docker-access-token ${{ secrets.CR_PAT }} \
           ${OPTS} > /dev/null 2>&1
 
     - name: Record result
