@@ -22,7 +22,8 @@
 (def supported-dbs
   "The map of test DBs."
   {"cassandra" :cassandra
-   "postgres" :postgres})
+   "postgres" :postgres
+   "mysql" :mysql})
 
 (def workload-keys
   "A map of test workload keys."

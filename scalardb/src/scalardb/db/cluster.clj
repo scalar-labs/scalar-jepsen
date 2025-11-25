@@ -6,6 +6,7 @@
             [jepsen
              [control :as c]
              [db :as db]]
+            [scalardb.core :as scalar]
             [scalardb.db-extend :as ext]
             [scalardb.nemesis.cluster :as n])
   (:import (java.io File)
@@ -20,6 +21,7 @@
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
+(def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -42,12 +44,6 @@
                "scalar.db.cluster.membership.kubernetes.endpoint.namespace_name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAMESPACE_NAME}"
                "scalar.db.cluster.membership.kubernetes.endpoint.name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAME}"
                ""
-               ;; Storage configurations
-               "scalar.db.storage=jdbc"
-               "scalar.db.contact_points=jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
-               "scalar.db.username=postgres"
-               "scalar.db.password=postgres"
-               ""
                ;; Set to true to include transaction metadata in the records
                "scalar.db.consensus_commit.include_metadata.enabled=true"])
 
@@ -58,11 +54,29 @@
   (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type})))
 
 (defn- update-cluster-values
-  [test values]
+  [test db-type values]
   (let [path [:scalardbCluster :scalardbClusterNodeProperties]
+        [storage-type contact-points username password]
+        (case db-type
+          :postgres
+          ["jdbc"
+           "jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
+           "postgres"
+           "postgres"]
+          :mysql
+          ["jdbc"
+           (str "jdbc:mysql://mysql-scalardb-cluster.default.svc.cluster.local:3306/" scalar/KEYSPACE)
+           "root"
+           "mysql"]
+          (throw (ex-info "Unsupported DB for ScalarDB Cluster" {:db (:db-type test)})))
         new-db-props (-> values
                          (get-in path)
                          (str
+                          ;; Storage configurations
+                          "\nscalar.db.storage=" storage-type
+                          "\nscalar.db.contact_points=" contact-points
+                          "\nscalar.db.username=" username
+                          "\nscalar.db.password=" password
                           ;; isolation level
                           "\nscalar.db.consensus_commit.isolation_level="
                           (-> test
@@ -95,6 +109,8 @@
   (case db-type
     :postgres (c/exec :helm :repo :add
                       "bitnami" "https://charts.bitnami.com/bitnami")
+    :mysql (c/exec :helm :repo :add
+                   "bitnami" "https://charts.bitnami.com/bitnami")
     (throw-unsupported-db-error db-type))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
@@ -139,6 +155,20 @@
                :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
                :--set "global.security.allowInsecureImages=true"
                :--version "16.7.0")
+    :mysql (c/exec
+            :helm :install MYSQL_NAME "bitnami/mysql"
+            :--set "auth.rootPassword=mysql"
+            :--set (str "auth.database=" scalar/KEYSPACE)
+            :--set "primary.persistence.enabled=true"
+            ;:--set "primary.extraFlags={--innodb-flush-log-at-trx-commit=1,--sync-binlog=1}"
+            ;; Need an external IP for storage APIs
+            :--set "primary.service.type=LoadBalancer"
+            ;; Use legacy images
+            :--set "image.repository=bitnamilegacy/mysql"
+            :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
+            :--set "metrics.image.repository=bitnamilegacy/mysqld-exporter"
+            :--set "global.security.allowInsecureImages=true"
+            :--version "14.0.3")
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
@@ -147,7 +177,7 @@
     (info "helm chart version: " chart-version)
     (binding [c/*dir* (System/getProperty "user.dir")]
       (->> CLUSTER_VALUES
-           (update-cluster-values test)
+           (update-cluster-values test db-type)
            yaml/generate-string
            (spit CLUSTER_VALUES_YAML))
       (mapv #(c/exec :helm :install % "scalar-labs/scalardb-cluster"
@@ -176,8 +206,10 @@
       (catch Exception _ nil)))
   (info "wiping the pods...")
   (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
+               [:helm :uninstall MYSQL_NAME]
                [:kubectl :delete
                 :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
+               [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
                [:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
@@ -317,6 +349,13 @@
                                     (str "jdbc:postgresql://" ip ":5432/postgres"))
                       (.setProperty "scalar.db.username" "postgres")
                       (.setProperty "scalar.db.password" "postgres")))
+        :mysql (let [ip (c/on node (get-load-balancer-ip MYSQL_NAME))]
+                 (doto (Properties.)
+                   (.setProperty "scalar.db.storage" "jdbc")
+                   (.setProperty "scalar.db.contact_points"
+                                 (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
+                   (.setProperty "scalar.db.username" "root")
+                   (.setProperty "scalar.db.password" "mysql")))
         (throw-unsupported-db-error db-type)))))
 
 (defn gen-db
