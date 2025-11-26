@@ -11,13 +11,19 @@ on:
         description: 'ScalarDB Cluster version'
         type: string
         default: "4.0.0-SNAPSHOT"
+      storage_backend:
+        description: 'Storage backend to test'
+        type: choice
+        default: postgres
+        options:
+          - postgres
+          - mysql
       time_limit:
         description: 'Test duration in second'
         required: true
         type: number
       workload:
         description: 'Test workload'
-        required: true
         type: choice
         options:
           - transfer
@@ -194,7 +200,7 @@ jobs:
 
         lein with-profile cluster run test \
           --nodes localhost \
-          --db postgres \
+          --db ${{ github.event.inputs.storage_backend }} \
           --concurrency 5 \
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
