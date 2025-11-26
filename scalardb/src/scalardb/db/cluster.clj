@@ -320,4 +320,5 @@
   [faults admin db-type]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
-  [(ext/extend-db (db db-type) (->ExtCluster db-type)) (n/nemesis-package db 60 faults) 1])
+  (let [db (ext/extend-db (db db-type) (->ExtCluster db-type))]
+    [db (n/nemesis-package db 60 faults) 1]))
