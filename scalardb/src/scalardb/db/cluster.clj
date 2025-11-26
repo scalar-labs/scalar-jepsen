@@ -160,7 +160,6 @@
             :--set "auth.rootPassword=mysql"
             :--set (str "auth.database=" scalar/KEYSPACE)
             :--set "primary.persistence.enabled=true"
-            ;:--set "primary.extraFlags={--innodb-flush-log-at-trx-commit=1,--sync-binlog=1}"
             ;; Need an external IP for storage APIs
             :--set "primary.service.type=LoadBalancer"
             ;; Use legacy images
