@@ -70,7 +70,7 @@ Below is an example command to run the ScalarDB Cluster test:
 ```sh
 DOCKER_USERNAME=${GITHUB_USER} \
 DOCKER_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
-lein with-profile cluster run test --workload transfer --db cluster \
+lein with-profile cluster run test --workload transfer --db postgres \
     --nodes ${KUBERNETES_CLUSTER_HOST} \
     --username ${USER}
 ```
