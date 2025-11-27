@@ -198,6 +198,8 @@ jobs:
           OPTS+=" --enable-group-commit"
         fi
 
+        DOCKER_USERNAME=${{ github.repository_owner }} \
+        DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} \
         lein with-profile cluster run test \
           --nodes localhost \
           --db ${{ github.event.inputs.storage_backend }} \
