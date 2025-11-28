@@ -92,24 +92,17 @@
       (into (map name admin))
       (->> (remove nil?) (string/join "-"))))
 
-(defn- load-module
-  [db-type]
-  (if (= (env :cluster?) "true")
-    (require 'scalardb.db.cluster)
-    (case db-type
-      :cassandra (require 'scalardb.db.cassandra)
-      :postgres  (require 'scalardb.db.postgres)
-      (throw (ex-info "Unsupported DB" {:db db-type})))))
-
 (defn- gen-db
   "Returns [extended-db constructed-nemesis num-max-nodes]."
   [db-type faults admin]
-  (load-module db-type)
   (let [gen-db-sym (if (= (env :cluster?) "true")
-                     'scalardb.db.cluster/gen-db
+                     (do (require 'scalardb.db.cluster)
+                         'scalardb.db.cluster/gen-db)
                      (case db-type
-                       :cassandra 'scalardb.db.cassandra/gen-db
-                       :postgres  'scalardb.db.postgres/gen-db
+                       :cassandra (do (require 'scalardb.db.cassandra)
+                                      'scalardb.db.cassandra/gen-db)
+                       :postgres  (do (require 'scalardb.db.postgres)
+                                      'scalardb.db.postgres/gen-db)
                        (throw (ex-info "Unsupported DB" {:db db-type}))))
         gen-db-fn (resolve gen-db-sym)]
     (gen-db-fn faults admin db-type)))
