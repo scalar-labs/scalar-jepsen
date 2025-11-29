@@ -68,7 +68,7 @@
            (str "jdbc:mysql://mysql-scalardb-cluster.default.svc.cluster.local:3306/" scalar/KEYSPACE)
            "root"
            "mysql"]
-          (throw (ex-info "Unsupported DB for ScalarDB Cluster" {:db (:db-type test)})))
+          (throw-unsupported-db-error db-type))
         new-db-props (-> values
                          (get-in path)
                          (str

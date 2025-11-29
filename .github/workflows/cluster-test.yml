@@ -25,6 +25,7 @@ on:
       workload:
         description: 'Test workload'
         type: choice
+        default: transfer
         options:
           - transfer
           - transfer-2pc
