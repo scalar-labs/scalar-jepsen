@@ -1,5 +1,6 @@
 (ns scalardb.db.postgres
-  (:require [clojure.tools.logging :refer [info warn]]
+  (:require [clojure.string :as string]
+            [clojure.tools.logging :refer [info warn]]
             [jepsen
              [control :as c]
              [db :as db]
@@ -152,6 +153,12 @@
                  (.setProperty "scalar.db.storage" "jdbc")
                  (.setProperty "scalar.db.contact_points"
                                (str "jdbc:postgresql://" node ":5432/"))
+                 (.setProperty "scalar.db.jdbc.isolation_level"
+                               (-> test
+                                   :jdbc-isolation-level
+                                   name
+                                   string/upper-case
+                                   (string/replace #"-" "_")))
                  (.setProperty "scalar.db.username" "postgres")
                  (.setProperty "scalar.db.password" "postgres"))
                (ext/set-common-properties test)))))

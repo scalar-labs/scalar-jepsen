@@ -84,6 +84,12 @@
                               name
                               str/upper-case
                               (str/replace #"-" "_"))
+                          "\nscalar.db.jdbc.isolation_level="
+                          (-> test
+                              :jdbc-isolation-level
+                              name
+                              str/upper-case
+                              (str/replace #"-" "_"))
                           ;; one phase commit
                           (when (:enable-one-phase-commit test)
                             "\nscalar.db.consensus_commit.one_phase_commit.enabled=true")
@@ -160,8 +166,6 @@
             :--set "auth.rootPassword=mysql"
             :--set (str "auth.database=" scalar/KEYSPACE)
             :--set "primary.persistence.enabled=true"
-            ;; READ-COMMITTED isolation level is ok for ScalarDB
-            :--set "primary.extraFlags=--transaction-isolation=READ-COMMITTED"
             ;; Need an external IP for storage APIs
             :--set "primary.service.type=LoadBalancer"
             ;; Use legacy images
