@@ -5,9 +5,11 @@
 
 (deftest create-properties-test
   (let [db (ext/extend-db postgres/db (postgres/->ExtPostgres))
-        properties (ext/create-properties db
-                                          {:nodes ["n1"]
-                                           :isolation-level :serializable})]
+        properties (ext/create-properties
+                    db
+                    {:nodes ["n1"]
+                     :isolation-level :serializable
+                     :jdbc-isolation-level :read-committed})]
     (is (= "jdbc:postgresql://n1:5432/"
            (.getProperty properties "scalar.db.contact_points")))
     (is (= "postgres"
@@ -17,4 +19,6 @@
     (is (= "SERIALIZABLE"
            (.getProperty
             properties
-            "scalar.db.consensus_commit.isolation_level")))))
+            "scalar.db.consensus_commit.isolation_level")))
+    (is (= "READ_COMMITTED"
+           (.getProperty properties "scalar.db.jdbc.isolation_level")))))
