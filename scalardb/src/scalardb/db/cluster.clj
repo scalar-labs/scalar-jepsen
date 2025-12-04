@@ -22,6 +22,7 @@
 
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
+(def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -68,6 +69,11 @@
            (str "jdbc:mysql://mysql-scalardb-cluster.default.svc.cluster.local:3306/" scalar/KEYSPACE)
            "root"
            "mysql"]
+          :sqlserver
+          ["jdbc"
+           (str "jdbc:sqlserver://sqlserver-scalardb-cluster.default.svc.cluster.local:1433;database=" scalar/KEYSPACE)
+           "sa"
+           "sqlserver"]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
                          (get-in path)
@@ -117,6 +123,9 @@
                       "bitnami" "https://charts.bitnami.com/bitnami")
     :mysql (c/exec :helm :repo :add
                    "bitnami" "https://charts.bitnami.com/bitnami")
+    :sqlserver (c/exec :helm :repo :add
+                       "simcube"
+                       "https://simcubeltd.github.io/simcube-helm-charts")
     (throw-unsupported-db-error db-type))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
@@ -176,6 +185,13 @@
             :--set "metrics.image.repository=bitnamilegacy/mysqld-exporter"
             :--set "global.security.allowInsecureImages=true"
             :--version "14.0.3")
+    :sqlserver (c/exec
+                 :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
+                 :--set "acceptEula.value=Y"
+                 :--set "sapassword=sqlserver"
+                 :--set "persistence.enabled=true"
+                 :--set "service.type=LoadBalancer"
+                 :--version "1.2.3")
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
@@ -214,9 +230,11 @@
   (info "wiping the pods...")
   (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
                [:helm :uninstall MYSQL_NAME]
+               [:helm :uninstall SQLSERVER_NAME]
                [:kubectl :delete
                 :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
                [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
+               [:kubectl :delete :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]
                [:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
@@ -363,6 +381,13 @@
                                  (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
                    (.setProperty "scalar.db.username" "root")
                    (.setProperty "scalar.db.password" "mysql")))
+        :sqlserver (let [ip (c/on node (get-load-balancer-ip SQLSERVER_NAME))]
+                     (doto (Properties.)
+                       (.setProperty "scalar.db.storage" "jdbc")
+                       (.setProperty "scalar.db.contact_points"
+                                     (str "jdbc:sqlserver://" ip ":1433;database=" scalar/KEYSPACE))
+                       (.setProperty "scalar.db.username" "sa")
+                       (.setProperty "scalar.db.password" "sqlserver")))
         (throw-unsupported-db-error db-type)))))
 
 (defn gen-db

@@ -23,7 +23,8 @@
   "The map of test DBs."
   {"cassandra" :cassandra
    "postgres" :postgres
-   "mysql" :mysql})
+   "mysql" :mysql
+   "sqlserver" :sqlserver})
 
 (def workload-keys
   "A map of test workload keys."
