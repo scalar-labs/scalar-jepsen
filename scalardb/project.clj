@@ -36,7 +36,8 @@
                                                     com.azure/azure-cosmos
                                                     com.datastax.cassandra/cassandra-driver-core
                                                     com.google.cloud/alloydb-jdbc-connector]]]
-                       :env {:scalardb-cluster-version "4.0.0-SNAPSHOT"
+                       :env {:cluster? "true"
+                             :scalardb-cluster-version "4.0.0-SNAPSHOT"
                              :helm-chart-version "1.7.2"}}
              :use-jars {:dependencies [[com.google.guava/guava "31.1-jre"]
                                        [org.apache.commons/commons-text "1.13.0"]]

@@ -28,7 +28,6 @@
     (.setProperty "scalar.db.consensus_commit.include_metadata.enabled" "true")))
 
 (defprotocol DbExtension
-  (get-db-type [this])
   (live-nodes [this test])
   (wait-for-recovery [this test])
   (create-table-opts [this test])
@@ -53,7 +52,6 @@
     db/LogFiles
     (log-files [_ test node] (db/log-files db test node))
     DbExtension
-    (get-db-type [_] (get-db-type ext-db))
     (live-nodes [_ test] (live-nodes ext-db test))
     (wait-for-recovery [_ test] (wait-for-recovery ext-db test))
     (create-table-opts [_ test] (create-table-opts ext-db test))

@@ -94,7 +94,7 @@ jobs:
     - name: Setup Java
       uses: actions/setup-java@v5
       with:
-        java-version: '11'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Install leiningen
@@ -194,7 +194,7 @@ jobs:
 
         lein with-profile cluster run test \
           --nodes localhost \
-          --db cluster \
+          --db postgres \
           --concurrency 5 \
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \

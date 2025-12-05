@@ -53,6 +53,10 @@
 
     :imagePullSecrets [{:name "scalardb-ghcr-secret"}]}})
 
+(defn- throw-unsupported-db-error
+  [db-type]
+  (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type})))
+
 (defn- update-cluster-values
   [test values]
   (let [path [:scalardbCluster :scalardbClusterNodeProperties]
@@ -87,9 +91,11 @@
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
-  []
-  ;; postgre
-  (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami")
+  [db-type]
+  (case db-type
+    :postgres (c/exec :helm :repo :add
+                      "bitnami" "https://charts.bitnami.com/bitnami")
+    (throw-unsupported-db-error db-type))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
           "scalar-labs" "https://scalar-labs.github.io/helm-charts")
@@ -99,17 +105,17 @@
   (c/exec :helm :repo :update))
 
 (defn- configure!
-  [test]
-  (binding [c/*dir* (System/getProperty "user.dir")]
-    (try
-      (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
+  []
+  (when (and (seq (env :docker-username)) (seq (env :docker-access-token)))
+    (binding [c/*dir* (System/getProperty "user.dir")]
+      (try
+        (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
       ;; ignore the failure when the secret doesn't exist
-      (catch Exception _))
-    (when-let [docker-username (:docker-username test)]
+        (catch Exception _))
       (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
               "--docker-server=ghcr.io"
-              (str "--docker-username=" docker-username)
-              (str "--docker-password=" (:docker-access-token test)))))
+              (str "--docker-username=" (env :docker-username))
+              (str "--docker-password=" (env :docker-access-token)))))
 
   ;; Chaos Mesh
   (try
@@ -118,21 +124,22 @@
       (c/exec :kubectl :create :ns "chaos-mesh"))))
 
 (defn- start!
-  [test]
-  ;; postgresql
-  (c/exec
-   :helm :install POSTGRESQL_NAME "bitnami/postgresql"
-   :--set "auth.postgresPassword=postgres"
-   :--set "primary.persistence.enabled=true"
-   ;; Need an external IP for storage APIs
-   :--set "service.type=LoadBalancer"
-   :--set "primary.service.type=LoadBalancer"
-   ;; Use legacy images
-   :--set "image.repository=bitnamilegacy/postgresql"
-   :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-   :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
-   :--set "global.security.allowInsecureImages=true"
-   :--version "16.7.0")
+  [test db-type]
+  (case db-type
+    :postgres (c/exec
+               :helm :install POSTGRESQL_NAME "bitnami/postgresql"
+               :--set "auth.postgresPassword=postgres"
+               :--set "primary.persistence.enabled=true"
+               ;; Need an external IP for storage APIs
+               :--set "service.type=LoadBalancer"
+               :--set "primary.service.type=LoadBalancer"
+               ;; Use legacy images
+               :--set "image.repository=bitnamilegacy/postgresql"
+               :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
+               :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
+               :--set "global.security.allowInsecureImages=true"
+               :--version "16.7.0")
+    (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
@@ -168,14 +175,13 @@
                (apply c/exec :rm :-f))
       (catch Exception _ nil)))
   (info "wiping the pods...")
-  (try (c/exec :helm :uninstall POSTGRESQL_NAME) (catch Exception _ nil))
-  (try (c/exec :kubectl :delete
-               :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster")
-       (catch Exception _ nil))
-  (try (c/exec :helm :uninstall CLUSTER_NAME) (catch Exception _ nil))
-  (try (c/exec :helm :uninstall CLUSTER2_NAME) (catch Exception _ nil))
-  (try (c/exec :helm :uninstall "chaos-mesh" :-n "chaos-mesh")
-       (catch Exception _ nil)))
+  (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
+               [:kubectl :delete
+                :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
+               [:helm :uninstall CLUSTER_NAME]
+               [:helm :uninstall CLUSTER2_NAME]
+               [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
+    (try (apply c/exec cmd) (catch Exception _ nil))))
 
 (defn- get-pod-list
   [name]
@@ -245,15 +251,15 @@
 
 (defn db
   "Setup ScalarDB Cluster."
-  []
+  [db-type]
   (reify
     db/DB
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
         (wipe!))
-      (install!)
-      (configure! test)
-      (start! test)
+      (install! db-type)
+      (configure!)
+      (start! test db-type)
       ;; wait for the pods
       (wait-for-recovery test))
 
@@ -281,9 +287,8 @@
     (log-files [_ test _]
       (get-logs test))))
 
-(defrecord ExtCluster []
+(defrecord ExtCluster [db-type]
   ext/DbExtension
-  (get-db-type [_] :cluster)
   (live-nodes [_ test] (running-pods? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
   (create-table-opts [_ _] {})
@@ -303,17 +308,20 @@
             (mapv create-fn [ip ip2])
             (create-fn ip)))))
   (create-storage-properties [_ _]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
-      (doto (Properties.)
-        (.setProperty "scalar.db.storage" "jdbc")
-        (.setProperty "scalar.db.contact_points"
-                      (str "jdbc:postgresql://" ip ":5432/postgres"))
-        (.setProperty "scalar.db.username" "postgres")
-        (.setProperty "scalar.db.password" "postgres")))))
+    (let [node (-> test :nodes first)]
+      (case db-type
+        :postgres (let [ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
+                    (doto (Properties.)
+                      (.setProperty "scalar.db.storage" "jdbc")
+                      (.setProperty "scalar.db.contact_points"
+                                    (str "jdbc:postgresql://" ip ":5432/postgres"))
+                      (.setProperty "scalar.db.username" "postgres")
+                      (.setProperty "scalar.db.password" "postgres")))
+        (throw-unsupported-db-error db-type)))))
 
 (defn gen-db
-  [faults admin]
+  [faults admin db-type]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
-  [(ext/extend-db (db) (->ExtCluster)) (n/nemesis-package db 60 faults) 1])
+  (let [db (ext/extend-db (db db-type) (->ExtCluster db-type))]
+    [db (n/nemesis-package db 60 faults) 1]))

@@ -68,11 +68,11 @@ The test will attempt to SSH into a machine where the Kubernetes cluster is depl
 
 Below is an example command to run the ScalarDB Cluster test:
 ```sh
-lein with-profile cluster run test --workload transfer --db cluster \
+DOCKER_USERNAME=${GITHUB_USER} \
+DOCKER_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
+lein with-profile cluster run test --workload transfer --db postgres \
     --nodes ${KUBERNETES_CLUSTER_HOST} \
-    --username ${USER} \
-    --docker-username ${GITHUB_USER} \
-    --docker-access-token ${GITHUB_ACCESS_TOKEN}
+    --username ${USER}
 ```
   - `KUBERNETES_CLUSTER_HOST`: The IP address or hostname of the machine running the Kubernetes cluster.
   - `USER`: The SSH username used to connect to the Kubernetes cluster host. If needed, `--password` or `--ssh-private-key` can be added.
