@@ -22,7 +22,8 @@
 (def supported-dbs
   "The map of test DBs."
   {"cassandra" :cassandra
-   "postgres" :postgres})
+   "postgres" :postgres
+   "mysql" :mysql})
 
 (def workload-keys
   "A map of test workload keys."
@@ -70,6 +71,12 @@
     :parse-fn keyword
     :validate [#{:read-committed :snapshot :serializable}
                "Should be one of read-committed, snapshot, or serializable"]]
+
+   [nil "--jdbc-isolation-level JDBC_ISOLATION_LEVEL" "isolation level of the backend DB"
+    :default :read-committed
+    :parse-fn keyword
+    :validate [#{:read-committed :repeatable-read :serializable}
+               "Should be one of read-committed, repeatable-read, or serializable"]]
 
    (cli/repeated-opt nil "--consistency-model CONSISTENCY_MODEL"
                      "consistency model to be checked"
