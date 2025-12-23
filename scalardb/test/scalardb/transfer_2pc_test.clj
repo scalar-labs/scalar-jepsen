@@ -176,7 +176,7 @@
             validate-count (atom 0)
             rollback-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
-                  scalar/join-2pc (spy/stub mock-2pc)
+                  scalar/join-2pc (spy/stub mock-2pc-throws-unknown)
                   scalar/try-reconnection! (spy/spy)]
       (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
                                  nil nil)
@@ -195,6 +195,33 @@
         (is (= 0 @rollback-count))
         (is (= :fail (:type result)))
         (is (= [:unknown-tx-status] (get-in result [:error :results])))))))
+
+(deftest transfer-client-transfer-partial-commit-failure-test
+  (binding [get-count (atom 0)
+            put-count (atom 0)
+            prepare-count (atom 0)
+            validate-count (atom 0)
+            rollback-count (atom 0)]
+    (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
+                  scalar/join-2pc (spy/stub mock-2pc)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (transfer-2pc/->TransferClient (atom false) 5 100 1)
+                                 nil nil)
+            result (client/invoke! client
+                                   {:unknown-tx (atom #{})
+                                    :failures (atom 0)}
+                                   (#'transfer/transfer {:client client}
+                                                        nil))]
+        (is (spy/called-once? scalar/start-2pc))
+        (is (spy/called-once? scalar/join-2pc))
+        ;; One commit fails but the other succeeds, so overall it succeeds
+        (is (spy/not-called? scalar/try-reconnection!))
+        (is (= 2 @get-count))
+        (is (= 2 @put-count))
+        (is (= 2 @prepare-count))
+        (is (= 2 @validate-count))
+        (is (= 0 @rollback-count))
+        (is (= :ok (:type result)))))))
 
 (deftest transfer-client-get-all-test
   (binding [test-records (atom {0 1000 1 100 2 10 3 1 4 0})]

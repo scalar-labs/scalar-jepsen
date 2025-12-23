@@ -159,7 +159,7 @@
             validate-count (atom 0)
             rollback-count (atom 0)]
     (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
-                  scalar/join-2pc (spy/stub mock-2pc)
+                  scalar/join-2pc (spy/stub mock-2pc-throws-unknown)
                   scalar/try-reconnection! (spy/spy)]
       (let [client (client/open! (elle-wr/->WriteReadClient (atom false))
                                  nil nil)
@@ -181,3 +181,32 @@
         (is (= :info (:type result)))
         (is (= "unknown-state-tx" (get-in result
                                           [:error :unknown-tx-status])))))))
+
+(deftest write-read-client-invoke-partial-commit-failure-test
+  (binding [get-count (atom 0)
+            put-count (atom 0)
+            prepare-count (atom 0)
+            validate-count (atom 0)
+            rollback-count (atom 0)]
+    (with-redefs [scalar/start-2pc (spy/stub mock-2pc-throws-unknown)
+                  scalar/join-2pc (spy/stub mock-2pc)
+                  scalar/try-reconnection! (spy/spy)]
+      (let [client (client/open! (elle-wr/->WriteReadClient (atom false))
+                                 nil nil)
+            result (client/invoke! client
+                                   {:isolation-level :serializable
+                                    :table-id (atom 1)
+                                    :unknown-tx (atom #{})}
+                                   {:type :invoke
+                                    :f :txn
+                                    :value [0 [[:r 1 nil] [:w 1 1]]]})]
+        (is (spy/called-once? scalar/start-2pc))
+        (is (spy/called-once? scalar/join-2pc))
+        ;; One commit fails but the other succeeds, so overall it succeeds
+        (is (spy/not-called? scalar/try-reconnection!))
+        (is (= 2 @get-count))
+        (is (= 1 @put-count))
+        (is (= 2 @prepare-count))
+        (is (= 2 @validate-count))
+        (is (= 0 @rollback-count))
+        (is (= :ok (:type result)))))))

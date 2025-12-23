@@ -168,23 +168,27 @@
 
 (defn prepare-validate-commit-txs
   "Given transactions as a vector are prepared, validated, then committed for 2pc.
-   Once any commit succeeds, later commit failures are treated as success."
+   The overall commit is considered successful if at least one commit succeeds."
   [txs]
   ;; Prepare/validate (fail fast on any error)
-  (doseq [tx txs] (.prepare tx))
-  (doseq [tx txs] (.validate tx))
+  (doseq [f [#(.prepare %) #(.validate %)]
+          tx txs]
+    (f tx))
 
-  ;; Commit (after the first successful commit, ignore later failures)
-  (let [committed? (volatile! false)]
-    (doseq [tx txs]
-      (try
-        (.commit tx)
-        (vreset! committed? true)
-        (catch Exception e
-          ;; If no commit has succeeded yet, treat this as a failure.
-          ;; Otherwise, ignore commit failures and continue.
-          (when-not @committed?
-            (throw e)))))))
+  ;; Commit (successful if any commit succeeds)
+  (let [results (mapv (fn [tx]
+                        (try
+                          (.commit tx)
+                          :committed
+                          (catch Exception e
+                            e)))
+                      txs)]
+    (when-not (some #{:committed} results)
+      ;; All commit attempts failed: log all exceptions, then throw the first one.
+      (doseq [r results
+              :when (instance? Exception r)]
+        (warn r "Commit attempts failed in 2PC commit"))
+      (throw (first results)))))
 
 (defn rollback-txs
   "Given transactions as a vector are rollbacked."
