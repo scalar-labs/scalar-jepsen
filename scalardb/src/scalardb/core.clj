@@ -167,12 +167,24 @@
   (some-> test :2pc deref second (.join tx-id)))
 
 (defn prepare-validate-commit-txs
-  "Given transactions as a vector are prepared, validated,
-  then committed for 2pc."
+  "Given transactions as a vector are prepared, validated, then committed for 2pc.
+   Once any commit succeeds, later commit failures are treated as success."
   [txs]
-  (doseq [f [#(.prepare %) #(.validate %) #(.commit %)]
-          tx txs]
-    (f tx)))
+  ;; Prepare/validate (fail fast on any error)
+  (doseq [tx txs] (.prepare tx))
+  (doseq [tx txs] (.validate tx))
+
+  ;; Commit (after the first successful commit, ignore later failures)
+  (let [committed? (volatile! false)]
+    (doseq [tx txs]
+      (try
+        (.commit tx)
+        (vreset! committed? true)
+        (catch Exception e
+          ;; If no commit has succeeded yet, treat this as a failure.
+          ;; Otherwise, ignore commit failures and continue.
+          (when-not @committed?
+            (throw e)))))))
 
 (defn rollback-txs
   "Given transactions as a vector are rollbacked."
