@@ -167,12 +167,28 @@
   (some-> test :2pc deref second (.join tx-id)))
 
 (defn prepare-validate-commit-txs
-  "Given transactions as a vector are prepared, validated,
-  then committed for 2pc."
+  "Given transactions as a vector are prepared, validated, then committed for 2pc.
+   The overall commit is considered successful if at least one commit succeeds."
   [txs]
-  (doseq [f [#(.prepare %) #(.validate %) #(.commit %)]
+  ;; Prepare/validate (fail fast on any error)
+  (doseq [f [#(.prepare %) #(.validate %)]
           tx txs]
-    (f tx)))
+    (f tx))
+
+  ;; Commit (successful if any commit succeeds)
+  (let [results (mapv (fn [tx]
+                        (try
+                          (.commit tx)
+                          :committed
+                          (catch Exception e
+                            e)))
+                      txs)]
+    (when-not (some #{:committed} results)
+      ;; All commit attempts failed: log all exceptions, then throw the first one.
+      (doseq [r results
+              :when (instance? Exception r)]
+        (warn r "Commit attempts failed in 2PC commit"))
+      (throw (first results)))))
 
 (defn rollback-txs
   "Given transactions as a vector are rollbacked."
