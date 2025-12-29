@@ -187,6 +187,8 @@
             :--version "14.0.3")
     :sqlserver (c/exec
                  :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
+                 :--set "image.repository=mcr.microsoft.com/mssql/server"
+                 :--set "image.tag=2022-latest"
                  :--set "acceptEula.value=Y"
                  :--set "sapassword=sqlserver"
                  :--set "persistence.enabled=true"
