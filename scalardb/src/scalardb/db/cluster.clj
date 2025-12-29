@@ -23,6 +23,7 @@
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
+(def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -71,9 +72,9 @@
            "mysql"]
           :sqlserver
           ["jdbc"
-           (str "jdbc:sqlserver://sqlserver-scalardb-cluster.default.svc.cluster.local:1433;database=" scalar/KEYSPACE)
+           "jdbc:sqlserver://sqlserver-scalardb-cluster-mssqlserver-2022.default.svc.cluster.local:1433;encrypt=true;trustServerCertificate=true"
            "sa"
-           "sqlserver"]
+           SQLSERVER_PASSWORD]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
                          (get-in path)
@@ -186,14 +187,14 @@
             :--set "global.security.allowInsecureImages=true"
             :--version "14.0.3")
     :sqlserver (c/exec
-                 :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
-                 :--set "image.repository=mcr.microsoft.com/mssql/server"
-                 :--set "image.tag=2022-latest"
-                 :--set "acceptEula.value=Y"
-                 :--set "sapassword=sqlserver"
-                 :--set "persistence.enabled=true"
-                 :--set "service.type=LoadBalancer"
-                 :--version "1.2.3")
+                :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
+                :--set "image.repository=mcr.microsoft.com/mssql/server"
+                :--set "image.tag=2022-latest"
+                :--set "acceptEula.value=Y"
+                :--set (str "sapassword=" SQLSERVER_PASSWORD)
+                :--set "persistence.enabled=true"
+                :--set "service.type=LoadBalancer"
+                :--version "1.2.3")
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
@@ -389,7 +390,7 @@
                        (.setProperty "scalar.db.contact_points"
                                      (str "jdbc:sqlserver://" ip ":1433;database=" scalar/KEYSPACE))
                        (.setProperty "scalar.db.username" "sa")
-                       (.setProperty "scalar.db.password" "sqlserver")))
+                       (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
 
 (defn gen-db
