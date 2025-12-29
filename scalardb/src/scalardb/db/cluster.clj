@@ -388,7 +388,7 @@
                      (doto (Properties.)
                        (.setProperty "scalar.db.storage" "jdbc")
                        (.setProperty "scalar.db.contact_points"
-                                     (str "jdbc:sqlserver://" ip ":1433;database=" scalar/KEYSPACE))
+                                     "jdbc:sqlserver://" ip ":1433;encrypt=true;trustServerCertificate=true")
                        (.setProperty "scalar.db.username" "sa")
                        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
