@@ -339,8 +339,11 @@
               (fn [ip]
                 (->> (doto (Properties.)
                        (.setProperty "scalar.db.transaction_manager" "cluster")
-                       (.setProperty "scalar.db.contact_points" (str "indirect:" ip)))
-                     (ext/set-common-properties test)))]
+                       (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
+                       (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled"
+                                     (str (:enable-cluster-client-side-optimizations test)))
+                       (.setProperty "scalar.db.cluster.client.write_buffering.enabled"
+                                     (str (:enable-cluster-client-side-optimizations test))))))]
           (if (need-two-clusters? test)
             (mapv create-fn [ip ip2])
             (create-fn ip)))))
