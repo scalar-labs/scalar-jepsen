@@ -337,10 +337,12 @@
               ip2 (c/on node (get-load-balancer-ip (str CLUSTER2_NAME "-envoy")))
               create-fn
               (fn [ip]
-                (->> (doto (Properties.)
-                       (.setProperty "scalar.db.transaction_manager" "cluster")
-                       (.setProperty "scalar.db.contact_points" (str "indirect:" ip)))
-                     (ext/set-common-properties test)))]
+                (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
+                  (doto (Properties.)
+                    (.setProperty "scalar.db.transaction_manager" "cluster")
+                    (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
+                    (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled" client-side-optimizations-enabled)
+                    (.setProperty "scalar.db.cluster.client.write_buffering.enabled" client-side-optimizations-enabled))))]
           (if (need-two-clusters? test)
             (mapv create-fn [ip ip2])
             (create-fn ip)))))

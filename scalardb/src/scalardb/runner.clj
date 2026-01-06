@@ -88,6 +88,9 @@
    [nil "--enable-group-commit" "if set, group commit is enabled"
     :default false]
 
+   [nil "--enable-cluster-client-side-optimizations" "if set, ScalarDB Cluster client-side optimizations are enabled"
+    :default false]
+
    [nil "--config-file CONFIG_FILE"
     "ScalarDB config file. When this is given, other configuration options are ignored."
     :default ""]])
