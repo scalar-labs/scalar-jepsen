@@ -29,6 +29,10 @@
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
 (def ^:private ^:const SQLSERVER_USER "sa")
 (def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
+(def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
+(def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
+(def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
+(def ^:private ^:const ORACLE_APP_PASSWORD "Str0ng!AppPass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -80,6 +84,11 @@
            "jdbc:sqlserver://sqlserver-scalardb-cluster-mssqlserver-2022.default.svc.cluster.local:1433;encrypt=true;trustServerCertificate=true"
            SQLSERVER_USER
            SQLSERVER_PASSWORD]
+          :oracle
+          ["jdbc"
+           "jdbc:oracle:thin:@oracle-scalardb-cluster.default.svc.cluster.local:1521/FREEPDB1"
+           "system"
+           ORACLE_PASSWORD]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
                          (get-in path)
@@ -136,6 +145,7 @@
     :sqlserver (c/exec :helm :repo :add
                        "simcube"
                        "https://simcubeltd.github.io/simcube-helm-charts")
+    :oracle (c/upload ORACLE_MANIFEST_YAML "/tmp")
     (throw-unsupported-db-error db-type))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
@@ -146,7 +156,7 @@
   (c/exec :helm :repo :update))
 
 (defn- configure!
-  []
+  [db-type]
   (when (and (seq (env :docker-username)) (seq (env :docker-access-token)))
     (binding [c/*dir* (System/getProperty "user.dir")]
       (try
@@ -157,6 +167,16 @@
               "--docker-server=ghcr.io"
               (str "--docker-username=" (env :docker-username))
               (str "--docker-password=" (env :docker-access-token)))))
+
+  (when (= db-type :oracle)
+    (binding [c/*dir* (System/getProperty "user.dir")]
+      (try
+        (c/exec :kubectl :delete :secret "oracle-scalardb-cluster-secret")
+        ;; ignore the failure when the secret doesn't exist
+        (catch Exception _))
+      (c/exec :kubectl :create :secret :generic "oracle-scalardb-cluster-secret"
+              (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD)
+              (str "--from-literal=ORACLE_APP_PASSWORD=" ORACLE_APP_PASSWORD))))
 
   ;; Chaos Mesh
   (try
@@ -202,6 +222,7 @@
                 :--set "persistence.enabled=true"
                 :--set "service.type=LoadBalancer"
                 :--version "1.2.3")
+    :oracle (c/exec :kubectl :apply :-f (str "/tmp/" ORACLE_MANIFEST_YAML))
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
@@ -241,10 +262,12 @@
   (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
                [:helm :uninstall MYSQL_NAME]
                [:helm :uninstall SQLSERVER_NAME]
+               [:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)]
                [:kubectl :delete
                 :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
                [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
                [:kubectl :delete :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]
+               [:kubectl :delete :pvc "oracle-scalardb-cluster"]
                [:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
@@ -325,7 +348,7 @@
       (when-not (:leave-db-running? test)
         (wipe!))
       (install! db-type)
-      (configure!)
+      (configure! db-type)
       (start! test db-type)
       ;; wait for the pods
       (wait-for-recovery test))
@@ -402,6 +425,13 @@
                                           ":1433;encrypt=true;trustServerCertificate=true"))
                        (.setProperty "scalar.db.username" SQLSERVER_USER)
                        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
+        :oracle (let [ip (c/on node (get-load-balancer-ip ORACLE_NAME))]
+                  (doto (Properties.)
+                    (.setProperty "scalar.db.storage" "jdbc")
+                    (.setProperty "scalar.db.contact_points"
+                                  (str "jdbc:oracle:thin:@" ip ":1521/FREEPDB1"))
+                    (.setProperty "scalar.db.username" "system")
+                    (.setProperty "scalar.db.password" ORACLE_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
 
 (defn gen-db
