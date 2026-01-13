@@ -86,7 +86,7 @@ jobs:
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
             time_limit: 600
-          - name: "OnePhaseCommit"
+          - name: "OnePhaseCommit_SI"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: true
@@ -94,6 +94,15 @@ jobs:
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "OnePhaseCommit_Serializable"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: true
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "serializable"
+            consistency_model: "strict-serializable"
             time_limit: 600
           - name: "GroupCommit"
             workload: "elle-append elle-write-read"
