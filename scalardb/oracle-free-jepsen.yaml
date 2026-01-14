@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oracle-scalardb-cluster-startup
+  namespace: default
+data:
+  01-fix-listener.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "[startup] Fixing local_listener and registering services..."
+    sqlplus -s / as sysdba <<'SQL'
+    whenever sqlerror exit sql.sqlcode;
+    alter system set local_listener="(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))" scope=both;
+    alter system register;
+    exit
+    SQL
+    echo "[startup] Listener registration done."
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-scalardb-cluster
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: oracle-scalardb-cluster
+  ports:
+    - name: listener
+      port: 1521
+      targetPort: 1521
+      nodePort: 31521
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: oracle-scalardb-cluster
+  namespace: default
+spec:
+  serviceName: oracle-scalardb-cluster
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oracle-scalardb-cluster
+  template:
+    metadata:
+      labels:
+        app: oracle-scalardb-cluster
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: oracle
+          image: docker.io/gvenzl/oracle-free:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 1521
+              name: listener
+          env:
+            - name: ORACLE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-scalardb-cluster-secret
+                  key: ORACLE_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /opt/oracle/oradata
+          readinessProbe:
+            tcpSocket:
+              port: 1521
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 1521
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -lc
+                  - |
+                    (
+                      echo "[postStart] register once"
+                      echo 'alter system set local_listener="(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))"; alter system register;' \
+                        | sqlplus -s / as sysdba >/dev/null 2>&1 || true
+
+                      while true; do
+                        echo "alter system register;" | sqlplus -s / as sysdba >/dev/null 2>&1 || true
+                        sleep 10
+                      done
+                    ) >/proc/1/fd/1 2>/proc/1/fd/2 &
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 8Gi
+
