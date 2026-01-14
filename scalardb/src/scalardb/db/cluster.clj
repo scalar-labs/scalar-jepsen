@@ -32,7 +32,6 @@
 (def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
 (def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
 (def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
-(def ^:private ^:const ORACLE_APP_PASSWORD "Str0ng!AppPass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -175,8 +174,7 @@
         ;; ignore the failure when the secret doesn't exist
         (catch Exception _))
       (c/exec :kubectl :create :secret :generic "oracle-scalardb-cluster-secret"
-              (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD)
-              (str "--from-literal=ORACLE_APP_PASSWORD=" ORACLE_APP_PASSWORD))))
+              (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD))))
 
   ;; Chaos Mesh
   (try
@@ -267,7 +265,7 @@
                 :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
                [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
                [:kubectl :delete :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]
-               [:kubectl :delete :pvc "oracle-scalardb-cluster"]
+               [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"]
                [:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
@@ -298,6 +296,15 @@
        (filter #(str/includes? % prefix))
        (filter #(str/includes? % "LoadBalancer"))
        (map #(nth (str/split % #"\s+") 3))
+       first))
+
+(defn- get-k8s-node-ip
+  "Get the IP of the k8s node"
+  []
+  (->> (c/exec :kubectl :get :nodes :-o :wide)
+       str/split-lines
+       rest
+       (map #(nth (str/split % #"\s+") 5))
        first))
 
 (defn- running-pods?
@@ -425,11 +432,11 @@
                                           ":1433;encrypt=true;trustServerCertificate=true"))
                        (.setProperty "scalar.db.username" SQLSERVER_USER)
                        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
-        :oracle (let [ip (c/on node (get-load-balancer-ip ORACLE_NAME))]
+        :oracle (let [ip (c/on node (get-k8s-node-ip))]
                   (doto (Properties.)
                     (.setProperty "scalar.db.storage" "jdbc")
                     (.setProperty "scalar.db.contact_points"
-                                  (str "jdbc:oracle:thin:@" ip ":1521/FREEPDB1"))
+                                  (str "jdbc:oracle:thin:@" ip ":31521/FREEPDB1"))
                     (.setProperty "scalar.db.username" "system")
                     (.setProperty "scalar.db.password" ORACLE_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
