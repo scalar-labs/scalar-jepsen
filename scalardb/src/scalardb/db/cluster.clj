@@ -30,7 +30,6 @@
 (def ^:private ^:const SQLSERVER_USER "sa")
 (def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
 (def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
-(def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
 (def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
