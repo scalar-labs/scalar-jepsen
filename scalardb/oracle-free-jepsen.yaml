@@ -51,7 +51,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
         - name: oracle
-          image: docker.io/gvenzl/oracle-free:slim
+          image: ghcr.io/gvenzl/oracle-free:23-slim
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 1521
