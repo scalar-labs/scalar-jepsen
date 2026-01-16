@@ -29,6 +29,7 @@
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
 (def ^:private ^:const SQLSERVER_USER "sa")
 (def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
+(def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
 (def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
 (def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
 
@@ -219,7 +220,12 @@
                 :--set "persistence.enabled=true"
                 :--set "service.type=LoadBalancer"
                 :--version "1.2.3")
-    :oracle (c/exec :kubectl :apply :-f (str "/tmp/" ORACLE_MANIFEST_YAML))
+    :oracle (do (c/exec :kubectl :apply :-f (str "/tmp/" ORACLE_MANIFEST_YAML))
+                (c/exec :kubectl :wait
+                        "--for=condition=Ready"
+                        "pod"
+                        :-l (str "app=" ORACLE_NAME)
+                        "--timeout=120s"))
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
