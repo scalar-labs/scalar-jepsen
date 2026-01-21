@@ -90,6 +90,10 @@
                               name
                               str/upper-case
                               (str/replace #"-" "_"))
+                          ;; connection pool min idle
+                          "\nscalar.db.jdbc.connection_pool.min_idle=0"
+                          "\nscalar.db.jdbc.table_metadata.connection_pool.min_idle=0"
+                          "\nscalar.db.jdbc.admin.connection_pool.min_idle=0"
                           ;; one phase commit
                           (when (:enable-one-phase-commit test)
                             "\nscalar.db.consensus_commit.one_phase_commit.enabled=true")
