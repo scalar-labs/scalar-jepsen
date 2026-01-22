@@ -21,8 +21,13 @@
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
+(def ^:private ^:const POSTGRESQL_USER "postgres")
+(def ^:private ^:const POSTGRESQL_PASSWORD "postgres")
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
+(def ^:private ^:const MYSQL_USER "root")
+(def ^:private ^:const MYSQL_PASSWORD "mysql")
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
+(def ^:private ^:const SQLSERVER_USER "sa")
 (def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
@@ -63,17 +68,17 @@
           :postgres
           ["jdbc"
            "jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
-           "postgres"
-           "postgres"]
+           POSTGRESQL_USER
+           POSTGRESQL_PASSWORD]
           :mysql
           ["jdbc"
            (str "jdbc:mysql://mysql-scalardb-cluster.default.svc.cluster.local:3306/" scalar/KEYSPACE)
-           "root"
-           "mysql"]
+           MYSQL_USER
+           MYSQL_PASSWORD]
           :sqlserver
           ["jdbc"
            "jdbc:sqlserver://sqlserver-scalardb-cluster-mssqlserver-2022.default.svc.cluster.local:1433;encrypt=true;trustServerCertificate=true"
-           "sa"
+           SQLSERVER_USER
            SQLSERVER_PASSWORD]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
@@ -375,15 +380,15 @@
                       (.setProperty "scalar.db.storage" "jdbc")
                       (.setProperty "scalar.db.contact_points"
                                     (str "jdbc:postgresql://" ip ":5432/postgres"))
-                      (.setProperty "scalar.db.username" "postgres")
-                      (.setProperty "scalar.db.password" "postgres")))
+                      (.setProperty "scalar.db.username" POSTGRESQL_USER)
+                      (.setProperty "scalar.db.password" POSTGRESQL_PASSWORD)))
         :mysql (let [ip (c/on node (get-load-balancer-ip MYSQL_NAME))]
                  (doto (Properties.)
                    (.setProperty "scalar.db.storage" "jdbc")
                    (.setProperty "scalar.db.contact_points"
                                  (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
-                   (.setProperty "scalar.db.username" "root")
-                   (.setProperty "scalar.db.password" "mysql")))
+                   (.setProperty "scalar.db.username" MYSQL_USER)
+                   (.setProperty "scalar.db.password" MYSQL_PASSWORD)))
         :sqlserver (let [ip (c/on node (get-load-balancer-ip SQLSERVER_NAME))]
                      (doto (Properties.)
                        (.setProperty "scalar.db.storage" "jdbc")
@@ -391,7 +396,7 @@
                                      (str "jdbc:sqlserver://"
                                           ip
                                           ":1433;encrypt=true;trustServerCertificate=true"))
-                       (.setProperty "scalar.db.username" "sa")
+                       (.setProperty "scalar.db.username" SQLSERVER_USER)
                        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
 
