@@ -4,7 +4,9 @@
   :license {:name ""
             :url ""}
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [jepsen "0.3.3" :exclusions [net.java.dev.jna/jna
+                 [jepsen "0.3.3" :exclusions [com.fasterxml.jackson.core/jackson-annotations
+                                              com.fasterxml.jackson.core/jackson-core
+                                              net.java.dev.jna/jna
                                               net.java.dev.jna/jna-platform]]
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
