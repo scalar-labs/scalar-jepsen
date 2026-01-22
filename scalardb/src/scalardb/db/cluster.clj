@@ -102,6 +102,10 @@
                               name
                               str/upper-case
                               (str/replace #"-" "_"))
+                          ;; connection pool min idle
+                          "\nscalar.db.jdbc.connection_pool.min_idle=0"
+                          "\nscalar.db.jdbc.table_metadata.connection_pool.min_idle=0"
+                          "\nscalar.db.jdbc.admin.connection_pool.min_idle=0"
                           ;; one phase commit
                           (when (:enable-one-phase-commit test)
                             "\nscalar.db.consensus_commit.one_phase_commit.enabled=true")
@@ -365,10 +369,12 @@
               ip2 (c/on node (get-load-balancer-ip (str CLUSTER2_NAME "-envoy")))
               create-fn
               (fn [ip]
-                (->> (doto (Properties.)
-                       (.setProperty "scalar.db.transaction_manager" "cluster")
-                       (.setProperty "scalar.db.contact_points" (str "indirect:" ip)))
-                     (ext/set-common-properties test)))]
+                (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
+                  (doto (Properties.)
+                    (.setProperty "scalar.db.transaction_manager" "cluster")
+                    (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
+                    (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled" client-side-optimizations-enabled)
+                    (.setProperty "scalar.db.cluster.client.write_buffering.enabled" client-side-optimizations-enabled))))]
           (if (need-two-clusters? test)
             (mapv create-fn [ip ip2])
             (create-fn ip)))))

@@ -56,7 +56,8 @@
     (.setProperty "scalar.dl.client.server.host" (rand-nth (:servers test)))
     (.setProperty "scalar.dl.client.cert_holder_id" "jepsen")
     (.setProperty "scalar.dl.client.cert_path" (:cert test))
-    (.setProperty "scalar.dl.client.private_key_path" (:client-key test))))
+    (.setProperty "scalar.dl.client.private_key_path" (:client-key test))
+    (.setProperty "scalar.dl.client.auto_bootstrap" "false")))
 
 (defn prepare-client-service
   [test]

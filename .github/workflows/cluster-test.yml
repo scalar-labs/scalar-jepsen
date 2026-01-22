@@ -52,7 +52,11 @@ on:
         default: false
         type: boolean
       enable_group_commit:
-        description: 'Enable Group commit'
+        description: 'Enable group commit'
+        default: false
+        type: boolean
+      enable_client_side_optimizations:
+        description: 'Enable client-side optimizations'
         default: false
         type: boolean
       isolation_level:
@@ -198,6 +202,9 @@ jobs:
         fi
         if [ "${{ github.event.inputs.enable_group_commit }}" = "true" ]; then
           OPTS+=" --enable-group-commit"
+        fi
+        if [ "${{ github.event.inputs.enable_client_side_optimizations }}" = "true" ]; then
+          OPTS+=" --enable-cluster-client-side-optimizations"
         fi
 
         DOCKER_USERNAME=${{ github.repository_owner }} \
