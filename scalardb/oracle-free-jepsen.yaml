@@ -1,23 +1,4 @@
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: oracle-scalardb-cluster-startup
-  namespace: default
-data:
-  01-fix-listener.sh: |
-    #!/bin/bash
-    set -euo pipefail
-
-    echo "[startup] Fixing local_listener and registering services..."
-    sqlplus -s / as sysdba <<'SQL'
-    whenever sqlerror exit sql.sqlcode;
-    alter system set local_listener="(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=1521))" scope=both;
-    alter system register;
-    exit
-    SQL
-    echo "[startup] Listener registration done."
----
-apiVersion: v1
 kind: Service
 metadata:
   name: oracle-scalardb-cluster
