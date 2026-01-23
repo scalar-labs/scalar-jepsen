@@ -18,6 +18,7 @@ on:
         options:
           - postgres
           - mysql
+          - sqlserver
       time_limit:
         description: 'Test duration in second'
         required: true

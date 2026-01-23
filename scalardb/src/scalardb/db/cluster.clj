@@ -21,7 +21,14 @@
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
+(def ^:private ^:const POSTGRESQL_USER "postgres")
+(def ^:private ^:const POSTGRESQL_PASSWORD "postgres")
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
+(def ^:private ^:const MYSQL_USER "root")
+(def ^:private ^:const MYSQL_PASSWORD "mysql")
+(def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
+(def ^:private ^:const SQLSERVER_USER "sa")
+(def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -61,13 +68,18 @@
           :postgres
           ["jdbc"
            "jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
-           "postgres"
-           "postgres"]
+           POSTGRESQL_USER
+           POSTGRESQL_PASSWORD]
           :mysql
           ["jdbc"
            (str "jdbc:mysql://mysql-scalardb-cluster.default.svc.cluster.local:3306/" scalar/KEYSPACE)
-           "root"
-           "mysql"]
+           MYSQL_USER
+           MYSQL_PASSWORD]
+          :sqlserver
+          ["jdbc"
+           "jdbc:sqlserver://sqlserver-scalardb-cluster-mssqlserver-2022.default.svc.cluster.local:1433;encrypt=true;trustServerCertificate=true"
+           SQLSERVER_USER
+           SQLSERVER_PASSWORD]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
                          (get-in path)
@@ -121,6 +133,9 @@
                       "bitnami" "https://charts.bitnami.com/bitnami")
     :mysql (c/exec :helm :repo :add
                    "bitnami" "https://charts.bitnami.com/bitnami")
+    :sqlserver (c/exec :helm :repo :add
+                       "simcube"
+                       "https://simcubeltd.github.io/simcube-helm-charts")
     (throw-unsupported-db-error db-type))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
@@ -178,6 +193,15 @@
             :--set "metrics.image.repository=bitnamilegacy/mysqld-exporter"
             :--set "global.security.allowInsecureImages=true"
             :--version "14.0.3")
+    :sqlserver (c/exec
+                :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
+                :--set "image.repository=mcr.microsoft.com/mssql/server"
+                :--set "image.tag=2022-latest"
+                :--set "acceptEula.value=Y"
+                :--set (str "sapassword=" SQLSERVER_PASSWORD)
+                :--set "persistence.enabled=true"
+                :--set "service.type=LoadBalancer"
+                :--version "1.2.3")
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
@@ -216,9 +240,11 @@
   (info "wiping the pods...")
   (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
                [:helm :uninstall MYSQL_NAME]
+               [:helm :uninstall SQLSERVER_NAME]
                [:kubectl :delete
                 :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
                [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
+               [:kubectl :delete :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]
                [:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
@@ -358,15 +384,24 @@
                       (.setProperty "scalar.db.storage" "jdbc")
                       (.setProperty "scalar.db.contact_points"
                                     (str "jdbc:postgresql://" ip ":5432/postgres"))
-                      (.setProperty "scalar.db.username" "postgres")
-                      (.setProperty "scalar.db.password" "postgres")))
+                      (.setProperty "scalar.db.username" POSTGRESQL_USER)
+                      (.setProperty "scalar.db.password" POSTGRESQL_PASSWORD)))
         :mysql (let [ip (c/on node (get-load-balancer-ip MYSQL_NAME))]
                  (doto (Properties.)
                    (.setProperty "scalar.db.storage" "jdbc")
                    (.setProperty "scalar.db.contact_points"
                                  (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
-                   (.setProperty "scalar.db.username" "root")
-                   (.setProperty "scalar.db.password" "mysql")))
+                   (.setProperty "scalar.db.username" MYSQL_USER)
+                   (.setProperty "scalar.db.password" MYSQL_PASSWORD)))
+        :sqlserver (let [ip (c/on node (get-load-balancer-ip SQLSERVER_NAME))]
+                     (doto (Properties.)
+                       (.setProperty "scalar.db.storage" "jdbc")
+                       (.setProperty "scalar.db.contact_points"
+                                     (str "jdbc:sqlserver://"
+                                          ip
+                                          ":1433;encrypt=true;trustServerCertificate=true"))
+                       (.setProperty "scalar.db.username" SQLSERVER_USER)
+                       (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
 
 (defn gen-db
