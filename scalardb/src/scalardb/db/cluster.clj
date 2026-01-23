@@ -31,6 +31,7 @@
 (def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
 (def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
 (def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
+(def ^:private ^:const ORACLE_USER "system")
 (def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
@@ -86,7 +87,7 @@
           :oracle
           ["jdbc"
            "jdbc:oracle:thin:@oracle-scalardb-cluster.default.svc.cluster.local:1521/FREEPDB1"
-           "system"
+           ORACLE_USER
            ORACLE_PASSWORD]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
@@ -442,7 +443,7 @@
                     (.setProperty "scalar.db.storage" "jdbc")
                     (.setProperty "scalar.db.contact_points"
                                   (str "jdbc:oracle:thin:@" ip ":31521/FREEPDB1"))
-                    (.setProperty "scalar.db.username" "system")
+                    (.setProperty "scalar.db.username" ORACLE_USER)
                     (.setProperty "scalar.db.password" ORACLE_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
 
