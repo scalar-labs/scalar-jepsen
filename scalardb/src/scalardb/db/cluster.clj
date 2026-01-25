@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster
-  (:require [clj-yaml.core :as yaml]
+  (:require [cheshire.core :as cheshire]
+            [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.tools.logging :refer [info warn]]
             [environ.core :refer [env]]
@@ -278,12 +279,15 @@
     (try (apply c/exec cmd) (catch Exception _ nil))))
 
 (defn- get-pod-list
-  [name]
-  (->> (c/exec :kubectl :get :pod)
-       str/split-lines
-       (filter #(str/starts-with? % name))
-       (filter #(str/includes? % "Running"))
-       (map #(first (str/split % #"\s+")))))
+  "Get the pod list whose name starts with prefix"
+  [prefix]
+  (let [pods (-> (c/exec :kubectl :get :pod :-o :json)
+                 (cheshire/parse-string true))]
+    (->> pods
+         :items
+         (filter #(str/starts-with? (get-in % [:metadata :name]) prefix))
+         (filter #(= "Running" (get-in % [:status :phase])))
+         (map #(get-in % [:metadata :name])))))
 
 (defn- get-logs
   [_test]
@@ -295,23 +299,29 @@
       logs)))
 
 (defn- get-load-balancer-ip
-  "Get the IP of the load balancer"
+  "Get the external IP of a LoadBalancer service whose name includes prefix"
   [prefix]
-  (->> (c/exec :kubectl :get :svc)
-       str/split-lines
-       (filter #(str/includes? % prefix))
-       (filter #(str/includes? % "LoadBalancer"))
-       (map #(nth (str/split % #"\s+") 3))
-       first))
+  (let [svc (-> (c/exec :kubectl :get :svc :-o :json)
+                (cheshire/parse-string true))]
+    (->> svc
+         :items
+         (filter #(str/includes? (get-in % [:metadata :name]) prefix))
+         (filter #(= "LoadBalancer" (get-in % [:spec :type])))
+         (map #(get-in % [:status :loadBalancer :ingress 0 :ip]))
+         (remove nil?)
+         first)))
 
 (defn- get-k8s-node-ip
-  "Get the IP of the k8s node"
+  "Get the internal IP of a Kubernetes node"
   []
-  (->> (c/exec :kubectl :get :nodes :-o :wide)
-       str/split-lines
-       rest
-       (map #(nth (str/split % #"\s+") 5))
-       first))
+  (let [nodes (-> (c/exec :kubectl :get :nodes :-o :json)
+                  (cheshire/parse-string true))]
+    (->> nodes
+         :items
+         (mapcat #(get-in % [:status :addresses]))
+         (filter #(= "InternalIP" (:type %)))
+         (map :address)
+         first)))
 
 (defn- running-pods?
   "Check a live node."
