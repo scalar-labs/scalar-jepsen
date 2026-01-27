@@ -192,52 +192,6 @@ jobs:
         # Replace the ScalarDB Cluster version in project.clj
         sed -i "s/4.0.0-SNAPSHOT/${{ github.event.inputs.scalardb_cluster_version }}/g" project.clj
 
-        # Replace the docker image for Oracle if needed
-        if [ "${{ github.event.inputs.storage_backend }}" = "oracle" ]; then
-          sed -i "s|ghcr.io/gvenzl/oracle-free:23-slim|ghcr.io/scalar-labs/oracle/db-prebuilt:23|g" oracle-free-jepsen.yaml
-          NS=default
-          kubectl -n "$NS" create secret docker-registry ghcr-pull \
-            --docker-server=ghcr.io \
-            --docker-username="${{ github.repository_owner }}" \
-            --docker-password="${{ secrets.CR_PAT }}" \
-            --docker-email=none@example.com \
-            --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n "$NS" patch serviceaccount default \
-            -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}'
-        fi
-
-        # Debugging
-        echo "=== secret ==="
-        kubectl -n "default" get secret ghcr-pull -o jsonpath='{.type}{"\n"}' || true
-        echo "=== serviceaccount ==="
-        kubectl -n "default" get sa default -o yaml | sed -n '/imagePullSecrets/,$p' || true
-
-        # Debugging
-        kubectl -n default run ghcr-test \
-          --image=ghcr.io/scalar-labs/oracle/db-prebuilt:23 \
-          --restart=Never -- sleep 3600
-        kubectl -n default get pod ghcr-test -o wide
-        kubectl -n default get pod ghcr-test -o jsonpath='{.status.phase}{"\n"}{range .status.containerStatuses[*]}{.state.waiting.reason}{"\n"}{.state.waiting.message}{"\n"}{end}' || true
-        NS=default
-        POD=ghcr-test
-        for i in $(seq 1 90); do
-          phase="$(kubectl -n "$NS" get pod "$POD" -o jsonpath='{.status.phase}' 2>/dev/null || echo missing)"
-          reason="$(kubectl -n "$NS" get pod "$POD" -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || true)"
-          msg="$(kubectl -n "$NS" get pod "$POD" -o jsonpath='{.status.containerStatuses[0].state.waiting.message}' 2>/dev/null || true)"
-
-          echo "t=${i}s phase=${phase} reason=${reason}"
-          [ -n "$msg" ] && echo "msg=${msg}"
-
-          case "$reason" in
-            ErrImagePull|ImagePullBackOff|CreateContainerConfigError|CrashLoopBackOff)
-              break
-              ;;
-          esac
-          sleep 1
-        done
-        echo "=== describe ==="
-        kubectl -n "$NS" describe pod "$POD" | sed -n '/Events:/,$p'
-
         OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
         OPTS+=" --workload ${{ github.event.inputs.workload }}"
         OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
