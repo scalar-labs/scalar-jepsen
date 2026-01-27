@@ -216,6 +216,8 @@ jobs:
         kubectl -n default run ghcr-test \
           --image=ghcr.io/scalar-labs/oracle/db-prebuilt:23 \
           --restart=Never -- sleep 3600
+        kubectl -n default get pod ghcr-test -o wide
+        kubectl -n default get pod ghcr-test -o jsonpath='{.status.phase}{"\n"}{range .status.containerStatuses[*]}{.state.waiting.reason}{"\n"}{.state.waiting.message}{"\n"}{end}' || true
         kubectl -n default describe pod ghcr-test | sed -n '/Events:/,$p'
 
         OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
