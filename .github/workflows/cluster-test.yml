@@ -206,6 +206,18 @@ jobs:
             -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}'
         fi
 
+        # Debugging
+        echo "=== secret ==="
+        kubectl -n "default" get secret ghcr-pull -o jsonpath='{.type}{"\n"}' || true
+        echo "=== serviceaccount ==="
+        kubectl -n "default" get sa default -o yaml | sed -n '/imagePullSecrets/,$p' || true
+
+        # Debugging
+        kubectl -n default run ghcr-test \
+          --image=ghcr.io/scalar-labs/oracle/db-prebuilt:23 \
+          --restart=Never -- sleep 3600
+        kubectl -n default describe pod ghcr-test | sed -n '/Events:/,$p'
+
         OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
         OPTS+=" --workload ${{ github.event.inputs.workload }}"
         OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
