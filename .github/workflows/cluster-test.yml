@@ -192,6 +192,20 @@ jobs:
         # Replace the ScalarDB Cluster version in project.clj
         sed -i "s/4.0.0-SNAPSHOT/${{ github.event.inputs.scalardb_cluster_version }}/g" project.clj
 
+        # Replace the docker image for Oracle if needed
+        if [ "${{ github.event.inputs.storage_backend }}" = "oracle" ]; then
+          sed -i "s|ghcr.io/gvenzl/oracle-free:23-slim|ghcr.io/scalar-labs/oracle/db-prebuilt:19|g" oracle-free-jepsen.yaml
+          NS=default
+          kubectl -n "$NS" create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.repository_owner }}" \
+            --docker-password="${{ secrets.CR_PAT }}" \
+            --docker-email=none@example.com \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NS" patch serviceaccount default \
+            -p '{"imagePullSecrets":[{"name":"ghcr-pull"}]}'
+        fi
+
         OPTS=" --time-limit ${{ github.event.inputs.time_limit }}"
         OPTS+=" --workload ${{ github.event.inputs.workload }}"
         OPTS+=" --nemesis ${{ github.event.inputs.nemesis }}"
