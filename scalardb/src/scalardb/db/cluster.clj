@@ -227,7 +227,7 @@
                         "--for=condition=Ready"
                         "pod"
                         :-l (str "app=" ORACLE_NAME)
-                        "--timeout=600s"))
+                        "--timeout=300s"))
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster

@@ -194,7 +194,7 @@ jobs:
 
         # Replace the docker image for Oracle if needed
         if [ "${{ github.event.inputs.storage_backend }}" = "oracle" ]; then
-          # Free up some space for the Oracle image
+          # Free up some space for the prebuilt Oracle image
           sudo rm -r /usr/local/lib/android
 
           sed -i "s|ghcr.io/gvenzl/oracle-free:23-slim|ghcr.io/scalar-labs/oracle/db-prebuilt:23|g" oracle-free-jepsen.yaml
