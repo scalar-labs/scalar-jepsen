@@ -146,6 +146,8 @@
                   :-n "chaos-mesh"
                   :-p "{\"metadata\":{\"finalizers\":[]}}"
                   :--type "merge"
+                  ;; Need the deletion command with the pipe
+                  ;; because the finalizers could be reverted
                   c/|
                   :kubectl :delete "networkchaos" action :-n "chaos-mesh"))
         (.delete file)))))
