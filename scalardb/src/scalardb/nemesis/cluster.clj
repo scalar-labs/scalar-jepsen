@@ -145,7 +145,10 @@
           (c/exec :kubectl :patch "networkchaos" action
                   :-n "chaos-mesh"
                   :-p "{\"metadata\":{\"finalizers\":[]}}"
-                  :--type "merge"))
+                  :--type "merge"
+                  ;; Hack: Need the pipe to avoid reverting the finalizers before deletion
+                  c/|
+                  :kubectl :delete "networkchaos" action :-n "chaos-mesh"))
         (.delete file)))))
 
 (defn delete-partition-exp
