@@ -24,7 +24,8 @@
   {"cassandra" :cassandra
    "postgres" :postgres
    "mysql" :mysql
-   "sqlserver" :sqlserver})
+   "sqlserver" :sqlserver
+   "oracle" :oracle})
 
 (def workload-keys
   "A map of test workload keys."

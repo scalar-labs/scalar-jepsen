@@ -19,6 +19,7 @@ on:
           - postgres
           - mysql
           - sqlserver
+          - oracle
       time_limit:
         description: 'Test duration in second'
         required: true

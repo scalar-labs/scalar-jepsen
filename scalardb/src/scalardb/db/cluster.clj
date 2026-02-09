@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster
-  (:require [clj-yaml.core :as yaml]
+  (:require [cheshire.core :as cheshire]
+            [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.tools.logging :refer [info warn]]
             [environ.core :refer [env]]
@@ -29,6 +30,10 @@
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
 (def ^:private ^:const SQLSERVER_USER "sa")
 (def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
+(def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
+(def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
+(def ^:private ^:const ORACLE_USER "system")
+(def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -80,6 +85,11 @@
            "jdbc:sqlserver://sqlserver-scalardb-cluster-mssqlserver-2022.default.svc.cluster.local:1433;encrypt=true;trustServerCertificate=true"
            SQLSERVER_USER
            SQLSERVER_PASSWORD]
+          :oracle
+          ["jdbc"
+           "jdbc:oracle:thin:@oracle-scalardb-cluster.default.svc.cluster.local:1521/FREEPDB1"
+           ORACLE_USER
+           ORACLE_PASSWORD]
           (throw-unsupported-db-error db-type))
         new-db-props (-> values
                          (get-in path)
@@ -136,6 +146,7 @@
     :sqlserver (c/exec :helm :repo :add
                        "simcube"
                        "https://simcubeltd.github.io/simcube-helm-charts")
+    :oracle (c/upload ORACLE_MANIFEST_YAML "/tmp")
     (throw-unsupported-db-error db-type))
   ;; ScalarDB cluster
   (c/exec :helm :repo :add
@@ -146,7 +157,7 @@
   (c/exec :helm :repo :update))
 
 (defn- configure!
-  []
+  [db-type]
   (when (and (seq (env :docker-username)) (seq (env :docker-access-token)))
     (binding [c/*dir* (System/getProperty "user.dir")]
       (try
@@ -157,6 +168,15 @@
               "--docker-server=ghcr.io"
               (str "--docker-username=" (env :docker-username))
               (str "--docker-password=" (env :docker-access-token)))))
+
+  (when (= db-type :oracle)
+    (binding [c/*dir* (System/getProperty "user.dir")]
+      (try
+        (c/exec :kubectl :delete :secret "oracle-scalardb-cluster-secret")
+        ;; ignore the failure when the secret doesn't exist
+        (catch Exception _))
+      (c/exec :kubectl :create :secret :generic "oracle-scalardb-cluster-secret"
+              (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD))))
 
   ;; Chaos Mesh
   (try
@@ -202,6 +222,12 @@
                 :--set "persistence.enabled=true"
                 :--set "service.type=LoadBalancer"
                 :--version "1.2.3")
+    :oracle (do (c/exec :kubectl :apply :-f (str "/tmp/" ORACLE_MANIFEST_YAML))
+                (c/exec :kubectl :wait
+                        "--for=condition=Ready"
+                        "pod"
+                        :-l (str "app=" ORACLE_NAME)
+                        "--timeout=300s"))
     (throw-unsupported-db-error db-type))
 
   ;; ScalarDB Cluster
@@ -241,22 +267,27 @@
   (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
                [:helm :uninstall MYSQL_NAME]
                [:helm :uninstall SQLSERVER_NAME]
+               [:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)]
                [:kubectl :delete
                 :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
                [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
                [:kubectl :delete :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]
+               [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"]
                [:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
     (try (apply c/exec cmd) (catch Exception _ nil))))
 
 (defn- get-pod-list
-  [name]
-  (->> (c/exec :kubectl :get :pod)
-       str/split-lines
-       (filter #(str/starts-with? % name))
-       (filter #(str/includes? % "Running"))
-       (map #(first (str/split % #"\s+")))))
+  "Get the pod list whose name starts with prefix"
+  [prefix]
+  (let [pods (-> (c/exec :kubectl :get :pod :-o :json)
+                 (cheshire/parse-string true))]
+    (->> pods
+         :items
+         (filter #(str/starts-with? (get-in % [:metadata :name]) prefix))
+         (filter #(= "Running" (get-in % [:status :phase])))
+         (map #(get-in % [:metadata :name])))))
 
 (defn- get-logs
   [_test]
@@ -268,14 +299,29 @@
       logs)))
 
 (defn- get-load-balancer-ip
-  "Get the IP of the load balancer"
+  "Get the external IP of a LoadBalancer service whose name includes prefix"
   [prefix]
-  (->> (c/exec :kubectl :get :svc)
-       str/split-lines
-       (filter #(str/includes? % prefix))
-       (filter #(str/includes? % "LoadBalancer"))
-       (map #(nth (str/split % #"\s+") 3))
-       first))
+  (let [svc (-> (c/exec :kubectl :get :svc :-o :json)
+                (cheshire/parse-string true))]
+    (->> svc
+         :items
+         (filter #(str/includes? (get-in % [:metadata :name]) prefix))
+         (filter #(= "LoadBalancer" (get-in % [:spec :type])))
+         (map #(get-in % [:status :loadBalancer :ingress 0 :ip]))
+         (remove nil?)
+         first)))
+
+(defn- get-k8s-node-ip
+  "Get the internal IP of a Kubernetes node"
+  []
+  (let [nodes (-> (c/exec :kubectl :get :nodes :-o :json)
+                  (cheshire/parse-string true))]
+    (->> nodes
+         :items
+         (mapcat #(get-in % [:status :addresses]))
+         (filter #(= "InternalIP" (:type %)))
+         (map :address)
+         first)))
 
 (defn- running-pods?
   "Check a live node."
@@ -325,7 +371,7 @@
       (when-not (:leave-db-running? test)
         (wipe!))
       (install! db-type)
-      (configure!)
+      (configure! db-type)
       (start! test db-type)
       ;; wait for the pods
       (wait-for-recovery test))
@@ -402,6 +448,13 @@
                                           ":1433;encrypt=true;trustServerCertificate=true"))
                        (.setProperty "scalar.db.username" SQLSERVER_USER)
                        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
+        :oracle (let [ip (c/on node (get-k8s-node-ip))]
+                  (doto (Properties.)
+                    (.setProperty "scalar.db.storage" "jdbc")
+                    (.setProperty "scalar.db.contact_points"
+                                  (str "jdbc:oracle:thin:@" ip ":31521/FREEPDB1"))
+                    (.setProperty "scalar.db.username" ORACLE_USER)
+                    (.setProperty "scalar.db.password" ORACLE_PASSWORD)))
         (throw-unsupported-db-error db-type)))))
 
 (defn gen-db
