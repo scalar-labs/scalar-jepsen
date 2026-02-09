@@ -19,7 +19,7 @@
                                             :exclusions [software.amazon.awssdk/*
                                                          com.oracle.database.jdbc/ojdbc8-production
                                                          com.azure/azure-cosmos
-                                                         com.google.cloud/alloydb-jdbc-connector]]]}
+                                                         com.google.cloud/*]]]}
              :cassandra {:dependencies [[cassandra "0.1.0-SNAPSHOT"
                                          :exclusions [org.apache.commons/commons-lang3]]
                                         [com.scalar-labs/scalardb "4.0.0-SNAPSHOT"
@@ -27,7 +27,7 @@
                                          :exclusions [software.amazon.awssdk/*
                                                       com.oracle.database.jdbc/ojdbc8-production
                                                       com.azure/azure-cosmos
-                                                      com.google.cloud/alloydb-jdbc-connector]]]
+                                                      com.google.cloud/*]]]
                          :env {:cassandra? "true"}}
              :cluster {:dependencies [[com.scalar-labs/scalardb-cluster-java-client-sdk "4.0.0-SNAPSHOT"
                                        ;; avoid the netty and gRPC dependency issues
@@ -35,7 +35,7 @@
                                                     com.oracle.database.jdbc/ojdbc8-production
                                                     com.azure/azure-cosmos
                                                     com.datastax.cassandra/cassandra-driver-core
-                                                    com.google.cloud/alloydb-jdbc-connector]]]
+                                                    com.google.cloud/*]]]
                        :env {:cluster? "true"
                              :scalardb-cluster-version "4.0.0-SNAPSHOT"
                              :helm-chart-version "1.7.2"}}
