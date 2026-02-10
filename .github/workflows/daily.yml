@@ -15,6 +15,7 @@ jobs:
       matrix:
         tests:
           - name: "Transfers_SI"
+            backend_db: "postgres"
             workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -24,6 +25,7 @@ jobs:
             consistency_model: "snapshot-isolation"
             time_limit: 600
           - name: "Transfers_2PC_SI"
+            backend_db: "postgres"
             workload: "transfer-2pc transfer-append-2pc"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -33,6 +35,7 @@ jobs:
             consistency_model: "snapshot-isolation"
             time_limit: 600
           - name: "ReadCommitted"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -42,6 +45,7 @@ jobs:
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "ReadCommitted_2PC"
+            backend_db: "postgres"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -51,6 +55,7 @@ jobs:
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "RCSI"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -60,6 +65,7 @@ jobs:
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "RCSI_2PC"
+            backend_db: "postgres"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -69,6 +75,7 @@ jobs:
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "Serializable"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -78,6 +85,7 @@ jobs:
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "Serializable_2PC"
+            backend_db: "postgres"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -87,6 +95,7 @@ jobs:
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "OnePhaseCommit_SI"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: true
@@ -96,6 +105,7 @@ jobs:
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "OnePhaseCommit_Serializable"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: true
@@ -105,6 +115,7 @@ jobs:
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "GroupCommit"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -114,6 +125,7 @@ jobs:
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "ClientSideOptimizations"
+            backend_db: "postgres"
             workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
@@ -122,6 +134,37 @@ jobs:
             isolation_level: "snapshot"
             consistency_model: "cursor-stability"
             time_limit: 600
+          - name: "MySQL"
+            backend_db: "mysql"
+            workload: "transfer transfer-append elle-append elle-write-read"
+            nemesis: "none partition crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "SQLServer"
+            backend_db: "sqlserver"
+            workload: "transfer transfer-append elle-append elle-write-read"
+            nemesis: "none partition crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "Oracle"
+            backend_db: "oracle"
+            workload: "transfer transfer-append elle-append elle-write-read"
+            nemesis: "none partition crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+
 
     steps:
     - uses: actions/checkout@v4
@@ -227,7 +270,7 @@ jobs:
         lein with-profile cluster run test \
           --time-limit ${{ matrix.tests.time_limit }} \
           --nodes localhost \
-          --db postgres \
+          --db ${{ matrix.tests.backend_db }} \
           --concurrency 5 \
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
