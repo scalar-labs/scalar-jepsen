@@ -51,7 +51,7 @@
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"
-                      (str "jdbc:oracle:thin:@" ip ":1521/ORCLCDB.localdomain"))
+                      (str "jdbc:oracle:thin:@" ip ":31521/FREEPDB1"))
         (.setProperty "scalar.db.username" ORACLE_USER)
         (.setProperty "scalar.db.password" ORACLE_PASSWORD)))))
 
