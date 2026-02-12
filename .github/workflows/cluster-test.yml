@@ -18,6 +18,7 @@ on:
         options:
           - postgres
           - mysql
+          - mariadb
           - sqlserver
           - oracle
       time_limit:
