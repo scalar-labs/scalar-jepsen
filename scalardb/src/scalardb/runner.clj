@@ -24,6 +24,7 @@
   {"cassandra" :cassandra
    "postgres" :postgres
    "mysql" :mysql
+   "mariadb" :mariadb
    "sqlserver" :sqlserver
    "oracle" :oracle})
 

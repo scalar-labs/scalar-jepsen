@@ -328,6 +328,7 @@
 (def ^:private dbtype->gen-var
   {:postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
    :mysql     'scalardb.db.cluster-db.mysql/gen-cluster-db
+   :mariadb   'scalardb.db.cluster-db.mariadb/gen-cluster-db
    :sqlserver 'scalardb.db.cluster-db.sqlserver/gen-cluster-db
    :oracle    'scalardb.db.cluster-db.oracle/gen-cluster-db})
 
