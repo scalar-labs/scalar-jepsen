@@ -24,12 +24,6 @@
             "simcube"
             "https://simcubeltd.github.io/simcube-helm-charts"))
 
-  (wipe! [_]
-    (doseq [cmd [[:helm :uninstall SQLSERVER_NAME]
-                 [:kubectl :delete
-                  :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]]]
-      (try (apply c/exec cmd) (catch Exception _ nil))))
-
   (configure! [_])
 
   (start! [_]
@@ -41,6 +35,12 @@
             :--set "persistence.enabled=true"
             :--set "service.type=LoadBalancer"
             :--version "1.2.3"))
+
+  (wipe! [_]
+    (doseq [cmd [[:helm :uninstall SQLSERVER_NAME]
+                 [:kubectl :delete
+                  :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]]]
+      (try (apply c/exec cmd) (catch Exception _ nil))))
 
   (create-storage-properties [_ test]
     (let [node (-> test :nodes first)

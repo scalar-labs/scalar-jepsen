@@ -28,7 +28,7 @@
 
   (start! [_]
     (c/exec :helm :install MYSQL_NAME "bitnami/mysql"
-            :--set "auth.rootPassword=mysql"
+            :--set (str "auth.rootPassword=" MYSQL_PASSWORD)
             :--set (str "auth.database=" scalar/KEYSPACE)
             :--set "primary.persistence.enabled=true"
             ;; Need an external IP for storage APIs

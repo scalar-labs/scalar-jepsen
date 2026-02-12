@@ -26,12 +26,12 @@
 
   (start! [_]
     (c/exec :helm :install POSTGRESQL_NAME "bitnami/postgresql"
-            :--set "auth.postgresPassword=postgres"
+            :--set (str "auth.postgresPassword=" POSTGRESQL_PASSWORD)
             :--set "primary.persistence.enabled=true"
-               ;; Need an external IP for storage APIs
+            ;; Need an external IP for storage APIs
             :--set "service.type=LoadBalancer"
             :--set "primary.service.type=LoadBalancer"
-               ;; Use legacy images
+            ;; Use legacy images
             :--set "image.repository=bitnamilegacy/postgresql"
             :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
             :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
