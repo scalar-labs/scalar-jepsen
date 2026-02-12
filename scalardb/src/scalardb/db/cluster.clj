@@ -325,20 +325,22 @@
   (create-storage-properties [_ test]
     (cluster-db/create-storage-properties backend-db test)))
 
+(def ^:private dbtype->gen-var
+  {:postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
+   :mysql     'scalardb.db.cluster-db.mysql/gen-cluster-db
+   :sqlserver 'scalardb.db.cluster-db.sqlserver/gen-cluster-db
+   :oracle    'scalardb.db.cluster-db.oracle/gen-cluster-db})
+
+(defn- cluster-backend-db
+  [db-type]
+  (if-let [v (get dbtype->gen-var db-type)]
+    ((requiring-resolve v))
+    (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
+
 (defn gen-db
   [faults admin db-type]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
-  (let [cluster-db-sym (case db-type
-                         :postgres (do (require 'scalardb.db.cluster-db.postgres)
-                                       'scalardb.db.cluster-db.postgres/gen-cluster-db)
-                         :mysql (do (require 'scalardb.db.cluster-db.mysql)
-                                    'scalardb.db.cluster-db.mysql/gen-cluster-db)
-                         :sqlserver (do (require 'scalardb.db.cluster-db.sqlserver)
-                                        'scalardb.db.cluster-db.sqlserver/gen-cluster-db)
-                         :oracle (do (require 'scalardb.db.cluster-db.oracle)
-                                     'scalardb.db.cluster-db.oracle/gen-cluster-db)
-                         (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type})))
-        backend-db ((resolve cluster-db-sym))
+  (let [backend-db (cluster-backend-db db-type)
         db (ext/extend-db (db backend-db) (->ExtCluster backend-db))]
     [db (n/nemesis-package db 60 faults) 1]))
