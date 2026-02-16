@@ -22,6 +22,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "snapshot-isolation"
             time_limit: 600
           - name: "Transfers_2PC_SI"
@@ -32,6 +33,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "snapshot-isolation"
             time_limit: 600
           - name: "ReadCommitted"
@@ -42,6 +44,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "read-committed"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "ReadCommitted_2PC"
@@ -52,6 +55,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "read-committed"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "RCSI"
@@ -62,6 +66,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "RCSI_2PC"
@@ -72,6 +77,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "Serializable"
@@ -82,6 +88,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "serializable"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "Serializable_2PC"
@@ -92,6 +99,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "serializable"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "OnePhaseCommit_SI"
@@ -102,6 +110,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "OnePhaseCommit_Serializable"
@@ -112,6 +121,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "serializable"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "GroupCommit"
@@ -122,6 +132,7 @@ jobs:
             enable_group_commit: true
             enable_client_side_optimizations: false
             isolation_level: "serializable"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "strict-serializable"
             time_limit: 600
           - name: "ClientSideOptimizations"
@@ -132,6 +143,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: true
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "MySQL"
@@ -142,6 +154,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "SQLServer"
@@ -152,6 +165,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
           - name: "Oracle"
@@ -162,6 +176,7 @@ jobs:
             enable_group_commit: false
             enable_client_side_optimizations: false
             isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
 
@@ -255,6 +270,7 @@ jobs:
           OPTS+=" --nemesis ${n}"
         done
         OPTS+=" --isolation-level ${{ matrix.tests.isolation_level }}"
+        OPTS+=" --jdbc-isolation-level ${{ matrix.tests.jdbc_isolation_level }}"
         OPTS+=" --consistency-model ${{ matrix.tests.consistency_model }}"
         if [ "${{ matrix.tests.enable_one_phase_commit }}" = "true" ]; then
           OPTS+=" --enable-one-phase-commit"
