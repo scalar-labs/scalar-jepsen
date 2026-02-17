@@ -7,7 +7,7 @@
             [jepsen
              [control :as c]
              [db :as db]]
-            [scalardb.core :as scalar]
+            [scalardb.db.cluster-db.cluster-db :as cluster-db]
             [scalardb.db-extend :as ext]
             [scalardb.nemesis.cluster :as n])
   (:import (java.io File)
@@ -20,20 +20,6 @@
 
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
-
-(def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
-(def ^:private ^:const POSTGRESQL_USER "postgres")
-(def ^:private ^:const POSTGRESQL_PASSWORD "postgres")
-(def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
-(def ^:private ^:const MYSQL_USER "root")
-(def ^:private ^:const MYSQL_PASSWORD "mysql")
-(def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
-(def ^:private ^:const SQLSERVER_USER "sa")
-(def ^:private ^:const SQLSERVER_PASSWORD "Str0ng!Pass")
-(def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
-(def ^:private ^:const ORACLE_MANIFEST_YAML "oracle-free-jepsen.yaml")
-(def ^:private ^:const ORACLE_USER "system")
-(def ^:private ^:const ORACLE_PASSWORD "Str0ng!Pass")
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
@@ -61,36 +47,13 @@
 
     :imagePullSecrets [{:name "scalardb-ghcr-secret"}]}})
 
-(defn- throw-unsupported-db-error
-  [db-type]
-  (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type})))
-
 (defn- update-cluster-values
-  [test db-type values]
+  [test backend-db values]
   (let [path [:scalardbCluster :scalardbClusterNodeProperties]
-        [storage-type contact-points username password]
-        (case db-type
-          :postgres
-          ["jdbc"
-           "jdbc:postgresql://postgresql-scalardb-cluster.default.svc.cluster.local:5432/postgres"
-           POSTGRESQL_USER
-           POSTGRESQL_PASSWORD]
-          :mysql
-          ["jdbc"
-           (str "jdbc:mysql://mysql-scalardb-cluster.default.svc.cluster.local:3306/" scalar/KEYSPACE)
-           MYSQL_USER
-           MYSQL_PASSWORD]
-          :sqlserver
-          ["jdbc"
-           "jdbc:sqlserver://sqlserver-scalardb-cluster-mssqlserver-2022.default.svc.cluster.local:1433;encrypt=true;trustServerCertificate=true"
-           SQLSERVER_USER
-           SQLSERVER_PASSWORD]
-          :oracle
-          ["jdbc"
-           "jdbc:oracle:thin:@oracle-scalardb-cluster.default.svc.cluster.local:1521/FREEPDB1"
-           ORACLE_USER
-           ORACLE_PASSWORD]
-          (throw-unsupported-db-error db-type))
+        storage-type (cluster-db/get-storage-type backend-db)
+        contact-points (cluster-db/get-contact-points backend-db)
+        username (cluster-db/get-username backend-db)
+        password (cluster-db/get-password backend-db)
         new-db-props (-> values
                          (get-in path)
                          (str
@@ -137,18 +100,11 @@
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
-  [db-type]
-  (case db-type
-    :postgres (c/exec :helm :repo :add
-                      "bitnami" "https://charts.bitnami.com/bitnami")
-    :mysql (c/exec :helm :repo :add
-                   "bitnami" "https://charts.bitnami.com/bitnami")
-    :sqlserver (c/exec :helm :repo :add
-                       "simcube"
-                       "https://simcubeltd.github.io/simcube-helm-charts")
-    :oracle (c/upload ORACLE_MANIFEST_YAML "/tmp")
-    (throw-unsupported-db-error db-type))
-  ;; ScalarDB cluster
+  [backend-db]
+  ;; Cluster backend DB
+  (cluster-db/install! backend-db)
+
+  ;; ScalarDB Cluster
   (c/exec :helm :repo :add
           "scalar-labs" "https://scalar-labs.github.io/helm-charts")
   ;; Chaos mesh
@@ -157,7 +113,7 @@
   (c/exec :helm :repo :update))
 
 (defn- configure!
-  [db-type]
+  [backend-db]
   (when (and (seq (env :docker-username)) (seq (env :docker-access-token)))
     (binding [c/*dir* (System/getProperty "user.dir")]
       (try
@@ -169,14 +125,7 @@
               (str "--docker-username=" (env :docker-username))
               (str "--docker-password=" (env :docker-access-token)))))
 
-  (when (= db-type :oracle)
-    (binding [c/*dir* (System/getProperty "user.dir")]
-      (try
-        (c/exec :kubectl :delete :secret "oracle-scalardb-cluster-secret")
-        ;; ignore the failure when the secret doesn't exist
-        (catch Exception _))
-      (c/exec :kubectl :create :secret :generic "oracle-scalardb-cluster-secret"
-              (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD))))
+  (cluster-db/configure! backend-db)
 
   ;; Chaos Mesh
   (try
@@ -185,50 +134,9 @@
       (c/exec :kubectl :create :ns "chaos-mesh"))))
 
 (defn- start!
-  [test db-type]
-  (case db-type
-    :postgres (c/exec
-               :helm :install POSTGRESQL_NAME "bitnami/postgresql"
-               :--set "auth.postgresPassword=postgres"
-               :--set "primary.persistence.enabled=true"
-               ;; Need an external IP for storage APIs
-               :--set "service.type=LoadBalancer"
-               :--set "primary.service.type=LoadBalancer"
-               ;; Use legacy images
-               :--set "image.repository=bitnamilegacy/postgresql"
-               :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-               :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
-               :--set "global.security.allowInsecureImages=true"
-               :--version "16.7.0")
-    :mysql (c/exec
-            :helm :install MYSQL_NAME "bitnami/mysql"
-            :--set "auth.rootPassword=mysql"
-            :--set (str "auth.database=" scalar/KEYSPACE)
-            :--set "primary.persistence.enabled=true"
-            ;; Need an external IP for storage APIs
-            :--set "primary.service.type=LoadBalancer"
-            ;; Use legacy images
-            :--set "image.repository=bitnamilegacy/mysql"
-            :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-            :--set "metrics.image.repository=bitnamilegacy/mysqld-exporter"
-            :--set "global.security.allowInsecureImages=true"
-            :--version "14.0.3")
-    :sqlserver (c/exec
-                :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
-                :--set "image.repository=mcr.microsoft.com/mssql/server"
-                :--set "image.tag=2022-latest"
-                :--set "acceptEula.value=Y"
-                :--set (str "sapassword=" SQLSERVER_PASSWORD)
-                :--set "persistence.enabled=true"
-                :--set "service.type=LoadBalancer"
-                :--version "1.2.3")
-    :oracle (do (c/exec :kubectl :apply :-f (str "/tmp/" ORACLE_MANIFEST_YAML))
-                (c/exec :kubectl :wait
-                        "--for=condition=Ready"
-                        "pod"
-                        :-l (str "app=" ORACLE_NAME)
-                        "--timeout=300s"))
-    (throw-unsupported-db-error db-type))
+  [test backend-db]
+  ;; Cluster backend DB
+  (cluster-db/start! backend-db)
 
   ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
@@ -236,7 +144,7 @@
     (info "helm chart version: " chart-version)
     (binding [c/*dir* (System/getProperty "user.dir")]
       (->> CLUSTER_VALUES
-           (update-cluster-values test db-type)
+           (update-cluster-values test backend-db)
            yaml/generate-string
            (spit CLUSTER_VALUES_YAML))
       (mapv #(c/exec :helm :install % "scalar-labs/scalardb-cluster"
@@ -254,7 +162,7 @@
           :--version DEFAULT_CHAOS_MESH_VERSION))
 
 (defn- wipe!
-  []
+  [backend-db]
   (info "wiping old logs...")
   (binding [c/*dir* (System/getProperty "user.dir")]
     (try
@@ -264,16 +172,8 @@
                (apply c/exec :rm :-f))
       (catch Exception _ nil)))
   (info "wiping the pods...")
-  (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME]
-               [:helm :uninstall MYSQL_NAME]
-               [:helm :uninstall SQLSERVER_NAME]
-               [:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)]
-               [:kubectl :delete
-                :pvc :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"]
-               [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"]
-               [:kubectl :delete :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]
-               [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"]
-               [:helm :uninstall CLUSTER_NAME]
+  (cluster-db/wipe! backend-db)
+  (doseq [cmd [[:helm :uninstall CLUSTER_NAME]
                [:helm :uninstall CLUSTER2_NAME]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
     (try (apply c/exec cmd) (catch Exception _ nil))))
@@ -298,7 +198,7 @@
       (mapv #(spit %1 (c/exec :kubectl :logs %2)) logs pods)
       logs)))
 
-(defn- get-load-balancer-ip
+(defn get-load-balancer-ip
   "Get the external IP of a LoadBalancer service whose name includes prefix"
   [prefix]
   (let [svc (-> (c/exec :kubectl :get :svc :-o :json)
@@ -311,7 +211,7 @@
          (remove nil?)
          first)))
 
-(defn- get-k8s-node-ip
+(defn get-k8s-node-ip
   "Get the internal IP of a Kubernetes node"
   []
   (let [nodes (-> (c/exec :kubectl :get :nodes :-o :json)
@@ -364,21 +264,21 @@
 
 (defn db
   "Setup ScalarDB Cluster."
-  [db-type]
+  [backend-db]
   (reify
     db/DB
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe!))
-      (install! db-type)
-      (configure! db-type)
-      (start! test db-type)
+        (wipe! backend-db))
+      (install! backend-db)
+      (configure! backend-db)
+      (start! test backend-db)
       ;; wait for the pods
       (wait-for-recovery test))
 
     (teardown! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe!)))
+        (wipe! backend-db)))
 
     db/Primary
     (primaries [_ test] (:nodes test))
@@ -400,7 +300,7 @@
     (log-files [_ test _]
       (get-logs test))))
 
-(defrecord ExtCluster [db-type]
+(defrecord ExtCluster [backend-db]
   ext/DbExtension
   (live-nodes [_ test] (running-pods? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
@@ -422,44 +322,25 @@
           (if (need-two-clusters? test)
             (mapv create-fn [ip ip2])
             (create-fn ip)))))
-  (create-storage-properties [_ _]
-    (let [node (-> test :nodes first)]
-      (case db-type
-        :postgres (let [ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
-                    (doto (Properties.)
-                      (.setProperty "scalar.db.storage" "jdbc")
-                      (.setProperty "scalar.db.contact_points"
-                                    (str "jdbc:postgresql://" ip ":5432/postgres"))
-                      (.setProperty "scalar.db.username" POSTGRESQL_USER)
-                      (.setProperty "scalar.db.password" POSTGRESQL_PASSWORD)))
-        :mysql (let [ip (c/on node (get-load-balancer-ip MYSQL_NAME))]
-                 (doto (Properties.)
-                   (.setProperty "scalar.db.storage" "jdbc")
-                   (.setProperty "scalar.db.contact_points"
-                                 (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
-                   (.setProperty "scalar.db.username" MYSQL_USER)
-                   (.setProperty "scalar.db.password" MYSQL_PASSWORD)))
-        :sqlserver (let [ip (c/on node (get-load-balancer-ip SQLSERVER_NAME))]
-                     (doto (Properties.)
-                       (.setProperty "scalar.db.storage" "jdbc")
-                       (.setProperty "scalar.db.contact_points"
-                                     (str "jdbc:sqlserver://"
-                                          ip
-                                          ":1433;encrypt=true;trustServerCertificate=true"))
-                       (.setProperty "scalar.db.username" SQLSERVER_USER)
-                       (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))
-        :oracle (let [ip (c/on node (get-k8s-node-ip))]
-                  (doto (Properties.)
-                    (.setProperty "scalar.db.storage" "jdbc")
-                    (.setProperty "scalar.db.contact_points"
-                                  (str "jdbc:oracle:thin:@" ip ":31521/FREEPDB1"))
-                    (.setProperty "scalar.db.username" ORACLE_USER)
-                    (.setProperty "scalar.db.password" ORACLE_PASSWORD)))
-        (throw-unsupported-db-error db-type)))))
+  (create-storage-properties [_ test]
+    (cluster-db/create-storage-properties backend-db test)))
+
+(def ^:private dbtype->gen-var
+  {:postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
+   :mysql     'scalardb.db.cluster-db.mysql/gen-cluster-db
+   :sqlserver 'scalardb.db.cluster-db.sqlserver/gen-cluster-db
+   :oracle    'scalardb.db.cluster-db.oracle/gen-cluster-db})
+
+(defn- cluster-backend-db
+  [db-type]
+  (if-let [v (get dbtype->gen-var db-type)]
+    ((requiring-resolve v))
+    (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
 
 (defn gen-db
   [faults admin db-type]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
-  (let [db (ext/extend-db (db db-type) (->ExtCluster db-type))]
+  (let [backend-db (cluster-backend-db db-type)
+        db (ext/extend-db (db backend-db) (->ExtCluster backend-db))]
     [db (n/nemesis-package db 60 faults) 1]))
