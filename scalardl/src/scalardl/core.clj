@@ -113,7 +113,7 @@
   []
   (retry-when-exception (fn [package]
                           (c/su (debian/install package)))
-                        [[:openjdk-11-jre]]
+                        [[:openjdk-21-jre]]
                         debian/update!))
 
 (defn- install-server!
