@@ -38,12 +38,12 @@
     (c/exec :kubectl :apply :-f (str "/tmp/" TIDB_MANIFEST_YAML)))
 
   (wipe! [_]
-    (doseq [cmd [[:helm :uninstall TIDB_OPERATOR_NAME]
-                 [:kubectl :delete :namespace "tidb-admin"]
-                 [:kubectl :delete :-f TIDB_CRD_URL]
-                 [:kubectl :delete :-f (str "/tmp/" TIDB_MANIFEST_YAML)]
+    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" TIDB_MANIFEST_YAML)]
                  [:kubectl :delete :pvc "pd-tidb-scalardb-cluster-pd-0"]
-                 [:kubectl :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"]]]
+                 [:kubectl :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"]
+                 [:helm :uninstall TIDB_OPERATOR_NAME :--namespace "tidb-admin"]
+                 [:kubectl :delete :namespace "tidb-admin"]
+                 [:kubectl :delete :-f TIDB_CRD_URL]]]
       (try (apply c/exec cmd) (catch Exception _ nil))))
 
   (create-storage-properties [_ test]
