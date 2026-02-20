@@ -46,7 +46,7 @@
                  [:kubectl :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"]]]
       (try (apply c/exec cmd) (catch Exception _ nil))))
 
-  (create-storage-properties [_ _]
+  (create-storage-properties [_ test]
     (let [node (-> test :nodes first)
           ip (c/on node (get-load-balancer-ip TIDB_NAME))]
       (doto (Properties.)
