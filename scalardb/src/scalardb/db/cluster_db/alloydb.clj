@@ -51,7 +51,7 @@
   (start! [_]
     (c/exec :kubectl :apply :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML))
     (c/exec :kubectl :wait
-            "--for=condition=Ready"
+            "--for=condition=K8ServiceReady"
             (str "dbcluster/" ALLOYDB_NAME)
             "--timeout=300s"))
 

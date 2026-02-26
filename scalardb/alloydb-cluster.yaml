@@ -11,7 +11,7 @@ spec:
         name: db-pw-alloydb-scalardb-cluster
     resources:
       cpu: 1
-      memory: 4Gi
+      memory: 2Gi
       disks:
         - name: DataDisk
           size: 8Gi
