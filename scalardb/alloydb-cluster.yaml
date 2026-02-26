@@ -1,0 +1,19 @@
+apiVersion: alloydbomni.dbadmin.goog/v1
+kind: DBCluster
+metadata:
+  name: alloydb-scalardb-cluster
+  namespace: default
+spec:
+  databaseVersion: "17.5.0"
+  primarySpec:
+    adminUser:
+      passwordRef:
+        name: db-pw-alloydb-scalardb-cluster
+    resources:
+      cpu: 1
+      memory: 4Gi
+      disks:
+        - name: DataDisk
+          size: 8Gi
+
+  allowExternalIncomingTraffic: true
