@@ -59,7 +59,9 @@
 
   (wipe! [_]
     (binding [c/*dir* (System/getProperty "user.dir")]
-      (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML)]
+      (doseq [cmd [[:kubectl :patch "dbcluster" ALLOYDB_NAME
+                    :--type=merge :-p "{\"spec\":{\"isDeleted\":true}}"]
+                   [:kubectl :delete :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML)]
                    [:helm :uninstall "cert-manager"
                     :--namespace CERT_MANAGER_NAMESPACE]
                    [:kubectl :delete :namespace CERT_MANAGER_NAMESPACE]
