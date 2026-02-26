@@ -4,6 +4,8 @@
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
 
+(def ^:private ^:const CERT_MANAGER_NAMESPACE "cert-manager")
+(def ^:private ^:const ALLOYDB_OPERATOR_NAMESPACE "alloydb-omni-system")
 (def ^:private ^:const ALLOYDB_OPERATOR_NAME "alloydbomni-operator")
 (def ^:private ^:const ALLOYDB_OPERATOR_VERSION "1.6.2")
 (def ^:private ^:const ALLOYDB_MANIFEST_YAML "alloydb-cluster.yaml")
@@ -28,7 +30,7 @@
       ;; set up cert-manager for AlloyDB Operator
       (c/exec :helm :repo :add "jetstack" "https://charts.jetstack.io")
       (c/exec :helm :install "cert-manager" "jetstack/cert-manager"
-              :--namespace "cert-manager" :--create-namespace
+              :--namespace CERT_MANAGER_NAMESPACE :--create-namespace
               :--set "installCRDs=true" :--version "v1.19.4")
       ;; set up operator
       (c/exec :curl :-O
@@ -37,16 +39,16 @@
                    "/alloydbomni-operator-" ALLOYDB_OPERATOR_VERSION ".tgz"))
       (c/exec :helm :install ALLOYDB_OPERATOR_NAME
               (str "alloydbomni-operator-" ALLOYDB_OPERATOR_VERSION ".tgz")
-              :--namespace "alloydb-omni-system" :--create-namespace
+              :--namespace ALLOYDB_OPERATOR_NAMESPACE :--create-namespace
               :--atomic :--timeout "5m")))
 
   (configure! [_]
-      (try
-        (c/exec :kubectl :delete :secret "db-pw-alloydb-scalardb-cluster")
+    (try
+      (c/exec :kubectl :delete :secret "db-pw-alloydb-scalardb-cluster")
         ;; ignore the failure when the secret doesn't exist
-        (catch Exception _))
-      (c/exec :kubectl :create :secret :generic "db-pw-alloydb-scalardb-cluster"
-              (str "--from-literal=alloydb-scalardb-cluster=" ALLOYDB_PASSWORD)))
+      (catch Exception _))
+    (c/exec :kubectl :create :secret :generic "db-pw-alloydb-scalardb-cluster"
+            (str "--from-literal=alloydb-scalardb-cluster=" ALLOYDB_PASSWORD)))
 
   (start! [_]
     (c/exec :kubectl :apply :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML))
@@ -57,12 +59,14 @@
 
   (wipe! [_]
     (binding [c/*dir* (System/getProperty "user.dir")]
-      (doseq [cmd [[:kubectl :delete :-f "alloydb-cluster.yaml"]
-                   [:helm :uninstall "cert-manager" :--namespace "cert-manager"]
-                   [:kubectl :delete :namespace "cert-manager"]
-                   [:helm :uninstall ALLOYDB_OPERATOR_NAME :--namespace "alloydb-omni-system"]
-                   [:kubectl :delete :namespace "alloydb-omni-system"]
-                   [:rm :-f (str "alloydbomni-operator-" ALLOYDB_OPERATOR_VERSION ".tgz")]]]
+      (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML)]
+                   [:helm :uninstall "cert-manager"
+                    :--namespace CERT_MANAGER_NAMESPACE]
+                   [:kubectl :delete :namespace CERT_MANAGER_NAMESPACE]
+                   [:helm :uninstall ALLOYDB_OPERATOR_NAME
+                    :--namespace ALLOYDB_OPERATOR_NAMESPACE]
+                   [:kubectl :delete :namespace ALLOYDB_OPERATOR_NAMESPACE]
+                   [:rm :-f "alloydbomni-operator-*.tgz"]]]
         (try (apply c/exec cmd) (catch Exception _ nil)))))
 
   (create-storage-properties [_ test]
