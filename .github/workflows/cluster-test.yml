@@ -17,6 +17,7 @@ on:
         default: postgres
         options:
           - postgres
+          - alloydb
           - mysql
           - mariadb
           - sqlserver
