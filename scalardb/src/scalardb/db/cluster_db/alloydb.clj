@@ -45,7 +45,7 @@
   (configure! [_]
     (try
       (c/exec :kubectl :delete :secret "db-pw-alloydb-scalardb-cluster")
-        ;; ignore the failure when the secret doesn't exist
+      ;; ignore the failure when the secret doesn't exist
       (catch Exception _))
     (c/exec :kubectl :create :secret :generic "db-pw-alloydb-scalardb-cluster"
             (str "--from-literal=alloydb-scalardb-cluster=" ALLOYDB_PASSWORD)))
