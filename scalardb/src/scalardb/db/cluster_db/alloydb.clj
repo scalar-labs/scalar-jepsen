@@ -5,6 +5,8 @@
   (:import (java.util Properties)))
 
 (def ^:private ^:const CERT_MANAGER_NAMESPACE "cert-manager")
+(def ^:private ^:const CERT_MANAGER_VERSION "v1.19.4")
+
 (def ^:private ^:const ALLOYDB_OPERATOR_NAMESPACE "alloydb-omni-system")
 (def ^:private ^:const ALLOYDB_OPERATOR_NAME "alloydbomni-operator")
 (def ^:private ^:const ALLOYDB_OPERATOR_VERSION "1.6.2")
@@ -29,9 +31,10 @@
       (c/upload ALLOYDB_MANIFEST_YAML "/tmp")
       ;; set up cert-manager for AlloyDB Operator
       (c/exec :helm :repo :add "jetstack" "https://charts.jetstack.io")
+      (c/exec :helm :repo :update)
       (c/exec :helm :install "cert-manager" "jetstack/cert-manager"
               :--namespace CERT_MANAGER_NAMESPACE :--create-namespace
-              :--set "installCRDs=true" :--version "v1.19.4")
+              :--set "installCRDs=true" :--version CERT_MANAGER_VERSION)
       ;; set up operator
       (c/exec :curl :-O
               (str "https://storage.googleapis.com/alloydb-omni-operator/"
@@ -44,11 +47,11 @@
 
   (configure! [_]
     (try
-      (c/exec :kubectl :delete :secret "db-pw-alloydb-scalardb-cluster")
+      (c/exec :kubectl :delete :secret (str "db-pw-" ALLOYDB_NAME))
       ;; ignore the failure when the secret doesn't exist
       (catch Exception _))
-    (c/exec :kubectl :create :secret :generic "db-pw-alloydb-scalardb-cluster"
-            (str "--from-literal=alloydb-scalardb-cluster=" ALLOYDB_PASSWORD)))
+    (c/exec :kubectl :create :secret :generic (str "db-pw-" ALLOYDB_NAME)
+            (str "--from-literal=" ALLOYDB_NAME \= ALLOYDB_PASSWORD)))
 
   (start! [_]
     (c/exec :kubectl :apply :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML))
@@ -68,7 +71,7 @@
                    [:helm :uninstall ALLOYDB_OPERATOR_NAME
                     :--namespace ALLOYDB_OPERATOR_NAMESPACE]
                    [:kubectl :delete :namespace ALLOYDB_OPERATOR_NAMESPACE]
-                   [:rm :-f "alloydbomni-operator-*.tgz"]]]
+                   [:rm :-f (str "alloydbomni-operator-" ALLOYDB_OPERATOR_VERSION ".tgz")]]]
         (try (apply c/exec cmd) (catch Exception _ nil)))))
 
   (create-storage-properties [_ test]
