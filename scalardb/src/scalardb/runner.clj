@@ -25,6 +25,7 @@
    "postgres" :postgres
    "mysql" :mysql
    "mariadb" :mariadb
+   "tidb" :tidb
    "sqlserver" :sqlserver
    "oracle" :oracle})
 

@@ -19,6 +19,7 @@ on:
           - postgres
           - mysql
           - mariadb
+          - tidb
           - sqlserver
           - oracle
       time_limit:
