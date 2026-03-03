@@ -23,6 +23,7 @@
   "The map of test DBs."
   {"cassandra" :cassandra
    "postgres" :postgres
+   "alloydb" :alloydb
    "mysql" :mysql
    "mariadb" :mariadb
    "tidb" :tidb
