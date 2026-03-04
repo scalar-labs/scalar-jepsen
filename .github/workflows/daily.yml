@@ -149,7 +149,7 @@ jobs:
           - name: "AlloyDB"
             backend_db: "alloydb"
             workload: "transfer transfer-append elle-append elle-write-read"
-            nemesis: "none partition crash"
+            nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
             enable_client_side_optimizations: false
@@ -160,7 +160,7 @@ jobs:
           - name: "MySQL"
             backend_db: "mysql"
             workload: "transfer transfer-append elle-append elle-write-read"
-            nemesis: "none partition crash"
+            nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
             enable_client_side_optimizations: false
@@ -171,7 +171,7 @@ jobs:
           - name: "MariaDB"
             backend_db: "mariadb"
             workload: "transfer transfer-append elle-append elle-write-read"
-            nemesis: "none partition crash"
+            nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
             enable_client_side_optimizations: false
@@ -182,7 +182,7 @@ jobs:
           - name: "TiDB"
             backend_db: "tidb"
             workload: "transfer transfer-append elle-append elle-write-read"
-            nemesis: "none partition crash"
+            nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
             enable_client_side_optimizations: false
@@ -193,7 +193,7 @@ jobs:
           - name: "SQLServer"
             backend_db: "sqlserver"
             workload: "transfer transfer-append elle-append elle-write-read"
-            nemesis: "none partition crash"
+            nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
             enable_client_side_optimizations: false
@@ -204,7 +204,7 @@ jobs:
           - name: "Oracle"
             backend_db: "oracle"
             workload: "transfer transfer-append elle-append elle-write-read"
-            nemesis: "none partition crash"
+            nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
             enable_client_side_optimizations: false
