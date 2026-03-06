@@ -110,17 +110,18 @@
           :> LEDGER_PROPERTIES))
 
 (defn- install-jdk-with-retry
-  []
-  (retry-when-exception (fn [package]
-                          (c/su (debian/install package)))
-                        [[:openjdk-21-jre]]
-                        debian/update!))
+  [server?]
+  (let [jre (if server? :openjdk-21-jre :openjdk-11-jre)]
+    (retry-when-exception (fn [package]
+                            (c/su (debian/install package)))
+                          [[jre]]
+                          debian/update!)))
 
 (defn- install-server!
   [node test]
   (info node "installing DL server")
   (c/su (c/exec :rm :-rf LEDGER_INSTALL_DIR))
-  (install-jdk-with-retry)
+  (install-jdk-with-retry (util/server? node test))
   (c/upload (:ledger-tarball test) "/tmp/ledger.tar")
   (cu/install-archive! "file:///tmp/ledger.tar" LEDGER_INSTALL_DIR)
   (c/upload (:server-key test) LEDGER_KEY)
