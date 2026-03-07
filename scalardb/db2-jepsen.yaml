@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: db2-scalardb-cluster
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: db2-scalardb-cluster
+  ports:
+    - name: db2
+      port: 50000
+      targetPort: 50000
+      nodePort: 31500
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db2-scalardb-cluster
+  namespace: default
+spec:
+  serviceName: db2-scalardb-cluster
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db2-scalardb-cluster
+  template:
+    metadata:
+      labels:
+        app: db2-scalardb-cluster
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: db2
+          image: icr.io/db2_community/db2:12.1.3.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 50000
+              name: db2
+          env:
+            - name: LICENSE
+              value: accept
+            - name: DB2INSTANCE
+              value: db2inst1
+            - name: DB2INST1_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db2-scalardb-cluster-secret
+                  key: DB2INST1_PASSWORD
+            - name: DBNAME
+              value: jepsen
+          volumeMounts:
+            - name: data
+              mountPath: /database
+          readinessProbe:
+            tcpSocket:
+              port: 50000
+            initialDelaySeconds: 120
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 50000
+            initialDelaySeconds: 180
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 8Gi

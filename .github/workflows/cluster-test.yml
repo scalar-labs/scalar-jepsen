@@ -23,6 +23,7 @@ on:
           - tidb
           - sqlserver
           - oracle
+          - db2
       time_limit:
         description: 'Test duration in second'
         required: true
