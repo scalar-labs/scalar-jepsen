@@ -23,22 +23,22 @@ jobs:
 
     steps:
     - name: Checkout scalar-jepsen
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Checkout ScalarDL
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: scalar-labs/scalardl
         path: scalardl-build
 
     - name: Setup Java
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '21'
         distribution: 'temurin'
 
     - name: Cache Gradle packages
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.gradle/caches
@@ -48,7 +48,7 @@ jobs:
           ${{ runner.os }}-gradle-
 
     - name: Cache m2 repository
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: m2-cache
         key: ${{ runner.os }}-m2-dl-${{ hashFiles('**/project.clj') }}
@@ -66,7 +66,7 @@ jobs:
       uses: docker/setup-buildx-action@v4
 
     - name: Cache Docker images
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: docker-cache
         key: ${{ runner.os }}-docker-jepsen-${{ hashFiles('docker/**/Dockerfile', 'docker/**/init.sh') }}
@@ -141,7 +141,7 @@ jobs:
 
     - name: Upload result
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: result-${{ matrix.tests.name }}
         path: result-${{ matrix.tests.name }}.txt
@@ -153,7 +153,7 @@ jobs:
 
     - name: Upload logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: logs-${{ matrix.tests.name }}
         path: store-${{ matrix.tests.name }}
