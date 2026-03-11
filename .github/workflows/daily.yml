@@ -6,7 +6,7 @@ on:
 
 jobs:
   daily-cluster:
-    name: "Daily ScalarDB Cluster test"
+    name: "ScalarDB Cluster / ${{ matrix.tests.name }}"
 
     runs-on: ubuntu-latest
 
@@ -371,14 +371,28 @@ jobs:
 
       - name: Generate Slack message
         id: message
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          # Get expected test names from the matrix jobs in this run
+          mapfile -t expected_tests < <(
+            gh api --paginate "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+              --jq '.jobs[] | select(.name | startswith("ScalarDB Cluster / ")) | .name | ltrimstr("ScalarDB Cluster / ")'
+          )
+
           successes=""
           failures=""
+          timeouts=""
+
+          # Track which tests have results
+          declare -A found_tests
 
           for file in results/result-*.txt; do
+            [ -f "$file" ] || continue
             while read -r line; do
               name=$(echo "$line" | cut -d: -f1)
               status=$(echo "$line" | cut -d: -f2)
+              found_tests["$name"]=1
 
               if [ "$status" = "success" ]; then
                 successes="${successes}- $name\n"
@@ -388,7 +402,14 @@ jobs:
             done < "$file"
           done
 
-          if [ -n "$failures" ]; then
+          # Detect missing tests (likely timed out)
+          for test in "${expected_tests[@]}"; do
+            if [ -z "${found_tests[$test]}" ]; then
+              timeouts="${timeouts}- $test\n"
+            fi
+          done
+
+          if [ -n "$failures" ] || [ -n "$timeouts" ]; then
             icon=":fire:"
           else
             icon=":white_check_mark:"
@@ -399,6 +420,7 @@ jobs:
             printf "${icon} *ScalarDB Cluster tests completed*\n\n"
             printf "*Success:*\n%s\n" "$successes"
             printf "*Failed:*\n%s\n" "$failures"
+            printf "*Timed out:*\n%s\n" "$timeouts"
             printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
             echo "EOF"
           } >> $GITHUB_OUTPUT
