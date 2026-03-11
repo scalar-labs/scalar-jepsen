@@ -38,6 +38,24 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
 
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('scalardl-build/**/*.gradle*', 'scalardl-build/**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Cache m2 repository
+      uses: actions/cache@v3
+      with:
+        path: m2-cache
+        key: ${{ runner.os }}-m2-dl-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-dl-
+
     - name: Build ScalarDL
       run: |
         cd scalardl-build
@@ -47,6 +65,10 @@ jobs:
 
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
+
+    - name: Cache Docker layers
+      uses: satackey/action-docker-layer-caching@v0.0.11
+      continue-on-error: true
 
     - name: Start Jepsen Docker environment
       run: |
@@ -65,6 +87,12 @@ jobs:
         # Give SSH a moment to start
         sleep 5
 
+    - name: Restore m2 cache to container
+      run: |
+        if [ -d m2-cache ] && [ "$(ls -A m2-cache)" ]; then
+          docker cp m2-cache/. jepsen-control:/root/.m2/
+        fi
+
     - name: Install Cassandra test tool
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
@@ -79,6 +107,12 @@ jobs:
             --concurrency 5 \
             --time-limit 60 \
             --ssh-private-key ~/.ssh/id_rsa"
+
+    - name: Save m2 cache from container
+      if: always()
+      run: |
+        rm -rf m2-cache
+        docker cp jepsen-control:/root/.m2 m2-cache || true
 
     - name: Record result
       if: always()
