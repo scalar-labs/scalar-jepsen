@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - daily-dl-test
-
 jobs:
   daily-dl:
     name: "DL-${{ matrix.tests.name }}"
@@ -66,14 +65,31 @@ jobs:
     - name: Set up Docker
       uses: docker/setup-buildx-action@v4
 
-    - name: Cache Docker layers
-      uses: satackey/action-docker-layer-caching@v0.0.11
-      continue-on-error: true
+    - name: Cache Docker images
+      uses: actions/cache@v4
+      with:
+        path: docker-cache
+        key: ${{ runner.os }}-docker-jepsen-${{ hashFiles('docker/**/Dockerfile', 'docker/**/init.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-docker-jepsen-
+
+    - name: Restore Docker images from cache
+      run: |
+        if [ -f docker-cache/images.tar ]; then
+          docker load -i docker-cache/images.tar
+        fi
 
     - name: Start Jepsen Docker environment
       run: |
         cd docker
         docker compose up -d
+
+    - name: Save Docker images to cache
+      run: |
+        if [ ! -f docker-cache/images.tar ]; then
+          mkdir -p docker-cache
+          docker save $(docker compose -f docker/docker-compose.yaml images -q | sort -u) -o docker-cache/images.tar
+        fi
 
     - name: Wait for containers to be ready
       run: |
