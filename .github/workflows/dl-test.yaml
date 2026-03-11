@@ -1,7 +1,9 @@
 name: Daily ScalarDL test
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - daily-dl-test
 
 jobs:
   daily-dl:
@@ -75,7 +77,7 @@ jobs:
             --workload all \
             --nemesis ${{ matrix.tests.nemesis }} \
             --concurrency 5 \
-            --time-limit 600 \
+            --time-limit 60 \
             --ssh-private-key ~/.ssh/id_rsa"
 
     - name: Record result
