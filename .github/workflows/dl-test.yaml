@@ -43,7 +43,7 @@ jobs:
         cd scalardl-build
         ./gradlew distTar
         # Copy the built tarball to the expected location
-        cp server/build/distributions/server-*.tar $GITHUB_WORKSPACE/scalardl/resources/ledger.tar
+        cp ledger/build/distributions/ledger.tar $GITHUB_WORKSPACE/scalardl/resources/ledger.tar
 
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
