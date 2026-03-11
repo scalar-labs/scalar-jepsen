@@ -1,0 +1,168 @@
+name: Daily ScalarDL test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  daily-dl:
+    name: "DL-${{ matrix.tests.name }}"
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tests:
+          - name: "nemesis-none"
+            nemesis: "none"
+          - name: "nemesis-crash"
+            nemesis: "crash"
+          - name: "nemesis-partition"
+            nemesis: "partition"
+
+    steps:
+    - name: Checkout scalar-jepsen
+      uses: actions/checkout@v4
+
+    - name: Checkout ScalarDL
+      uses: actions/checkout@v4
+      with:
+        repository: scalar-labs/scalardl
+        path: scalardl-build
+
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Build ScalarDL
+      run: |
+        cd scalardl-build
+        ./gradlew distTar
+        # Copy the built tarball to the expected location
+        cp server/build/distributions/server-*.tar $GITHUB_WORKSPACE/scalardl/resources/ledger.tar
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Start Jepsen Docker environment
+      run: |
+        cd docker
+        docker compose up -d
+
+    - name: Wait for containers to be ready
+      run: |
+        # Wait for all containers to be running
+        for node in jepsen-control jepsen-n1 jepsen-n2 jepsen-n3 jepsen-n4 jepsen-n5; do
+          echo "Waiting for $node..."
+          until docker inspect -f '{{.State.Running}}' $node 2>/dev/null | grep -q true; do
+            sleep 1
+          done
+        done
+        # Give SSH a moment to start
+        sleep 5
+
+    - name: Install Cassandra test tool
+      run: |
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
+
+    - name: Run ScalarDL Jepsen test (${{ matrix.tests.nemesis }})
+      run: |
+        docker exec jepsen-control bash -c "\
+          cd /scalar-jepsen/scalardl && \
+          lein run test \
+            --workload all \
+            --nemesis ${{ matrix.tests.nemesis }} \
+            --concurrency 5 \
+            --time-limit 600 \
+            --ssh-private-key ~/.ssh/id_rsa"
+
+    - name: Record result
+      if: always()
+      run: |
+        if docker exec jepsen-control bash -c "grep -q 'Everything looks good!' /scalar-jepsen/scalardl/store/latest/jepsen.log"; then
+          echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}.txt
+        else
+          echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}.txt
+        fi
+
+    - name: Upload result
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: result-${{ matrix.tests.name }}
+        path: result-${{ matrix.tests.name }}.txt
+
+    - name: Copy logs from container
+      if: always()
+      run: |
+        docker cp jepsen-control:/scalar-jepsen/scalardl/store store-${{ matrix.tests.name }} || true
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: logs-${{ matrix.tests.name }}
+        path: store-${{ matrix.tests.name }}
+
+  notify-slack:
+    name: Notify Slack
+    if: always()
+    needs: daily-dl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Download result artifacts only
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          mkdir -p results
+          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
+            while read name; do
+              echo "Downloading $name"
+              gh run download ${{ github.run_id }} -n "$name" -D results -R "${{ github.repository }}"
+            done
+
+      - name: Generate Slack message
+        id: message
+        run: |
+          successes=""
+          failures=""
+
+          for file in results/result-*.txt; do
+            while read -r line; do
+              name=$(echo "$line" | cut -d: -f1)
+              status=$(echo "$line" | cut -d: -f2)
+
+              if [ "$status" = "success" ]; then
+                successes="${successes}- $name\n"
+              else
+                failures="${failures}- $name\n"
+              fi
+            done < "$file"
+          done
+
+          if [ -n "$failures" ]; then
+            icon=":fire:"
+          else
+            icon=":white_check_mark:"
+          fi
+
+          {
+            echo "message<<EOF"
+            printf "${icon} *ScalarDL tests completed*\n\n"
+            printf "*Success:*\n%s\n" "$successes"
+            printf "*Failed:*\n%s\n" "$failures"
+            printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Post to Slack
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\": \"${{ steps.message.outputs.message }}\"}" \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
