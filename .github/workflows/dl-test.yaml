@@ -1,9 +1,9 @@
 name: Daily ScalarDL test
 
 on:
-  push:
-    branches:
-      - daily-dl-test
+  schedule:
+    - cron: "0 15 * * *"
+
 jobs:
   daily-dl:
     name: "DL-${{ matrix.tests.name }}"
@@ -15,11 +15,17 @@ jobs:
       matrix:
         tests:
           - name: "nemesis-none"
+            workload: "all"
             nemesis: "none"
+            time_limit: 600
           - name: "nemesis-crash"
+            workload: "all"
             nemesis: "crash"
+            time_limit: 600
           - name: "nemesis-partition"
+            workload: "all"
             nemesis: "partition"
+            time_limit: 600
 
     steps:
     - name: Checkout scalar-jepsen
@@ -118,10 +124,10 @@ jobs:
         docker exec jepsen-control bash -c "\
           cd /scalar-jepsen/scalardl && \
           lein run test \
-            --workload all \
+            --workload ${{ matrix.tests.workload }} \
             --nemesis ${{ matrix.tests.nemesis }} \
             --concurrency 5 \
-            --time-limit 60 \
+            --time-limit ${{ matrix.tests.time_limit }} \
             --ssh-private-key ~/.ssh/id_rsa"
 
     - name: Save m2 cache from container
