@@ -1,0 +1,197 @@
+name: Daily ScalarDB test
+
+on:
+  push:
+    branches:
+      - daily-db-test
+
+jobs:
+  daily-db:
+    name: "DB-${{ matrix.tests.name }}"
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tests:
+          - name: "nemesis-none"
+            workload: "all"
+            nemesis: "none"
+            time_limit: 600
+          - name: "nemesis-crash"
+            workload: "all"
+            nemesis: "crash"
+            time_limit: 600
+          - name: "nemesis-partition"
+            workload: "all"
+            nemesis: "partition"
+            time_limit: 600
+          - name: "nemesis-packet"
+            workload: "all"
+            nemesis: "packet"
+            time_limit: 600
+
+    steps:
+    - name: Checkout scalar-jepsen
+      uses: actions/checkout@v4
+
+    - name: Cache Docker images
+      uses: actions/cache@v4
+      with:
+        path: docker-cache
+        key: ${{ runner.os }}-docker-jepsen-${{ hashFiles('docker/**/Dockerfile', 'docker/**/init.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-docker-jepsen-
+
+    - name: Restore Docker images from cache
+      run: |
+        if [ -f docker-cache/images.tar ]; then
+          docker load -i docker-cache/images.tar
+        fi
+
+    - name: Cache m2 repository
+      uses: actions/cache@v4
+      with:
+        path: m2-cache
+        key: ${{ runner.os }}-m2-db-${{ hashFiles('**/project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-db-
+
+    - name: Start Jepsen Docker environment
+      run: |
+        cd docker
+        docker compose up -d
+
+    - name: Save Docker images to cache
+      run: |
+        if [ ! -f docker-cache/images.tar ]; then
+          mkdir -p docker-cache
+          docker save $(docker compose -f docker/docker-compose.yaml images -q | sort -u) -o docker-cache/images.tar
+        fi
+
+    - name: Wait for containers to be ready
+      run: |
+        for node in jepsen-control jepsen-n1 jepsen-n2 jepsen-n3 jepsen-n4 jepsen-n5; do
+          echo "Waiting for $node..."
+          until docker inspect -f '{{.State.Running}}' $node 2>/dev/null | grep -q true; do
+            sleep 1
+          done
+        done
+        sleep 5
+
+    - name: Restore m2 cache to container
+      run: |
+        if [ -d m2-cache ] && [ "$(ls -A m2-cache)" ]; then
+          docker cp m2-cache/. jepsen-control:/root/.m2/
+        fi
+
+    - name: Install Cassandra test tool
+      run: |
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
+
+    - name: Run ScalarDB Jepsen test (${{ matrix.tests.nemesis }})
+      run: |
+        docker exec jepsen-control bash -c "\
+          cd /scalar-jepsen/scalardb && \
+          lein with-profile cassandra run test \
+            --workload ${{ matrix.tests.workload }} \
+            --nemesis ${{ matrix.tests.nemesis }} \
+            --concurrency 5 \
+            --time-limit ${{ matrix.tests.time_limit }} \
+            --ssh-private-key ~/.ssh/id_rsa"
+
+    - name: Save m2 cache from container
+      if: always()
+      run: |
+        rm -rf m2-cache
+        docker cp jepsen-control:/root/.m2/. m2-cache || true
+
+    - name: Record result
+      if: always()
+      run: |
+        if docker exec jepsen-control bash -c "grep -q 'Everything looks good!' /scalar-jepsen/scalardb/store/latest/jepsen.log"; then
+          echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}.txt
+        else
+          echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}.txt
+        fi
+
+    - name: Upload result
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: result-${{ matrix.tests.name }}
+        path: result-${{ matrix.tests.name }}.txt
+
+    - name: Copy logs from container
+      if: always()
+      run: |
+        docker cp jepsen-control:/scalar-jepsen/scalardb/store store-${{ matrix.tests.name }} || true
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: logs-${{ matrix.tests.name }}
+        path: store-${{ matrix.tests.name }}
+
+  notify-slack:
+    name: Notify Slack
+    if: always()
+    needs: daily-db
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Download result artifacts only
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          mkdir -p results
+          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
+            while read name; do
+              echo "Downloading $name"
+              gh run download ${{ github.run_id }} -n "$name" -D results -R "${{ github.repository }}"
+            done
+
+      - name: Generate Slack message
+        id: message
+        run: |
+          successes=""
+          failures=""
+
+          for file in results/result-*.txt; do
+            while read -r line; do
+              name=$(echo "$line" | cut -d: -f1)
+              status=$(echo "$line" | cut -d: -f2)
+
+              if [ "$status" = "success" ]; then
+                successes="${successes}- $name\n"
+              else
+                failures="${failures}- $name\n"
+              fi
+            done < "$file"
+          done
+
+          if [ -n "$failures" ]; then
+            icon=":fire:"
+          else
+            icon=":white_check_mark:"
+          fi
+
+          {
+            echo "message<<EOF"
+            printf "${icon} *ScalarDB tests completed*\n\n"
+            printf "*Success:*\n%s\n" "$successes"
+            printf "*Failed:*\n%s\n" "$failures"
+            printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Post to Slack
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\": \"${{ steps.message.outputs.message }}\"}" \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
