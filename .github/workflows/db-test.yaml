@@ -41,7 +41,7 @@ jobs:
             isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "ReadCommitted"
+          - name: "ReadCommitted_2PC"
             workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition crash"
             enable_one_phase_commit: false
@@ -132,8 +132,6 @@ jobs:
       with:
         path: docker-cache
         key: ${{ runner.os }}-docker-jepsen-${{ hashFiles('docker/**/Dockerfile', 'docker/**/init.sh') }}
-        restore-keys: |
-          ${{ runner.os }}-docker-jepsen-
 
     - name: Restore Docker images from cache
       run: |
