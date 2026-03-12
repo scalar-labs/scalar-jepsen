@@ -76,8 +76,6 @@ jobs:
       with:
         path: docker-cache
         key: ${{ runner.os }}-docker-jepsen-${{ hashFiles('docker/**/Dockerfile', 'docker/**/init.sh') }}
-        restore-keys: |
-          ${{ runner.os }}-docker-jepsen-
 
     - name: Restore Docker images from cache
       run: |
