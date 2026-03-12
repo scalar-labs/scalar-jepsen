@@ -125,10 +125,10 @@ jobs:
 
     steps:
     - name: Checkout scalar-jepsen
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Cache Docker images
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: docker-cache
         key: ${{ runner.os }}-docker-jepsen-${{ hashFiles('docker/**/Dockerfile', 'docker/**/init.sh') }}
@@ -142,7 +142,7 @@ jobs:
         fi
 
     - name: Cache m2 repository
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: m2-cache
         key: ${{ runner.os }}-m2-db-${{ hashFiles('**/project.clj') }}
@@ -227,7 +227,7 @@ jobs:
 
     - name: Upload result
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: result-${{ matrix.tests.name }}
         path: result-${{ matrix.tests.name }}.txt
@@ -239,7 +239,7 @@ jobs:
 
     - name: Upload logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: logs-${{ matrix.tests.name }}
         path: store-${{ matrix.tests.name }}
