@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-db.mariadb
-  (:require [jepsen.control :as c]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.control :as c]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
@@ -41,9 +42,12 @@
             :--version "24.1.1"))
 
   (wipe! [_]
-    (doseq [cmd [[:helm :uninstall MARIADB_NAME]
-                 [:kubectl :delete :pvc "data-mariadb-scalardb-cluster-0"]]]
-      (try (apply c/exec cmd) (catch Exception _ nil))))
+    (doseq [cmd [[:helm :uninstall MARIADB_NAME
+                  :--timeout "3m0s" :--ignore-not-found]
+                 [:kubectl :delete :pvc "data-mariadb-scalardb-cluster-0"
+                  "--wait=false" "--ignore-not-found=true"]]]
+      (try (apply c/exec cmd)
+           (catch Exception e (warn e "Failed to exec:" cmd)))))
 
   (create-storage-properties [_ test]
     (let [node (-> test :nodes first)

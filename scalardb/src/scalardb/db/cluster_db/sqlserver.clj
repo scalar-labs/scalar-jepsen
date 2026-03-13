@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-db.sqlserver
-  (:require [jepsen.control :as c]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.control :as c]
             [scalardb.db.cluster :refer [get-load-balancer-ip]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -37,10 +38,13 @@
             :--version "1.2.3"))
 
   (wipe! [_]
-    (doseq [cmd [[:helm :uninstall SQLSERVER_NAME]
+    (doseq [cmd [[:helm :uninstall SQLSERVER_NAME
+                  :--timeout "3m0s" :--ignore-not-found]
                  [:kubectl :delete
-                  :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"]]]
-      (try (apply c/exec cmd) (catch Exception _ nil))))
+                  :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"
+                  "--wait=false" "--ignore-not-found=true"]]]
+      (try (apply c/exec cmd)
+           (catch Exception e (warn e "Failed to exec:" cmd)))))
 
   (create-storage-properties [_ test]
     (let [node (-> test :nodes first)
