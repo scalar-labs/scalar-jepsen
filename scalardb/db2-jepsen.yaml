@@ -55,14 +55,20 @@ spec:
             - name: data
               mountPath: /database
           startupProbe:
-            tcpSocket:
-              port: 50000
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - su - db2inst1 -c "db2 connect to jepsen" > /dev/null 2>&1
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket:
-              port: 50000
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - su - db2inst1 -c "db2 connect to jepsen" > /dev/null 2>&1
             periodSeconds: 10
           livenessProbe:
             tcpSocket:

@@ -43,8 +43,10 @@
             "--timeout=600s"))
 
   (wipe! [_]
-    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" DB2_MANIFEST_YAML)]
-                 [:kubectl :delete :pvc "data-db2-scalardb-cluster-0"]]]
+    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" DB2_MANIFEST_YAML)
+                  "--timeout=180s" "--ignore-not-found=true"]
+                 [:kubectl :delete :pvc "data-db2-scalardb-cluster-0"
+                  "--timeout=180s" "--ignore-not-found=true"]]]
       (try (apply c/exec cmd) (catch Exception _ nil))))
 
   (create-storage-properties [_ test]
