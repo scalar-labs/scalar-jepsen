@@ -62,6 +62,7 @@ spec:
                 - su - db2inst1 -c "db2 connect to jepsen" > /dev/null 2>&1
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 10
             failureThreshold: 60
           readinessProbe:
             exec:
@@ -70,6 +71,7 @@ spec:
                 - -c
                 - su - db2inst1 -c "db2 connect to jepsen" > /dev/null 2>&1
             periodSeconds: 10
+            timeoutSeconds: 10
           livenessProbe:
             tcpSocket:
               port: 50000
