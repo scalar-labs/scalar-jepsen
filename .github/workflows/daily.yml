@@ -157,6 +157,17 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
+          - name: "YugabyteDB"
+            backend_db: "yugabytedb"
+            workload: "transfer transfer-append elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
           - name: "MySQL"
             backend_db: "mysql"
             workload: "transfer transfer-append elle-append elle-write-read"
