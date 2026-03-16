@@ -6,7 +6,7 @@ on:
 
 jobs:
   daily-cluster:
-    name: "Daily ScalarDB Cluster test"
+    name: "ScalarDB Cluster / ${{ matrix.tests.name }}"
 
     runs-on: ubuntu-latest
 
@@ -226,7 +226,7 @@ jobs:
 
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     # Need ssh to the localhost and graphviz
     - name: Install packages
@@ -246,18 +246,18 @@ jobs:
         sudo service ssh restart
 
     - name: Setup Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v5
       with:
         java-version: '11'
         distribution: 'temurin'
 
     - name: Install leiningen
-      uses: DeLaGuardo/setup-clojure@13.0
+      uses: DeLaGuardo/setup-clojure@13.5.2
       with:
         lein: latest
 
     - name: Cache m2 repository
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
@@ -265,10 +265,10 @@ jobs:
           ${{ runner.os }}-m2-
 
     - name: Set up Docker
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Set up Kind cluster
-      uses: helm/kind-action@v1.12.0
+      uses: helm/kind-action@v1.14.0
       with:
         cluster_name: test-cluster
 
@@ -347,14 +347,14 @@ jobs:
 
     - name: Upload result
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: result-${{ matrix.tests.name }}
         path: result-${{ matrix.tests.name }}.txt
 
     - name: Upload logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: logs-${{ matrix.tests.name }}
         path: scalardb/store
@@ -373,7 +373,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           mkdir -p results
-          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+          gh api --paginate repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
             --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
             while read name; do
               echo "Downloading $name"
@@ -382,14 +382,28 @@ jobs:
 
       - name: Generate Slack message
         id: message
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          # Get expected test names from the matrix jobs in this run
+          mapfile -t expected_tests < <(
+            gh api --paginate "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+              --jq '.jobs[] | select(.name | startswith("ScalarDB Cluster / ")) | .name | ltrimstr("ScalarDB Cluster / ")'
+          )
+
           successes=""
           failures=""
+          timeouts=""
+
+          # Track which tests have results
+          declare -A found_tests
 
           for file in results/result-*.txt; do
+            [ -f "$file" ] || continue
             while read -r line; do
               name=$(echo "$line" | cut -d: -f1)
               status=$(echo "$line" | cut -d: -f2)
+              found_tests["$name"]=1
 
               if [ "$status" = "success" ]; then
                 successes="${successes}- $name\n"
@@ -399,7 +413,14 @@ jobs:
             done < "$file"
           done
 
-          if [ -n "$failures" ]; then
+          # Detect missing tests (likely timed out)
+          for test in "${expected_tests[@]}"; do
+            if [ -z "${found_tests[$test]}" ]; then
+              timeouts="${timeouts}- $test\n"
+            fi
+          done
+
+          if [ -n "$failures" ] || [ -n "$timeouts" ]; then
             icon=":fire:"
           else
             icon=":white_check_mark:"
@@ -410,6 +431,7 @@ jobs:
             printf "${icon} *ScalarDB Cluster tests completed*\n\n"
             printf "*Success:*\n%s\n" "$successes"
             printf "*Failed:*\n%s\n" "$failures"
+            printf "*Timed out:*\n%s\n" "$timeouts"
             printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
             echo "EOF"
           } >> $GITHUB_OUTPUT
