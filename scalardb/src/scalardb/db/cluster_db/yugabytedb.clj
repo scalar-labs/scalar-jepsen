@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-db.yugabytedb
-  (:require [jepsen.control :as c]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.control :as c]
             [scalardb.db.cluster :refer [get-load-balancer-ip]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -46,9 +47,12 @@
             :--version "2024.2.8"))
 
   (wipe! [_]
-    (doseq [cmd [[:helm :uninstall YUGABYTEDB_NAME]
-                 [:kubectl :delete :pvc :-l (str "release=" YUGABYTEDB_NAME)]]]
-      (try (apply c/exec cmd) (catch Exception _ nil))))
+    (doseq [cmd [[:helm :uninstall YUGABYTEDB_NAME
+                  :--timeout "3m0s" :--ignore-not-found]
+                 [:kubectl :delete :pvc :-l (str "release=" YUGABYTEDB_NAME)
+                  "--wait=false" "--ignore-not-found=true"]]]
+      (try (apply c/exec cmd)
+           (catch Exception e (warn e "Failed to exec:" cmd)))))
 
   (create-storage-properties [_ test]
     (let [node (-> test :nodes first)
