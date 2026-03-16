@@ -24,6 +24,7 @@
   {"cassandra" :cassandra
    "postgres" :postgres
    "alloydb" :alloydb
+   "yugabytedb" :yugabytedb
    "mysql" :mysql
    "mariadb" :mariadb
    "tidb" :tidb
