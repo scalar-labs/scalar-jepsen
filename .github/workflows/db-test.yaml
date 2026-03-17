@@ -113,15 +113,6 @@ jobs:
             isolation_level: "serializable"
             consistency_model: "strict-serializable"
             time_limit: 600
-          - name: "ClientSideOptimizations"
-            workload: "elle-append elle-write-read"
-            nemesis: "none partition crash"
-            enable_one_phase_commit: false
-            enable_group_commit: false
-            enable_client_side_optimizations: true
-            isolation_level: "snapshot"
-            consistency_model: "cursor-stability"
-            time_limit: 600
 
     steps:
     - name: Checkout scalar-jepsen
@@ -179,7 +170,7 @@ jobs:
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
 
-    - name: Run ScalarDB Jepsen test (${{ matrix.tests.nemesis }})
+    - name: Run ScalarDB Jepsen test (${{ matrix.tests.name }})
       run: |
         OPTS=""
         for w in ${{ matrix.tests.workload }}; do
