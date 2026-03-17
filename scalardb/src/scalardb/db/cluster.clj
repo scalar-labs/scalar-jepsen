@@ -173,10 +173,14 @@
       (catch Exception _ nil)))
   (info "wiping the pods...")
   (cluster-db/wipe! backend-db)
-  (doseq [cmd [[:helm :uninstall CLUSTER_NAME]
-               [:helm :uninstall CLUSTER2_NAME]
-               [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"]]]
-    (try (apply c/exec cmd) (catch Exception _ nil))))
+  (doseq [cmd [[:helm :uninstall CLUSTER_NAME
+                :--timeout "3m0s" :--ignore-not-found]
+               [:helm :uninstall CLUSTER2_NAME
+                :--timeout "3m0s" :--ignore-not-found]
+               [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"
+                :--timeout "3m0s" :--ignore-not-found]]]
+    (try (apply c/exec cmd)
+         (catch Exception e (warn e "Failed to exec:" cmd)))))
 
 (defn- get-pod-list
   "Get the pod list whose name starts with prefix"

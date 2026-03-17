@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-db.oracle
-  (:require [jepsen.control :as c]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.control :as c]
             [scalardb.db.cluster :refer [get-k8s-node-ip]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -41,9 +42,12 @@
             "--timeout=300s"))
 
   (wipe! [_]
-    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)]
-                 [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"]]]
-      (try (apply c/exec cmd) (catch Exception _ nil))))
+    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)
+                  "--timeout=180s" "--ignore-not-found=true"]
+                 [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"
+                  "--wait=false" "--ignore-not-found=true"]]]
+      (try (apply c/exec cmd)
+           (catch Exception e (warn e "Failed to exec:" cmd)))))
 
   (create-storage-properties [_ test]
     (let [node (-> test :nodes first)
