@@ -337,7 +337,8 @@
    :mariadb   'scalardb.db.cluster-db.mariadb/gen-cluster-db
    :tidb      'scalardb.db.cluster-db.tidb/gen-cluster-db
    :sqlserver 'scalardb.db.cluster-db.sqlserver/gen-cluster-db
-   :oracle    'scalardb.db.cluster-db.oracle/gen-cluster-db})
+   :oracle    'scalardb.db.cluster-db.oracle/gen-cluster-db
+   :db2       'scalardb.db.cluster-db.db2/gen-cluster-db})
 
 (defn- cluster-backend-db
   [db-type]

@@ -29,7 +29,8 @@
    "mariadb" :mariadb
    "tidb" :tidb
    "sqlserver" :sqlserver
-   "oracle" :oracle})
+   "oracle" :oracle
+   "db2" :db2})
 
 (def workload-keys
   "A map of test workload keys."
