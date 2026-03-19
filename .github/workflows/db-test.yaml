@@ -256,14 +256,23 @@ jobs:
 
       - name: Generate Slack message
         id: message
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           successes=""
           failures=""
 
+          # Get expected test names dynamically from the workflow run's matrix jobs
+          expected_tests=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            --paginate --jq '.jobs[] | select(.name | startswith("DB-")) | .name | sub("^DB-"; "")')
+
+          found_tests=""
           for file in results/result-*.txt; do
+            [ -f "$file" ] || continue
             while read -r line; do
               name=$(echo "$line" | cut -d: -f1)
               status=$(echo "$line" | cut -d: -f2)
+              found_tests="${found_tests} ${name}"
 
               if [ "$status" = "success" ]; then
                 successes="${successes}- $name\n"
@@ -271,6 +280,13 @@ jobs:
                 failures="${failures}- $name\n"
               fi
             done < "$file"
+          done
+
+          # Report missing results as failures
+          for test in $expected_tests; do
+            if ! echo "$found_tests" | grep -qw "$test"; then
+              failures="${failures}- $test (no result)\n"
+            fi
           done
 
           if [ -n "$failures" ]; then
