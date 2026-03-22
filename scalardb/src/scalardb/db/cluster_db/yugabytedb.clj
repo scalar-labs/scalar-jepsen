@@ -50,7 +50,7 @@
     (doseq [cmd [[:helm :uninstall YUGABYTEDB_NAME
                   :--timeout "3m0s" :--ignore-not-found]
                  [:kubectl :delete :pvc :-l (str "release=" YUGABYTEDB_NAME)
-                  "--wait=false" "--ignore-not-found=true"]]]
+                  "--timeout=180s" "--ignore-not-found=true"]]]
       (try (apply c/exec cmd)
            (catch Exception e (warn e "Failed to exec:" cmd)))))
 

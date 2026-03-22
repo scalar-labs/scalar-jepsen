@@ -42,9 +42,9 @@
     (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" TIDB_MANIFEST_YAML)
                   "--timeout=180s" "--ignore-not-found=true"]
                  [:kubectl :delete :pvc "pd-tidb-scalardb-cluster-pd-0"
-                  "--wait=false" "--ignore-not-found=true"]
+                  "--timeout=180s" "--ignore-not-found=true"]
                  [:kubectl :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"
-                  "--wait=false" "--ignore-not-found=true"]
+                  "--timeout=180s" "--ignore-not-found=true"]
                  [:helm :uninstall TIDB_OPERATOR_NAME
                   :--namespace "tidb-admin" :--timeout "3m0s"
                   :--ignore-not-found]

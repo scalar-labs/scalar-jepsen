@@ -42,7 +42,7 @@
                   :--timeout "3m0s" :--ignore-not-found]
                  [:kubectl :delete
                   :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"
-                  "--wait=false" "--ignore-not-found=true"]]]
+                  "--timeout=180s" "--ignore-not-found=true"]]]
       (try (apply c/exec cmd)
            (catch Exception e (warn e "Failed to exec:" cmd)))))
 

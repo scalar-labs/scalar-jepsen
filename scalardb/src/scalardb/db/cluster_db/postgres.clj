@@ -45,7 +45,7 @@
                  [:kubectl :delete
                   :pvc
                   :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"
-                  "--wait=false" "--ignore-not-found=true"]]]
+                  "--timeout=180s" "--ignore-not-found=true"]]]
       (try (apply c/exec cmd)
            (catch Exception e (warn e "Failed to exec:" cmd)))))
 

@@ -45,7 +45,7 @@
     (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)
                   "--timeout=180s" "--ignore-not-found=true"]
                  [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"
-                  "--wait=false" "--ignore-not-found=true"]]]
+                  "--timeout=180s" "--ignore-not-found=true"]]]
       (try (apply c/exec cmd)
            (catch Exception e (warn e "Failed to exec:" cmd)))))
 
