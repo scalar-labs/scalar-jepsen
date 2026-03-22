@@ -1,7 +1,7 @@
 (ns scalardb.db.cluster-db.sqlserver
   (:require [clojure.tools.logging :refer [warn]]
             [jepsen.control :as c]
-            [scalardb.db.cluster :refer [get-load-balancer-ip]]
+            [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
 
@@ -39,10 +39,10 @@
 
   (wipe! [_]
     (doseq [cmd [[:helm :uninstall SQLSERVER_NAME
-                  :--timeout "3m0s" :--ignore-not-found]
+                  :--timeout WIPE_TIMEOUT :--ignore-not-found]
                  [:kubectl :delete
                   :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"
-                  "--timeout=180s" "--ignore-not-found=true"]]]
+                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
       (try (apply c/exec cmd)
            (catch Exception e (warn e "Failed to exec:" cmd)))))
 

@@ -18,6 +18,7 @@
 (def ^:private ^:const DEFAULT_HELM_CHART_VERSION "1.7.2")
 (def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.2")
 
+(def ^:const WIPE_TIMEOUT "180s")
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
 
@@ -174,11 +175,11 @@
   (info "wiping the pods...")
   (cluster-db/wipe! backend-db)
   (doseq [cmd [[:helm :uninstall CLUSTER_NAME
-                :--timeout "3m0s" :--ignore-not-found]
+                :--timeout WIPE_TIMEOUT :--ignore-not-found]
                [:helm :uninstall CLUSTER2_NAME
-                :--timeout "3m0s" :--ignore-not-found]
+                :--timeout WIPE_TIMEOUT :--ignore-not-found]
                [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"
-                :--timeout "3m0s" :--ignore-not-found]]]
+                :--timeout WIPE_TIMEOUT :--ignore-not-found]]]
     (try (apply c/exec cmd)
          (catch Exception e (warn e "Failed to exec:" cmd)))))
 
