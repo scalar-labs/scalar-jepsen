@@ -1,7 +1,7 @@
 (ns scalardb.db.cluster-db.db2
   (:require [jepsen.control :as c]
             [scalardb.core :as scalar]
-            [scalardb.db.cluster :refer [get-k8s-node-ip]]
+            [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
 
@@ -44,9 +44,9 @@
 
   (wipe! [_]
     (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" DB2_MANIFEST_YAML)
-                  "--timeout=180s" "--ignore-not-found=true"]
+                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
                  [:kubectl :delete :pvc "data-db2-scalardb-cluster-0"
-                  "--timeout=180s" "--ignore-not-found=true"]]]
+                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
       (try (apply c/exec cmd) (catch Exception _ nil))))
 
   (create-storage-properties [_ test]
