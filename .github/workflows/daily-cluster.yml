@@ -9,7 +9,6 @@ jobs:
     name: "ScalarDB Cluster / ${{ matrix.tests.name }}"
 
     runs-on: ubuntu-latest
-    timeout-minutes: 180
 
     strategy:
       fail-fast: false
@@ -404,6 +403,7 @@ jobs:
         EOF
 
     - name: ${{ matrix.tests.name }}
+      timeout-minutes: 180
       run: |
         cd scalardb
         OPTS=""
