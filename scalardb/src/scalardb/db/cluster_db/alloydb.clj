@@ -1,7 +1,7 @@
 (ns scalardb.db.cluster-db.alloydb
   (:require [clojure.tools.logging :refer [warn]]
             [jepsen.control :as c]
-            [scalardb.db.cluster :refer [get-load-balancer-ip]]
+            [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
 
@@ -66,17 +66,17 @@
       (doseq [cmd [[:kubectl :patch "dbcluster" ALLOYDB_NAME
                     :--type=merge :-p "{\"spec\":{\"isDeleted\":true}}"]
                    [:kubectl :delete :-f (str "/tmp/" ALLOYDB_MANIFEST_YAML)
-                    "--timeout=180s" "--ignore-not-found=true"]
+                    :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
                    [:helm :uninstall "cert-manager"
-                    :--namespace CERT_MANAGER_NAMESPACE :--timeout "3m0s"
+                    :--namespace CERT_MANAGER_NAMESPACE :--timeout WIPE_TIMEOUT
                     :--ignore-not-found]
                    [:kubectl :delete :namespace CERT_MANAGER_NAMESPACE
-                    "--timeout=180s" "--ignore-not-found=true"]
+                    :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
                    [:helm :uninstall ALLOYDB_OPERATOR_NAME
-                    :--namespace ALLOYDB_OPERATOR_NAMESPACE :--timeout "3m0s"
+                    :--namespace ALLOYDB_OPERATOR_NAMESPACE :--timeout WIPE_TIMEOUT
                     :--ignore-not-found]
                    [:kubectl :delete :namespace ALLOYDB_OPERATOR_NAMESPACE
-                    "--timeout=180s" "--ignore-not-found=true"]
+                    :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
                    [:rm :-f (str "alloydbomni-operator-" ALLOYDB_OPERATOR_VERSION ".tgz")]]]
         (try (apply c/exec cmd)
              (catch Exception e (warn e "Failed to exec:" cmd))))))
