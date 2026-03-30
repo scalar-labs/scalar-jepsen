@@ -146,9 +146,9 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "AlloyDB"
+          - name: "AlloyDB_Transfers"
             backend_db: "alloydb"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -157,9 +157,20 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "YugabyteDB"
+          - name: "AlloyDB_Elle"
+            backend_db: "alloydb"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "YugabyteDB_Transfers"
             backend_db: "yugabytedb"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -168,9 +179,20 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "MySQL"
+          - name: "YugabyteDB_Elle"
+            backend_db: "yugabytedb"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "MySQL_Transfers"
             backend_db: "mysql"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -179,9 +201,20 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "MariaDB"
+          - name: "MySQL_Elle"
+            backend_db: "mysql"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "MariaDB_Transfers"
             backend_db: "mariadb"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -190,9 +223,20 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "TiDB"
+          - name: "MariaDB_Elle"
+            backend_db: "mariadb"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "TiDB_Transfers"
             backend_db: "tidb"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -201,9 +245,20 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "SQLServer"
+          - name: "TiDB_Elle"
+            backend_db: "tidb"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "SQLServer_Transfers"
             backend_db: "sqlserver"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -212,9 +267,20 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "Oracle"
+          - name: "SQLServer_Elle"
+            backend_db: "sqlserver"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "Oracle_Transfers"
             backend_db: "oracle"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -223,9 +289,31 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "Db2"
+          - name: "Oracle_Elle"
+            backend_db: "oracle"
+            workload: "elle-append elle-write-read"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "Db2_Transfers"
             backend_db: "db2"
-            workload: "transfer transfer-append elle-append elle-write-read"
+            workload: "transfer transfer-append"
+            nemesis: "none partition packet clock crash"
+            enable_one_phase_commit: false
+            enable_group_commit: false
+            enable_client_side_optimizations: false
+            isolation_level: "snapshot"
+            jdbc_isolation_level: "read-committed"
+            consistency_model: "cursor-stability"
+            time_limit: 600
+          - name: "Db2_Elle"
+            backend_db: "db2"
+            workload: "elle-append elle-write-read"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -315,6 +403,7 @@ jobs:
         EOF
 
     - name: ${{ matrix.tests.name }}
+      timeout-minutes: 180
       run: |
         cd scalardb
         OPTS=""
