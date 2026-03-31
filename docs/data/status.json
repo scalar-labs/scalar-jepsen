@@ -1,0 +1,8 @@
+{
+  "last_updated": "",
+  "suites": {
+    "scalardb": { "workflow": "Daily ScalarDB test", "tests": {} },
+    "scalardl": { "workflow": "Daily ScalarDL test", "tests": {} },
+    "scalardb-cluster": { "workflow": "Daily ScalarDB Cluster test", "tests": {} }
+  }
+}
