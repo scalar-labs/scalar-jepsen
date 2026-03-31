@@ -45,26 +45,90 @@
   header h1 {
     font-size: 1.75rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
   }
 
-  .overall-status {
-    display: inline-block;
-    padding: 0.35rem 1rem;
-    border-radius: 2rem;
+  .status-cards {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .status-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: default;
+    min-width: 200px;
+    justify-content: center;
+  }
+
+  .status-card .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-card.pass .status-dot { background: var(--green); }
+  .status-card.fail .status-dot { background: var(--red); }
+  .status-card.timeout .status-dot { background: var(--yellow); }
+  .status-card.unknown .status-dot { background: var(--gray); }
+
+  .status-card .status-label {
     font-size: 0.9rem;
     font-weight: 500;
   }
 
-  .overall-status.pass { background: var(--green-dim); color: #7ee787; }
-  .overall-status.fail { background: var(--red-dim); color: #ff7b72; }
-  .overall-status.timeout { background: var(--yellow-dim); color: #e3b341; }
-  .overall-status.unknown { background: var(--gray); color: var(--text-secondary); }
+  .status-card .status-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .status-card.pass .status-text { color: #7ee787; }
+  .status-card.fail .status-text { color: #ff7b72; }
+  .status-card.timeout .status-text { color: #e3b341; }
+
+  .status-card-tooltip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    text-align: left;
+  }
+
+  .status-card:hover .status-card-tooltip { display: block; }
+
+  .status-card-tooltip .tip-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+
+  .status-card-tooltip .tip-fail { color: #ff7b72; }
+  .status-card-tooltip .tip-timeout { color: #e3b341; }
+  .status-card-tooltip .tip-pass { color: #7ee787; }
 
   .last-updated {
     color: var(--text-secondary);
     font-size: 0.8rem;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
   }
 
   .suite {
@@ -227,6 +291,7 @@
     .date-labels .test-name-spacer { min-width: 140px; }
     .cell { width: 12px; height: 12px; }
     .date-labels .date-label { width: 12px; font-size: 0.45rem; }
+    .status-cards { flex-direction: column; align-items: center; }
   }
 </style>
 </head>
@@ -234,7 +299,7 @@
 <div class="container">
   <header>
     <h1>Scalar Jepsen Test Status</h1>
-    <div id="overall-status" class="overall-status unknown">Loading...</div>
+    <div id="status-cards" class="status-cards"></div>
     <div id="last-updated" class="last-updated"></div>
   </header>
   <div id="dashboard" class="loading">Loading status data...</div>
@@ -267,38 +332,26 @@ function getLast30Days() {
   return days;
 }
 
-function computeSuiteStatus(tests, dates) {
-  // Look at the most recent date that has any data
-  let hasFail = false;
-  let hasTimeout = false;
-  let hasPass = false;
-  for (const entries of Object.values(tests)) {
+function computeSuiteDetails(tests) {
+  const failed = [];
+  const timedOut = [];
+  for (const [name, entries] of Object.entries(tests)) {
     if (!entries || entries.length === 0) continue;
-    const latest = entries[0]; // sorted desc
-    if (latest.status === 'failure') hasFail = true;
-    else if (latest.status === 'timeout') hasTimeout = true;
-    else if (latest.status === 'success') hasPass = true;
+    const latest = entries[0];
+    if (latest.status === 'failure') failed.push(name);
+    else if (latest.status === 'timeout') timedOut.push(name);
   }
-  if (hasFail) return 'fail';
-  if (hasTimeout) return 'timeout';
-  if (hasPass) return 'pass';
-  return 'unknown';
-}
-
-function computeOverallStatus(suites) {
-  const statuses = Object.values(suites).map(s => {
-    return computeSuiteStatus(s.tests || {});
-  });
-  if (statuses.includes('fail')) return 'fail';
-  if (statuses.includes('timeout')) return 'timeout';
-  if (statuses.includes('pass')) return 'pass';
-  return 'unknown';
+  let status = 'unknown';
+  if (failed.length > 0) status = 'fail';
+  else if (timedOut.length > 0) status = 'timeout';
+  else if (Object.keys(tests).length > 0) status = 'pass';
+  return { status, failed, timedOut };
 }
 
 function statusLabel(s) {
-  if (s === 'pass') return 'All tests operational';
-  if (s === 'fail') return 'Some tests failing';
-  if (s === 'timeout') return 'Some tests timed out';
+  if (s === 'pass') return 'Pass';
+  if (s === 'fail') return 'Fail';
+  if (s === 'timeout') return 'Timeout';
   return 'No data';
 }
 
@@ -321,17 +374,49 @@ function statusText(s) {
   return s;
 }
 
+function buildTooltipHTML(details) {
+  if (details.status === 'pass') {
+    return '<div class="tip-pass">All tests passed</div>';
+  }
+  let html = '';
+  if (details.failed.length > 0) {
+    html += '<div class="tip-title tip-fail">Failed:</div>';
+    html += details.failed.map(n => '<div class="tip-fail">  ' + n + '</div>').join('');
+  }
+  if (details.timedOut.length > 0) {
+    if (html) html += '<div style="height:4px"></div>';
+    html += '<div class="tip-title tip-timeout">Timed out:</div>';
+    html += details.timedOut.map(n => '<div class="tip-timeout">  ' + n + '</div>').join('');
+  }
+  return html;
+}
+
 function render(data) {
   const days = getLast30Days();
   const dashboard = document.getElementById('dashboard');
   dashboard.className = '';
   dashboard.innerHTML = '';
 
-  // Overall status
-  const overall = computeOverallStatus(data.suites);
-  const overallEl = document.getElementById('overall-status');
-  overallEl.className = 'overall-status ' + overall;
-  overallEl.textContent = statusLabel(overall);
+  // Status cards
+  const cardsEl = document.getElementById('status-cards');
+  cardsEl.innerHTML = '';
+
+  for (const [suiteKey, suite] of Object.entries(data.suites)) {
+    const tests = suite.tests || {};
+    const details = computeSuiteDetails(tests);
+
+    const card = document.createElement('div');
+    card.className = 'status-card ' + details.status;
+    card.innerHTML = `
+      <div class="status-dot"></div>
+      <div>
+        <div class="status-label">${SUITE_LABELS[suiteKey] || suiteKey}</div>
+        <div class="status-text">${statusLabel(details.status)}</div>
+      </div>
+      <div class="status-card-tooltip">${buildTooltipHTML(details)}</div>
+    `;
+    cardsEl.appendChild(card);
+  }
 
   // Last updated
   if (data.last_updated) {
@@ -345,7 +430,7 @@ function render(data) {
     const testNames = Object.keys(tests).sort();
     if (testNames.length === 0) continue;
 
-    const suiteStatus = computeSuiteStatus(tests, days);
+    const details = computeSuiteDetails(tests);
 
     const section = document.createElement('div');
     section.className = 'suite';
@@ -355,7 +440,7 @@ function render(data) {
     header.className = 'suite-header';
     header.innerHTML = `
       <h2>${SUITE_LABELS[suiteKey] || suiteKey}</h2>
-      <span class="suite-badge ${suiteStatus}">${statusLabel(suiteStatus)}</span>
+      <span class="suite-badge ${details.status}">${statusLabel(details.status)}</span>
     `;
     section.appendChild(header);
 
@@ -370,7 +455,6 @@ function render(data) {
     days.forEach((day, i) => {
       const label = document.createElement('div');
       label.className = 'date-label';
-      // Show label every 7 days
       if (i % 7 === 0) {
         const d = new Date(day + 'T00:00:00Z');
         label.textContent = (d.getUTCMonth() + 1) + '/' + d.getUTCDate();
