@@ -1,0 +1,99 @@
+name: Update status page
+
+on:
+  workflow_run:
+    workflows:
+      - "Daily ScalarDB test"
+      - "Daily ScalarDL test"
+      - "Daily ScalarDB Cluster test"
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  update-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+
+      - name: Determine suite
+        id: suite
+        run: |
+          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+          case "$WORKFLOW_NAME" in
+            "Daily ScalarDB test")
+              echo "suite=scalardb" >> $GITHUB_OUTPUT
+              echo "job_prefix=DB-" >> $GITHUB_OUTPUT
+              ;;
+            "Daily ScalarDL test")
+              echo "suite=scalardl" >> $GITHUB_OUTPUT
+              echo "job_prefix=DL-" >> $GITHUB_OUTPUT
+              ;;
+            "Daily ScalarDB Cluster test")
+              echo "suite=scalardb-cluster" >> $GITHUB_OUTPUT
+              echo "job_prefix=ScalarDB Cluster / " >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Fetch job results and update status
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          SUITE="${{ steps.suite.outputs.suite }}"
+          PREFIX="${{ steps.suite.outputs.job_prefix }}"
+          TODAY=$(date -u +%Y-%m-%d)
+
+          # Fetch all jobs for the workflow run as a JSON array
+          gh api --paginate "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs" \
+            --jq "[.jobs[] | select(.name | startswith(\"${PREFIX}\"))]" > /tmp/jobs.json
+
+          # Build results JSON array: [{test, status}, ...]
+          jq --arg prefix "$PREFIX" '[
+            .[] |
+            (.name | ltrimstr($prefix)) as $test |
+            .conclusion as $c |
+            {
+              test: $test,
+              status: (if $c == "success" then "success"
+                       elif ($c == "timed_out" or $c == "cancelled") then "timeout"
+                       else "failure" end)
+            }
+          ]' /tmp/jobs.json > /tmp/results.json
+
+          # Update status.json
+          jq --arg suite "$SUITE" \
+             --arg date "$TODAY" \
+             --argjson run_id "$RUN_ID" \
+             --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             --slurpfile results /tmp/results.json '
+            .last_updated = $now |
+            .suites[$suite].tests as $current_tests |
+            reduce $results[0][] as $r (
+              .;
+              .suites[$suite].tests[$r.test] = (
+                ($current_tests[$r.test] // []) |
+                [{"date": $date, "status": $r.status, "run_id": $run_id}] +
+                [.[] | select(.date != $date)] |
+                sort_by(.date) | reverse |
+                .[0:30]
+              )
+            )
+          ' docs/data/status.json > /tmp/status_new.json
+
+          mv /tmp/status_new.json docs/data/status.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/status.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Update status: ${{ steps.suite.outputs.suite }} $(date -u +%Y-%m-%d)"
+          git push
