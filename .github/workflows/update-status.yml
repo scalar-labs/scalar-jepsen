@@ -41,33 +41,57 @@ jobs:
               ;;
           esac
 
-      - name: Fetch job results and update status
+      - name: Collect results from artifacts
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           RUN_ID="${{ github.event.workflow_run.id }}"
-          SUITE="${{ steps.suite.outputs.suite }}"
           PREFIX="${{ steps.suite.outputs.job_prefix }}"
+
+          # Get expected test names from the job list
+          gh api --paginate "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs" \
+            --jq ".jobs[] | select(.name | startswith(\"${PREFIX}\")) | .name | ltrimstr(\"${PREFIX}\")" \
+            > /tmp/expected_tests.txt
+
+          # Download result artifacts
+          mkdir -p /tmp/results
+          gh api --paginate "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
+            while read name; do
+              gh run download "$RUN_ID" -n "$name" -D /tmp/results -R "${{ github.repository }}" || true
+            done
+
+          # Parse result files: success or failure
+          echo '[]' > /tmp/results.json
+          found_tests=""
+          for file in /tmp/results/result-*.txt; do
+            [ -f "$file" ] || continue
+            while IFS=: read -r test status; do
+              found_tests="${found_tests} ${test}"
+              jq --arg test "$test" --arg status "$status" \
+                '. += [{"test": $test, "status": $status}]' \
+                /tmp/results.json > /tmp/results_tmp.json
+              mv /tmp/results_tmp.json /tmp/results.json
+            done < "$file"
+          done
+
+          # Tests with no result artifact = timeout
+          while read -r test; do
+            [ -z "$test" ] && continue
+            if ! echo "$found_tests" | grep -qw "$test"; then
+              jq --arg test "$test" \
+                '. += [{"test": $test, "status": "timeout"}]' \
+                /tmp/results.json > /tmp/results_tmp.json
+              mv /tmp/results_tmp.json /tmp/results.json
+            fi
+          done < /tmp/expected_tests.txt
+
+      - name: Update status.json
+        run: |
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          SUITE="${{ steps.suite.outputs.suite }}"
           TODAY=$(date -u +%Y-%m-%d)
 
-          # Fetch all jobs for the workflow run as a JSON array
-          gh api --paginate "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs" \
-            --jq "[.jobs[] | select(.name | startswith(\"${PREFIX}\"))]" > /tmp/jobs.json
-
-          # Build results JSON array: [{test, status}, ...]
-          jq --arg prefix "$PREFIX" '[
-            .[] |
-            (.name | ltrimstr($prefix)) as $test |
-            .conclusion as $c |
-            {
-              test: $test,
-              status: (if $c == "success" then "success"
-                       elif ($c == "timed_out" or $c == "cancelled") then "timeout"
-                       else "failure" end)
-            }
-          ]' /tmp/jobs.json > /tmp/results.json
-
-          # Update status.json
           jq --arg suite "$SUITE" \
              --arg date "$TODAY" \
              --argjson run_id "$RUN_ID" \
