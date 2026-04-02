@@ -115,6 +115,8 @@ jobs:
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
 
     - name: Run ScalarDL Jepsen test (${{ matrix.tests.nemesis }})
+      id: run-test
+      timeout-minutes: 180
       run: |
         docker exec jepsen-control bash -c "\
           cd /scalar-jepsen/scalardl && \
@@ -134,7 +136,9 @@ jobs:
     - name: Record result
       if: always()
       run: |
-        if docker exec jepsen-control bash -c "grep -q 'Everything looks good!' /scalar-jepsen/scalardl/store/latest/jepsen.log"; then
+        if [ "${{ steps.run-test.outcome }}" = "cancelled" ]; then
+          echo "${{ matrix.tests.name }}:timeout" > result-${{ matrix.tests.name }}.txt
+        elif docker exec jepsen-control bash -c "grep -q 'Everything looks good!' /scalar-jepsen/scalardl/store/latest/jepsen.log"; then
           echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}.txt
         else
           echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}.txt
@@ -185,21 +189,25 @@ jobs:
         run: |
           successes=""
           failures=""
+          timeouts=""
 
           for file in results/result-*.txt; do
+            [ -f "$file" ] || continue
             while read -r line; do
               name=$(echo "$line" | cut -d: -f1)
               status=$(echo "$line" | cut -d: -f2)
 
               if [ "$status" = "success" ]; then
                 successes="${successes}- $name\n"
+              elif [ "$status" = "timeout" ]; then
+                timeouts="${timeouts}- $name\n"
               else
                 failures="${failures}- $name\n"
               fi
             done < "$file"
           done
 
-          if [ -n "$failures" ]; then
+          if [ -n "$failures" ] || [ -n "$timeouts" ]; then
             icon=":fire:"
           else
             icon=":white_check_mark:"
@@ -210,6 +218,7 @@ jobs:
             printf "${icon} *ScalarDL tests completed*\n\n"
             printf "*Success:*\n%s\n" "$successes"
             printf "*Failed:*\n%s\n" "$failures"
+            printf "*Timed out:*\n%s\n" "$timeouts"
             printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
             echo "EOF"
           } >> $GITHUB_OUTPUT

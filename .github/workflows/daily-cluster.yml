@@ -403,6 +403,7 @@ jobs:
         EOF
 
     - name: ${{ matrix.tests.name }}
+      id: run-test
       timeout-minutes: 180
       run: |
         cd scalardb
@@ -439,7 +440,9 @@ jobs:
     - name: Record result
       if: always()
       run: |
-        if grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
+        if [ "${{ steps.run-test.outcome }}" = "cancelled" ]; then
+          echo "${{ matrix.tests.name }}:timeout" > result-${{ matrix.tests.name }}.txt
+        elif grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
           echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}.txt
         else
           echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}.txt
@@ -507,16 +510,18 @@ jobs:
 
               if [ "$status" = "success" ]; then
                 successes="${successes}- $name\n"
+              elif [ "$status" = "timeout" ]; then
+                timeouts="${timeouts}- $name\n"
               else
                 failures="${failures}- $name\n"
               fi
             done < "$file"
           done
 
-          # Detect missing tests (likely timed out)
+          # Detect missing results (likely timed out at job level)
           for test in "${expected_tests[@]}"; do
             if [ -z "${found_tests[$test]}" ]; then
-              timeouts="${timeouts}- $test\n"
+              timeouts="${timeouts}- $test (no result)\n"
             fi
           done
 
