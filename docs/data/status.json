@@ -1,9 +1,87 @@
 {
-  "last_updated": "2026-04-02T16:08:08Z",
+  "last_updated": "2026-04-02T21:58:19Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
-      "tests": {}
+      "tests": {
+        "GroupCommit": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "OnePhaseCommit_SI": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "OnePhaseCommit_Serializable": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "RCSI": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "RCSI_2PC": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "ReadCommitted": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "ReadCommitted_2PC": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "Serializable": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "Serializable_2PC": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "Transfers_2PC_SI": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ],
+        "Transfers_SI": [
+          {
+            "date": "2026-04-02",
+            "status": "success",
+            "run_id": 23919767332
+          }
+        ]
+      }
     },
     "scalardl": {
       "workflow": "Daily ScalarDL test",
