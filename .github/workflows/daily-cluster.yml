@@ -426,6 +426,7 @@ jobs:
         if [ "${{ matrix.tests.enable_client_side_optimizations }}" = "true" ]; then
           OPTS+=" --enable-cluster-client-side-optimizations"
         fi
+        set +e
         DOCKER_USERNAME=${{ github.repository_owner }} \
         DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} \
         lein with-profile cluster run test \
@@ -436,7 +437,9 @@ jobs:
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
           ${OPTS} > /dev/null 2>&1
+        EXIT_CODE=$?
         echo "done=true" >> $GITHUB_OUTPUT
+        exit $EXIT_CODE
 
     - name: Record result
       if: always()

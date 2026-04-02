@@ -193,6 +193,7 @@ jobs:
           OPTS+=" --enable-cluster-client-side-optimizations"
         fi
 
+        set +e
         docker exec jepsen-control bash -c "\
           cd /scalar-jepsen/scalardb && \
           lein with-profile cassandra run test \
@@ -200,7 +201,9 @@ jobs:
             --concurrency 5 \
             --time-limit ${{ matrix.tests.time_limit }} \
             --ssh-private-key ~/.ssh/id_rsa"
+        EXIT_CODE=$?
         echo "done=true" >> $GITHUB_OUTPUT
+        exit $EXIT_CODE
 
     - name: Save m2 cache from container
       if: always()
