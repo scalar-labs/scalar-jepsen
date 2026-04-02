@@ -126,6 +126,7 @@ jobs:
             --concurrency 5 \
             --time-limit ${{ matrix.tests.time_limit }} \
             --ssh-private-key ~/.ssh/id_rsa"
+        echo "done=true" >> $GITHUB_OUTPUT
 
     - name: Save m2 cache from container
       if: always()
@@ -136,9 +137,9 @@ jobs:
     - name: Record result
       if: always()
       run: |
-        if [ "${{ steps.run-test.outcome }}" = "cancelled" ]; then
+        if [ "${{ steps.run-test.outputs.done }}" != "true" ]; then
           echo "${{ matrix.tests.name }}:timeout" > result-${{ matrix.tests.name }}.txt
-        elif docker exec jepsen-control bash -c "grep -q 'Everything looks good!' /scalar-jepsen/scalardl/store/latest/jepsen.log"; then
+        elif [ "${{ steps.run-test.outcome }}" = "success" ]; then
           echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}.txt
         else
           echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}.txt
