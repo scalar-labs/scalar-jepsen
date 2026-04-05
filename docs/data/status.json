@@ -1,10 +1,15 @@
 {
-  "last_updated": "2026-04-05T15:55:02Z",
+  "last_updated": "2026-04-05T22:23:45Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
       "tests": {
         "GroupCommit": [
+          {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
           {
             "date": "2026-04-04",
             "status": "success",
@@ -23,6 +28,11 @@
         ],
         "OnePhaseCommit_SI": [
           {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
+          {
             "date": "2026-04-04",
             "status": "success",
             "run_id": 23986588434
@@ -39,6 +49,11 @@
           }
         ],
         "OnePhaseCommit_Serializable": [
+          {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
           {
             "date": "2026-04-04",
             "status": "success",
@@ -57,6 +72,11 @@
         ],
         "RCSI": [
           {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
+          {
             "date": "2026-04-04",
             "status": "success",
             "run_id": 23986588434
@@ -73,6 +93,11 @@
           }
         ],
         "RCSI_2PC": [
+          {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
           {
             "date": "2026-04-04",
             "status": "success",
@@ -91,6 +116,11 @@
         ],
         "ReadCommitted": [
           {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
+          {
             "date": "2026-04-04",
             "status": "success",
             "run_id": 23986588434
@@ -107,6 +137,11 @@
           }
         ],
         "ReadCommitted_2PC": [
+          {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
           {
             "date": "2026-04-04",
             "status": "success",
@@ -125,6 +160,11 @@
         ],
         "Serializable": [
           {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
+          {
             "date": "2026-04-04",
             "status": "success",
             "run_id": 23986588434
@@ -141,6 +181,11 @@
           }
         ],
         "Serializable_2PC": [
+          {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
           {
             "date": "2026-04-04",
             "status": "success",
@@ -159,6 +204,11 @@
         ],
         "Transfers_2PC_SI": [
           {
+            "date": "2026-04-05",
+            "status": "success",
+            "run_id": 24009434989
+          },
+          {
             "date": "2026-04-04",
             "status": "timeout",
             "run_id": 23986588434
@@ -175,6 +225,11 @@
           }
         ],
         "Transfers_SI": [
+          {
+            "date": "2026-04-05",
+            "status": "timeout",
+            "run_id": 24009434989
+          },
           {
             "date": "2026-04-04",
             "status": "success",
