@@ -426,6 +426,7 @@ jobs:
         if [ "${{ matrix.tests.enable_client_side_optimizations }}" = "true" ]; then
           OPTS+=" --enable-cluster-client-side-optimizations"
         fi
+        set +e
         DOCKER_USERNAME=${{ github.repository_owner }} \
         DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} \
         lein with-profile cluster run test \
@@ -436,13 +437,16 @@ jobs:
           --username runner \
           --ssh-private-key ~/.ssh/id_rsa \
           ${OPTS} > /dev/null 2>&1
+        EXIT_CODE=$?
+        echo "done=true" >> $GITHUB_OUTPUT
+        exit $EXIT_CODE
 
     - name: Record result
       if: always()
       run: |
-        if [ "${{ steps.run-test.outcome }}" = "cancelled" ]; then
+        if [ "${{ steps.run-test.outputs.done }}" != "true" ]; then
           echo "${{ matrix.tests.name }}:timeout" > result-${{ matrix.tests.name }}.txt
-        elif grep -q "Everything looks good!" scalardb/store/latest/jepsen.log; then
+        elif [ "${{ steps.run-test.outcome }}" = "success" ]; then
           echo "${{ matrix.tests.name }}:success" > result-${{ matrix.tests.name }}.txt
         else
           echo "${{ matrix.tests.name }}:failure" > result-${{ matrix.tests.name }}.txt
