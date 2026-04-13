@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-12T22:27:04Z",
+  "last_updated": "2026-04-13T13:34:39Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
@@ -814,6 +814,11 @@
       "tests": {
         "AlloyDB_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "timeout",
             "run_id": 24304252532
@@ -870,6 +875,11 @@
           }
         ],
         "AlloyDB_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "timeout",
@@ -928,6 +938,11 @@
         ],
         "ClientSideOptimizations": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -984,6 +999,11 @@
           }
         ],
         "Db2_Elle": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1042,6 +1062,11 @@
         ],
         "Db2_Transfers": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1098,6 +1123,11 @@
           }
         ],
         "GroupCommit": [
+          {
+            "date": "2026-04-13",
+            "status": "timeout",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1156,6 +1186,11 @@
         ],
         "MariaDB_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1212,6 +1247,11 @@
           }
         ],
         "MariaDB_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "timeout",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1270,6 +1310,11 @@
         ],
         "MySQL_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1326,6 +1371,11 @@
           }
         ],
         "MySQL_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1384,6 +1434,11 @@
         ],
         "OnePhaseCommit_SI": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1440,6 +1495,11 @@
           }
         ],
         "OnePhaseCommit_Serializable": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1498,6 +1558,11 @@
         ],
         "Oracle_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1554,6 +1619,11 @@
           }
         ],
         "Oracle_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1612,6 +1682,11 @@
         ],
         "RCSI": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1668,6 +1743,11 @@
           }
         ],
         "RCSI_2PC": [
+          {
+            "date": "2026-04-13",
+            "status": "timeout",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1726,6 +1806,11 @@
         ],
         "ReadCommitted": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1782,6 +1867,11 @@
           }
         ],
         "ReadCommitted_2PC": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1840,6 +1930,11 @@
         ],
         "SQLServer_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -1896,6 +1991,11 @@
           }
         ],
         "SQLServer_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -1954,6 +2054,11 @@
         ],
         "Serializable": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -2010,6 +2115,11 @@
           }
         ],
         "Serializable_2PC": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -2068,6 +2178,11 @@
         ],
         "TiDB_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "timeout",
             "run_id": 24304252532
@@ -2124,6 +2239,11 @@
           }
         ],
         "TiDB_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "failure",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -2182,6 +2302,11 @@
         ],
         "Transfers_2PC_SI": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "timeout",
             "run_id": 24304252532
@@ -2238,6 +2363,11 @@
           }
         ],
         "Transfers_SI": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
@@ -2296,6 +2426,11 @@
         ],
         "YugabyteDB_Elle": [
           {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
+          {
             "date": "2026-04-12",
             "status": "success",
             "run_id": 24304252532
@@ -2352,6 +2487,11 @@
           }
         ],
         "YugabyteDB_Transfers": [
+          {
+            "date": "2026-04-13",
+            "status": "success",
+            "run_id": 24338659778
+          },
           {
             "date": "2026-04-12",
             "status": "success",
