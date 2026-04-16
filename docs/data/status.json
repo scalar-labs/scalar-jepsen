@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-04-16T17:49:34Z",
+  "last_updated": "2026-04-16T19:15:14Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
@@ -881,7 +881,7 @@
         "nemesis-none": [
           {
             "date": "2026-04-16",
-            "status": "timeout",
+            "status": "success",
             "run_id": 24519367612
           },
           {
