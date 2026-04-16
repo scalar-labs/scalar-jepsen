@@ -10,6 +10,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      models: read
+
     strategy:
       fail-fast: false
       matrix:
@@ -159,6 +163,35 @@ jobs:
       if: always()
       run: |
         docker cp jepsen-control:/scalar-jepsen/scalardl/store store-${{ matrix.tests.name }} || true
+
+    - name: First-pass triage with GitHub Models
+      if: failure()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        LOG=store-${{ matrix.tests.name }}/current/jepsen.log
+        if [ ! -f "$LOG" ]; then
+          echo "No jepsen.log found at $LOG; skipping triage"
+          exit 0
+        fi
+        mkdir -p triage-${{ matrix.tests.name }}
+        python3 .github/scripts/triage.py \
+          --log "$LOG" \
+          --summary triage-${{ matrix.tests.name }}/triage.md
+
+    - name: Append triage summary
+      if: failure()
+      run: |
+        if [ -f triage-${{ matrix.tests.name }}/triage.md ]; then
+          cat triage-${{ matrix.tests.name }}/triage.md >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Upload triage
+      if: failure()
+      uses: actions/upload-artifact@v6
+      with:
+        name: triage-${{ matrix.tests.name }}
+        path: triage-${{ matrix.tests.name }}/triage.md
 
     - name: Upload logs
       if: always()
