@@ -22,7 +22,7 @@ ANALYSIS_ERRORS_NO_ANOMALIES_PAT = re.compile(
 )
 
 MODELS_API_URL = "https://models.github.ai/inference/chat/completions"
-MODEL_ID = "openai/gpt-4.1-mini"
+MODEL_ID = "openai/gpt-4o-mini"
 
 
 def load_lines(path: Path) -> list[str]:

@@ -252,6 +252,7 @@ jobs:
         python3 .github/scripts/triage.py \
           --log "$LOG" \
           --summary triage-${{ matrix.tests.name }}/triage.md
+      continue-on-error: true
 
     - name: Append triage summary
       if: failure()
@@ -266,6 +267,7 @@ jobs:
       with:
         name: triage-${{ matrix.tests.name }}
         path: triage-${{ matrix.tests.name }}/triage.md
+      continue-on-error: true
 
     - name: Upload logs
       if: always()
