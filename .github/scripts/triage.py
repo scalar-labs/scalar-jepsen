@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import collections
 import json
 import os
 import re
@@ -10,6 +11,7 @@ from urllib.error import HTTPError
 
 TAIL_LINES = 200
 MAX_LINE_LEN = 2000
+ERROR_SNIPPET_LIMIT = 120
 
 ERROR_PATTERNS = re.compile(
     r"(ERROR|Exception|timeout|timed out|refused|reset|broken pipe|ssh|failed|failure|crash)",
@@ -25,32 +27,26 @@ MODELS_API_URL = "https://models.github.ai/inference/chat/completions"
 MODEL_ID = "openai/gpt-4o-mini"
 
 
-def load_lines(path: Path) -> list[str]:
-    with path.open("r", encoding="utf-8", errors="replace") as f:
-        return [line.rstrip("\n") for line in f]
-
-
 def shorten(line: str, max_len: int = MAX_LINE_LEN) -> str:
     return line[:max_len]
 
 
-def last_nonempty_line(lines: list[str]) -> str:
-    for line in reversed(lines):
-        if line.strip():
-            return line.strip()
-    return ""
+def scan_log(path: Path) -> tuple[list[str], list[str], str]:
+    tail: collections.deque[str] = collections.deque(maxlen=TAIL_LINES)
+    errors: collections.deque[str] = collections.deque(maxlen=ERROR_SNIPPET_LIMIT)
+    last_nonempty = ""
 
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            line = raw.rstrip("\n")
+            tail.append(shorten(line))
+            if ERROR_PATTERNS.search(line):
+                errors.append(shorten(line))
+            stripped = line.strip()
+            if stripped:
+                last_nonempty = stripped
 
-def extract_tail(lines: list[str], n: int = TAIL_LINES) -> list[str]:
-    return [shorten(x) for x in lines[-n:]]
-
-
-def extract_error_snippets(lines: list[str], limit: int = 120) -> list[str]:
-    out = []
-    for line in lines:
-        if ERROR_PATTERNS.search(line):
-            out.append(shorten(line))
-    return out[-limit:]
+    return list(tail), list(errors), last_nonempty
 
 
 def categorize_final_line(final_line: str) -> str:
@@ -192,12 +188,8 @@ def main():
     log_path = Path(args.log)
     summary_path = Path(args.summary)
 
-    lines = load_lines(log_path)
-    final_line = last_nonempty_line(lines)
+    tail, errors, final_line = scan_log(log_path)
     category = categorize_final_line(final_line)
-
-    tail = extract_tail(lines, TAIL_LINES)
-    errors = extract_error_snippets(lines)
     result = call_github_models(final_line, category, tail, errors)
 
     md = []
