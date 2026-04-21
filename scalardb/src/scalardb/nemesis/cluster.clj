@@ -154,8 +154,8 @@
         (try
           (c/exec :kubectl :patch :networkchaos name
                   :-n "chaos-mesh"
-                  :--type "json"
-                  :-p "[{\"op\":\"remove\",\"path\":\"/metadata/finalizers\"}]"
+                  :--type "merge"
+                  :-p "{\"metadata\":{\"finalizers\":[]}}"
                   :--request-timeout "10s")
           (catch Exception e
             (warn "networkchaos finalizer patch failed (ignored)"
