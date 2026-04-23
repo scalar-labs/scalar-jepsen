@@ -14,7 +14,7 @@ MAX_LINE_LEN = 2000
 ERROR_SNIPPET_LIMIT = 50
 
 ERROR_PATTERNS = re.compile(
-    r"(ERROR|Exception|timeout|timed out|refused|reset|broken pipe|ssh|failed|failure|crash)",
+    r"(ERROR|Exception|WARN|timeout|timed out|refused|reset|broken pipe|ssh|failed|failure|crash)",
     re.IGNORECASE,
 )
 
