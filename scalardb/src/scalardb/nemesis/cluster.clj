@@ -142,7 +142,7 @@
 (defn- network-fault-exists?
   [name]
   (try
-    (c/exec :kubectl :get :networkchaos name :-n "chaos-mesh" :-o "name")
+    (c/exec :kubectl :get :networkchaos name :-n "chaos-mesh" :-o "name" :--request-timeout "10s")
     true
     (catch Exception _ false)))
 
