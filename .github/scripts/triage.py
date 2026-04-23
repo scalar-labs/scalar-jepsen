@@ -11,7 +11,7 @@ from urllib.error import HTTPError
 
 TAIL_LINES = 200
 MAX_LINE_LEN = 2000
-ERROR_SNIPPET_LIMIT = 120
+ERROR_SNIPPET_LIMIT = 50
 
 ERROR_PATTERNS = re.compile(
     r"(ERROR|Exception|timeout|timed out|refused|reset|broken pipe|ssh|failed|failure|crash)",
