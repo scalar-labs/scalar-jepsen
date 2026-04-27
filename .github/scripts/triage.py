@@ -24,7 +24,7 @@ ANALYSIS_ERRORS_NO_ANOMALIES_PAT = re.compile(
 )
 
 MODELS_API_URL = "https://models.github.ai/inference/chat/completions"
-MODEL_ID = "openai/gpt-4o-mini"
+MODEL_ID = "openai/gpt-4o-mini" # https://docs.github.com/en/billing/reference/costs-for-github-modelso
 
 
 def shorten(line: str, max_len: int = MAX_LINE_LEN) -> str:
