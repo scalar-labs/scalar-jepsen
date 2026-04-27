@@ -1,7 +1,7 @@
 (ns scalardb.nemesis.cluster
   (:require [clj-yaml.core :as yaml]
             [clojure.string :as str]
-            [clojure.tools.logging :refer [error info]]
+            [clojure.tools.logging :refer [error info warn]]
             [jepsen
              [control :as c]
              [generator :as gen]
@@ -10,6 +10,9 @@
             [jepsen.nemesis.combined :as jn]
             [jepsen.nemesis.time :as nt])
   (:import (java.io File)))
+
+(def ^:private ^:const MAX_RETRIES 5)
+(def ^:private ^:const SLEEP_MS 1000)
 
 (def ^:private ^:const POD_FAULT_YAML "./pod-fault.yaml")
 (def ^:private ^:const PARTITION_YAML "./partition.yaml")
@@ -136,20 +139,68 @@
   [pod-names]
   (mapv #(-> % time-fault-yaml delete-chaos-exp) pod-names))
 
+(defn- network-fault-exists?
+  [name]
+  (try
+    (c/exec :kubectl :get :networkchaos name :-n "chaos-mesh" :-o "name" :--request-timeout "10s")
+    true
+    (catch Exception _ false)))
+
+(defn- try-force-delete-network-fault
+  [name]
+  (loop [i 0]
+    (when (< i MAX_RETRIES)
+      (when (network-fault-exists? name)
+        (try
+          (c/exec :kubectl :patch :networkchaos name
+                  :-n "chaos-mesh"
+                  :--type "merge"
+                  :-p "{\"metadata\":{\"finalizers\":[]}}"
+                  :--request-timeout "10s")
+          (catch Exception e
+            (warn "networkchaos finalizer patch failed (ignored)"
+                  {:name name :retry i :error (.getMessage e)})))
+
+        (try
+          (c/exec :kubectl :delete :networkchaos name
+                  :-n "chaos-mesh"
+                  :--wait=false
+                  :--ignore-not-found=true
+                  :--request-timeout "10s")
+          (catch Exception e
+            (warn "networkchaos delete retry failed (ignored)"
+                  {:name name :retry i :error (.getMessage e)})))
+
+        (Thread/sleep SLEEP_MS)
+
+        (recur (inc i))))))
+
 (defn- force-delete-network-fault-exp
   [yaml-path]
   (binding [c/*dir* (System/getProperty "user.dir")]
     (let [file (File. yaml-path)]
       (when (.exists file)
-        (let [action (-> yaml-path slurp yaml/parse-string :spec :action)]
-          (c/exec :kubectl :patch "networkchaos" action
-                  :-n "chaos-mesh"
-                  :-p "{\"metadata\":{\"finalizers\":[]}}"
-                  :--type "merge"
-                  ;; Hack: Need the pipe to avoid reverting the finalizers before deletion
-                  c/|
-                  :kubectl :delete "networkchaos" action :-n "chaos-mesh"))
-        (.delete file)))))
+        (let [name (-> yaml-path slurp yaml/parse-string :metadata :name)]
+          (try
+            (c/exec :kubectl :delete :networkchaos name
+                    :-n "chaos-mesh"
+                    :--wait=false
+                    :--ignore-not-found=true
+                    :--request-timeout "10s")
+            (catch Exception e
+              (warn "networkchaos delete failed (ignored)"
+                    {:name name :error (.getMessage e)})))
+
+          ;; if the network chaos still exists,
+          ;; try to force delete it by removing finalizers for several times
+          (try-force-delete-network-fault name)
+
+          (when (network-fault-exists? name)
+            (warn "networkchaos still exists after best-effort cleanup"
+                  {:name name :yaml yaml-path}))
+
+          (when-not (.delete file)
+            (warn "failed to delete local chaos yaml file" {:yaml yaml-path})))))))
 
 (defn delete-partition-exp
   []
