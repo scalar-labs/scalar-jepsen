@@ -7,16 +7,15 @@
             [jepsen
              [control :as c]
              [db :as db]]
+            [jepsen.k8s.chaos-mesh.core :as cm]
             [scalardb.db.cluster-db.cluster-db :as cluster-db]
-            [scalardb.db-extend :as ext]
-            [scalardb.nemesis.cluster :as n])
+            [scalardb.db-extend :as ext])
   (:import (java.io File)
            (java.util Properties)))
 
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
 (def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "4.0.0-SNAPSHOT")
 (def ^:private ^:const DEFAULT_HELM_CHART_VERSION "1.7.2")
-(def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.2")
 
 (def ^:const WIPE_TIMEOUT "180s")
 (def ^:private ^:const TIMEOUT_SEC 600)
@@ -108,9 +107,6 @@
   ;; ScalarDB Cluster
   (c/exec :helm :repo :add
           "scalar-labs" "https://scalar-labs.github.io/helm-charts")
-  ;; Chaos mesh
-  (c/exec :helm :repo :add "chaos-mesh" "https://charts.chaos-mesh.org")
-
   (c/exec :helm :repo :update))
 
 (defn- configure!
@@ -126,13 +122,7 @@
               (str "--docker-username=" (env :docker-username))
               (str "--docker-password=" (env :docker-access-token)))))
 
-  (cluster-db/configure! backend-db)
-
-  ;; Chaos Mesh
-  (try
-    (c/exec :kubectl :get :namespaces "chaos-mesh")
-    (catch Exception _
-      (c/exec :kubectl :create :ns "chaos-mesh"))))
+  (cluster-db/configure! backend-db))
 
 (defn- start!
   [test backend-db]
@@ -157,13 +147,11 @@
               [CLUSTER_NAME]))
       (-> CLUSTER_VALUES_YAML File. .delete)))
 
-  ;; Chaos mesh
-  (c/exec :helm :install "chaos-mesh" "chaos-mesh/chaos-mesh"
-          :-n "chaos-mesh"
-          :--version DEFAULT_CHAOS_MESH_VERSION))
+  ;; Chaos Mesh
+  (cm/setup! test {}))
 
 (defn- wipe!
-  [backend-db]
+  [test backend-db]
   (info "wiping old logs...")
   (binding [c/*dir* (System/getProperty "user.dir")]
     (try
@@ -177,11 +165,11 @@
   (doseq [cmd [[:helm :uninstall CLUSTER_NAME
                 :--timeout WIPE_TIMEOUT :--ignore-not-found]
                [:helm :uninstall CLUSTER2_NAME
-                :--timeout WIPE_TIMEOUT :--ignore-not-found]
-               [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"
                 :--timeout WIPE_TIMEOUT :--ignore-not-found]]]
     (try (apply c/exec cmd)
-         (catch Exception e (warn e "Failed to exec:" cmd)))))
+         (catch Exception e (warn e "Failed to exec:" cmd))))
+  (try (cm/wipe! test {})
+       (catch Exception e (warn e "Failed to wipe Chaos Mesh"))))
 
 (defn- get-pod-list
   "Get the pod list whose name starts with prefix"
@@ -274,7 +262,7 @@
     db/DB
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe! backend-db))
+        (wipe! test backend-db))
       (install! backend-db)
       (configure! backend-db)
       (start! test backend-db)
@@ -283,23 +271,11 @@
 
     (teardown! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe! backend-db)))
+        (wipe! test backend-db)))
 
     db/Primary
     (primaries [_ test] (:nodes test))
     (setup-primary! [_ _ _])
-
-    db/Pause
-    (pause! [_ _ _]
-      (n/apply-pod-fault-exp :pause))
-    (resume! [_ _ _]
-      (n/delete-pod-fault-exp))
-
-    db/Kill
-    (start! [_ _ _]
-      (n/delete-pod-fault-exp))
-    (kill! [_ _ _]
-      (n/apply-pod-fault-exp :kill))
 
     db/LogFiles
     (log-files [_ test _]
@@ -360,5 +336,6 @@
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
   (let [backend-db (cluster-backend-db db-type opts)
-        db (ext/extend-db (db backend-db) (->ExtCluster backend-db))]
-    [db (n/nemesis-package db 60 faults) 1]))
+        db (ext/extend-db (db backend-db) (->ExtCluster backend-db))
+        nemesis (cm/nemesis-package db 60 faults)]
+    [db nemesis 1]))

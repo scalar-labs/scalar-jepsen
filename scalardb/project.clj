@@ -2,8 +2,8 @@
   :description "Jepsen testing for Scalar DB"
   :url "https://github.com/scalar-labs/scalar-jepsen"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [jepsen "0.3.3" :exclusions [net.java.dev.jna/jna
-                                              net.java.dev.jna/jna-platform]]
+                 [jepsen "0.3.10" :exclusions [net.java.dev.jna/jna
+                                               net.java.dev.jna/jna-platform]]
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
                  [org.slf4j/slf4j-jdk14 "2.0.6"]
@@ -35,7 +35,8 @@
                                                     com.oracle.database.jdbc/ojdbc8-production
                                                     com.azure/azure-cosmos
                                                     com.datastax.cassandra/cassandra-driver-core
-                                                    com.google.cloud/*]]]
+                                                    com.google.cloud/*]]
+                                      [com.scalar-labs/jepsen-k8s "0.1.0-SNAPSHOT"]]
                        :env {:cluster? "true"
                              :scalardb-cluster-version "4.0.0-SNAPSHOT"
                              :helm-chart-version "1.7.2"}}
