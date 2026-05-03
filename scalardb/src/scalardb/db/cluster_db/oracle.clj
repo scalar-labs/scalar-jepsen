@@ -1,6 +1,6 @@
 (ns scalardb.db.cluster-db.oracle
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -21,37 +21,31 @@
 
   (get-password [_] ORACLE_PASSWORD)
 
-  (install! [_]
-    (c/upload ORACLE_MANIFEST_YAML "/tmp"))
+  (install! [_ _])
 
-  (configure! [_]
-    (binding [c/*dir* (System/getProperty "user.dir")]
-      (try
-        (c/exec :kubectl :delete :secret "oracle-scalardb-cluster-secret")
-        ;; ignore the failure when the secret doesn't exist
-        (catch Exception _))
-      (c/exec :kubectl :create :secret :generic "oracle-scalardb-cluster-secret"
-              (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD))))
+  (configure! [_ test]
+    (try
+      (k8s/kubectl! test :delete :secret "oracle-scalardb-cluster-secret")
+      (catch Exception _))
+    (k8s/kubectl! test :create :secret :generic "oracle-scalardb-cluster-secret"
+                  (str "--from-literal=ORACLE_PASSWORD=" ORACLE_PASSWORD)))
 
-  (start! [_]
-    (c/exec :kubectl :apply :-f (str "/tmp/" ORACLE_MANIFEST_YAML))
-    (c/exec :kubectl :wait
-            "--for=condition=Ready"
-            "pod"
-            :-l (str "app=" ORACLE_NAME)
-            "--timeout=300s"))
+  (start! [_ test]
+    (k8s/kubectl! test :apply :-f ORACLE_MANIFEST_YAML)
+    (k8s/wait! test {:resource "pod"
+                     :selector {"app" ORACLE_NAME}
+                     :for "condition=Ready"}))
 
-  (wipe! [_]
-    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" ORACLE_MANIFEST_YAML)
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
-                 [:kubectl :delete :pvc "data-oracle-scalardb-cluster-0"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(k8s/kubectl! test :delete :-f ORACLE_MANIFEST_YAML
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
+                 #(k8s/kubectl! test :delete :pvc "data-oracle-scalardb-cluster-0"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-k8s-node-ip))]
+    (let [ip (get-k8s-node-ip test)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"
