@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-db.yugabytedb
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -21,42 +22,43 @@
 
   (get-password [_] YUGABYTEDB_PASSWORD)
 
-  (install! [_]
-    (c/exec :helm :repo :add "yugabytedb" "https://charts.yugabyte.com"))
+  (install! [_ test]
+    (helm/repo-add! test "yugabytedb" "https://charts.yugabyte.com"))
 
-  (configure! [_])
+  (configure! [_ _])
 
-  (start! [_]
-    (c/exec :helm :install YUGABYTEDB_NAME "yugabytedb/yugabyte"
-            :--set "replicas.master=1"
-            :--set "replicas.tserver=1"
-            :--set "replicas.totalMasters=1"
-            :--set "resource.master.requests.cpu=0.5"
-            :--set "resource.master.requests.memory=512Mi"
-            :--set "resource.master.limits.cpu=0.5"
-            :--set "resource.master.limits.memory=512Mi"
-            :--set "resource.tserver.requests.cpu=0.5"
-            :--set "resource.tserver.requests.memory=1Gi"
-            :--set "resource.tserver.limits.cpu=0.5"
-            :--set "resource.tserver.limits.memory=1Gi"
-            :--set "storage.master.count=1"
-            :--set "storage.master.size=1Gi"
-            :--set "storage.tserver.count=1"
-            :--set "storage.tserver.size=1Gi"
-            :--set "enableLoadBalancer=true"
-            :--version "2024.2.8"))
+  (start! [_ test]
+    (helm/install! test {:release YUGABYTEDB_NAME
+                         :chart "yugabytedb/yugabyte"
+                         :version "2024.2.8"
+                         :set {:replicas.master 1
+                               :replicas.tserver 1
+                               :replicas.totalMasters 1
+                               :resource.master.requests.cpu 0.5
+                               :resource.master.requests.memory "512Mi"
+                               :resource.master.limits.cpu 0.5
+                               :resource.master.limits.memory "512Mi"
+                               :resource.tserver.requests.cpu 0.5
+                               :resource.tserver.requests.memory "1Gi"
+                               :resource.tserver.limits.cpu 0.5
+                               :resource.tserver.limits.memory "1Gi"
+                               :storage.master.count 1
+                               :storage.master.size "1Gi"
+                               :storage.tserver.count 1
+                               :storage.tserver.size "1Gi"
+                               :enableLoadBalancer true}}))
 
-  (wipe! [_]
-    (doseq [cmd [[:helm :uninstall YUGABYTEDB_NAME
-                  :--timeout WIPE_TIMEOUT :--ignore-not-found]
-                 [:kubectl :delete :pvc :-l (str "release=" YUGABYTEDB_NAME)
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(helm/uninstall! test {:release YUGABYTEDB_NAME
+                                       :timeout WIPE_TIMEOUT
+                                       :ignore-not-found? true})
+                 #(k8s/kubectl! test :delete :pvc :-l (str "release=" YUGABYTEDB_NAME)
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip YUGABYTEDB_LB_SERVICE))]
+    (let [ip (get-load-balancer-ip test YUGABYTEDB_LB_SERVICE)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"
