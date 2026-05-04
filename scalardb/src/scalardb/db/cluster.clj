@@ -22,8 +22,7 @@
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
-(def ^:private ^:const CLUSTER_NODE_NAME (str CLUSTER_NAME "-node"))
-(def ^:private ^:const CLUSTER2_NODE_NAME (str CLUSTER2_NAME "-node"))
+(def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
@@ -150,19 +149,17 @@
        (catch Exception e (warn e "Failed to wipe Chaos Mesh"))))
 
 (defn- get-pod-list
-  "Get the pod list whose name starts with prefix"
-  [test prefix]
-  (->> (k8s/pods test {})
+  "Get names of running ScalarDB Cluster node pods across all releases."
+  [test]
+  (->> (k8s/pods test {:selector NODE_SELECTOR})
        :items
-       (filter #(str/starts-with? (get-in % [:metadata :name]) prefix))
        (filter #(= "Running" (get-in % [:status :phase])))
        (map #(get-in % [:metadata :name]))))
 
 (defn- get-logs
   [test]
   (let [dir (System/getProperty "user.dir")
-        pods (concat (get-pod-list test CLUSTER_NODE_NAME)
-                     (get-pod-list test CLUSTER2_NODE_NAME))
+        pods (get-pod-list test)
         logs (mapv #(str dir "/" % ".log") pods)]
     (mapv #(spit %1 (k8s/pod-logs! test {:pod %2})) logs pods)
     logs))
@@ -191,19 +188,17 @@
 (defn- running-pods?
   "Check a live node."
   [test]
-  (= (count (concat (get-pod-list test CLUSTER_NODE_NAME)
-                    (get-pod-list test CLUSTER2_NODE_NAME)))
+  (= (count (get-pod-list test))
      (if (need-two-clusters? test) 6 3)))
 
 (defn- cluster-nodes-ready?
   [test]
   (and (running-pods? test)
        (try
-         (->> (concat (get-pod-list test CLUSTER_NODE_NAME)
-                      (get-pod-list test CLUSTER2_NODE_NAME))
-              (mapv #(k8s/wait! test {:resource (str "pod/" %)
-                                      :for "condition=Ready"
-                                      :timeout "120s"})))
+         (k8s/wait! test {:resource "pod"
+                          :selector NODE_SELECTOR
+                          :for "condition=Ready"
+                          :timeout "120s"})
          true
          (catch Exception e
            (warn e "An error occurred")
