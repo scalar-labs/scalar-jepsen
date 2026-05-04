@@ -64,8 +64,8 @@
                      :for "condition=Provisioned"}))
 
   (wipe! [_ test]
-    (doseq [cmd [#(k8s/kubectl! test :patch "dbcluster" ALLOYDB_NAME
-                                :--type=merge :-p "{\"spec\":{\"isDeleted\":true}}")
+    (doseq [cmd [#(k8s/patch! test "dbcluster" ALLOYDB_NAME
+                              "{\"spec\":{\"isDeleted\":true}}")
                  #(k8s/kubectl! test :delete :-f ALLOYDB_MANIFEST_YAML
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(helm/uninstall! test {:release "cert-manager"
