@@ -30,7 +30,8 @@
    "tidb" :tidb
    "sqlserver" :sqlserver
    "oracle" :oracle
-   "db2" :db2})
+   "db2" :db2
+   "managed" :managed})
 
 (def workload-keys
   "A map of test workload keys."
@@ -100,6 +101,10 @@
 
    [nil "--config-file CONFIG_FILE"
     "ScalarDB config file. When this is given, other configuration options are ignored."
+    :default ""]
+
+   [nil "--managed-db-config FILE"
+    "YAML file with managed DB connection details (host, port, database, username, password). Required for managed DB types like aurora-postgres."
     :default ""]])
 
 (defn- test-name
@@ -111,7 +116,7 @@
 
 (defn- gen-db
   "Returns [extended-db constructed-nemesis num-max-nodes]."
-  [db-type faults admin]
+  [opts db-type faults admin]
   (let [gen-db-sym (if (= (env :cluster?) "true")
                      (do (require 'scalardb.db.cluster)
                          'scalardb.db.cluster/gen-db)
@@ -122,7 +127,7 @@
                                       'scalardb.db.postgres/gen-db)
                        (throw (ex-info "Unsupported DB" {:db db-type}))))
         gen-db-fn (resolve gen-db-sym)]
-    (gen-db-fn faults admin db-type)))
+    (gen-db-fn faults admin db-type opts)))
 
 (defn- gen-test-opt-spec
   []
@@ -144,7 +149,7 @@
 
 (defn scalardb-test
   [base-opts db-type workload-key faults admin]
-  (let [[db nemesis max-nodes] (gen-db db-type faults admin)
+  (let [[db nemesis max-nodes] (gen-db base-opts db-type faults admin)
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
                              scalardb-opts

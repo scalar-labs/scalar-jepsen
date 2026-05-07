@@ -9,3 +9,4 @@ docker/keys/
 */.clj-kondo
 */.lein-*
 */.lsp
+managed.yaml

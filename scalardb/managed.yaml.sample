@@ -1,0 +1,18 @@
+# Sample managed DB connection config.
+# Copy this file to managed.yaml (gitignored), fill in your details, and pass
+# it with --db managed --managed-db-config managed.yaml.
+
+# --- Option A: build the JDBC URL from parts ---
+# 'subprotocol' picks the JDBC driver. 'port' and 'database' are optional;
+# defaults are provided for postgresql (5432, "postgres") and mysql (3306, "jepsen").
+subprotocol: postgresql
+host: your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com
+# port: 5432
+# database: postgres
+
+# --- Option B: provide the full JDBC URL (overrides Option A) ---
+# Use this when you need SSL or other JDBC parameters.
+# jdbc-url: jdbc:postgresql://your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com:5432/postgres?ssl=true&sslmode=require
+
+username: postgres
+password: changeme
