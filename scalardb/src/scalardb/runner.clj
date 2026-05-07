@@ -104,7 +104,7 @@
     :default ""]
 
    [nil "--managed-db-config FILE"
-    "YAML file with managed DB connection details (host, port, database, username, password). Required for managed DB types like aurora-postgres."
+    "YAML file with managed DB connection details. Supported fields include host, port, database, username, password, jdbc-url (full override), and subprotocol (used to build the JDBC URL with defaults). Required for managed DB types like aurora-postgres."
     :default ""]])
 
 (defn- test-name
