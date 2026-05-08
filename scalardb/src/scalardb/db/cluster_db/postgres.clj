@@ -41,8 +41,8 @@
 
   (wipe! [_ test]
     (doseq [cmd [#(helm/uninstall! test {:release POSTGRESQL_NAME
-                                       :timeout WIPE_TIMEOUT
-                                       :ignore-not-found? true})
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete
                                 :pvc
                                 :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"
