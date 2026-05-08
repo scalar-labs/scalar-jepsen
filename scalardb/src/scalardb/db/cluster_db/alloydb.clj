@@ -69,15 +69,15 @@
                  #(k8s/kubectl! test :delete :-f ALLOYDB_MANIFEST_YAML
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(helm/uninstall! test {:release "cert-manager"
-                                        :namespace CERT_MANAGER_NAMESPACE
-                                        :timeout WIPE_TIMEOUT
-                                        :ignore-not-found? true})
+                                         :namespace CERT_MANAGER_NAMESPACE
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete :namespace CERT_MANAGER_NAMESPACE
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(helm/uninstall! test {:release ALLOYDB_OPERATOR_NAME
-                                        :namespace ALLOYDB_OPERATOR_NAMESPACE
-                                        :timeout WIPE_TIMEOUT
-                                        :ignore-not-found? true})
+                                         :namespace ALLOYDB_OPERATOR_NAMESPACE
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete :namespace ALLOYDB_OPERATOR_NAMESPACE
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(.delete (File. (operator-tgz)))]]

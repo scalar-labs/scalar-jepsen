@@ -23,8 +23,8 @@
 
   (install! [_ test]
     (helm/repo-add! test
-            "simcube"
-            "https://simcubeltd.github.io/simcube-helm-charts"))
+                    "simcube"
+                    "https://simcubeltd.github.io/simcube-helm-charts"))
 
   (configure! [_ _])
 
@@ -41,8 +41,8 @@
 
   (wipe! [_ test]
     (doseq [cmd [#(helm/uninstall! test {:release SQLSERVER_NAME
-                                       :timeout WIPE_TIMEOUT
-                                       :ignore-not-found? true})
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete
                                 :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]

@@ -50,8 +50,8 @@
 
   (wipe! [_ test]
     (doseq [cmd [#(helm/uninstall! test {:release YUGABYTEDB_NAME
-                                       :timeout WIPE_TIMEOUT
-                                       :ignore-not-found? true})
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete :pvc :-l (str "release=" YUGABYTEDB_NAME)
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
       (try (cmd)

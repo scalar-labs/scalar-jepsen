@@ -43,8 +43,8 @@
 
   (wipe! [_ test]
     (doseq [cmd [#(helm/uninstall! test {:release MARIADB_NAME
-                                       :timeout WIPE_TIMEOUT
-                                       :ignore-not-found? true})
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete :pvc "data-mariadb-scalardb-cluster-0"
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
       (try (cmd)
