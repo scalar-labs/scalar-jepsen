@@ -15,7 +15,7 @@
   (get-storage-type [_] "jdbc")
 
   (get-contact-points [_]
-    "jdbc:postgresql://yb-tservers.default.svc.cluster.local:5433/yugabyte")
+    "jdbc:yugabytedb://yb-tservers.default.svc.cluster.local:5433/yugabyte")
 
   (get-username [_] YUGABYTEDB_USER)
 
@@ -60,7 +60,7 @@
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"
-                      (str "jdbc:postgresql://" ip ":5433/yugabyte"))
+                      (str "jdbc:yugabytedb://" ip ":5433/yugabyte"))
         (.setProperty "scalar.db.username" YUGABYTEDB_USER)
         (.setProperty "scalar.db.password" YUGABYTEDB_PASSWORD)))))
 
