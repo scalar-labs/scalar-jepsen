@@ -1,18 +1,41 @@
 # Sample managed DB connection config.
 # Copy this file to managed.yaml (gitignored), fill in your details, and pass
 # it with --db managed --managed-db-config managed.yaml.
+#
+# Pick ONE of the storage blocks below and delete the others.
 
-# --- Option A: build the JDBC URL from parts ---
-# 'subprotocol' picks the JDBC driver. 'port' and 'database' are optional;
-# defaults are provided for postgresql (5432, "postgres") and mysql (3306, "jepsen").
+# ============================================================
+# Example A: JDBC (Aurora Postgres / MySQL, Cloud SQL, etc.)
+# ============================================================
+storage: jdbc
+
+# Option A1: build the JDBC URL from parts.
+# port and database default per subprotocol (postgresql: 5432/postgres,
+# mysql: 3306/jepsen).
 subprotocol: postgresql
 host: your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com
 # port: 5432
 # database: postgres
 
-# --- Option B: provide the full JDBC URL (overrides Option A) ---
+# Option A2: provide the full JDBC URL (overrides A1).
 # Use this when you need SSL or other JDBC parameters.
-# jdbc-url: jdbc:postgresql://your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com:5432/postgres?ssl=true&sslmode=require
+# contact-points: jdbc:postgresql://your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com:5432/postgres?ssl=true&sslmode=require
 
 username: postgres
 password: changeme
+
+# ============================================================
+# Example B: Amazon DynamoDB
+# ============================================================
+# storage: dynamo
+# contact-points: us-east-1                # AWS region
+# username: AKIAxxxxxxxxxxxxxxxx           # AWS_ACCESS_KEY_ID
+# password: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # AWS_SECRET_ACCESS_KEY
+
+# ============================================================
+# Example C: Azure Cosmos DB for NoSQL
+# ============================================================
+# storage: cosmos
+# contact-points: https://your-account.documents.azure.com:443/   # Cosmos DB URI
+# password: your-cosmos-primary-key                                # Cosmos DB key
+# username is not required for cosmos
