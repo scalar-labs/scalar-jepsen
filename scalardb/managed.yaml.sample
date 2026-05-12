@@ -39,3 +39,11 @@ password: changeme
 # contact-points: https://your-account.documents.azure.com:443/   # Cosmos DB URI
 # password: your-cosmos-primary-key                                # Cosmos DB key
 # username is not required for cosmos
+
+# ============================================================
+# Example D: External Cassandra cluster
+# ============================================================
+# storage: cassandra
+# contact-points: cass-node-1,cass-node-2,cass-node-3   # comma-separated host(s)
+# username: cassandra
+# password: cassandra

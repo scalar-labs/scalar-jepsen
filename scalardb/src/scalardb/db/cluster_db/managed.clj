@@ -1,19 +1,20 @@
 (ns scalardb.db.cluster-db.managed
   "Backend for externally-provisioned managed DBs (e.g., AWS Aurora, Aurora
-  MySQL, Amazon DynamoDB, Azure Cosmos DB for NoSQL).
-  install!/configure!/start!/wipe! are no-ops; connection details come from a
-  user-supplied YAML file passed via --managed-db-config.
+  MySQL, Amazon DynamoDB, Azure Cosmos DB for NoSQL, an external Cassandra
+  cluster). install!/configure!/start!/wipe! are no-ops; connection details
+  come from a user-supplied YAML file passed via --managed-db-config.
 
   YAML schema:
-    storage:        Required. One of 'jdbc', 'dynamo', 'cosmos'.
+    storage:        Required. One of 'jdbc', 'dynamo', 'cosmos', 'cassandra'.
     contact-points: For storage=jdbc, an explicit JDBC URL (alternative to
                     subprotocol+host below). For storage=dynamo, the AWS
-                    region. For storage=cosmos, the Cosmos DB URI.
+                    region. For storage=cosmos, the Cosmos DB URI. For
+                    storage=cassandra, comma-separated host(s).
     subprotocol, host, port, database:
                     For storage=jdbc only. If contact-points is not given, the
                     URL is built as jdbc:<subprotocol>://<host>:<port>/<db>.
                     Defaults are provided for postgresql/mysql.
-    username:       Required for jdbc and dynamo. Ignored for cosmos.
+    username:       Required for jdbc, dynamo, and cassandra. Ignored for cosmos.
     password:       Required."
   (:require [clj-yaml.core :as yaml]
             [clojure.tools.logging :refer [info warn]]
@@ -21,7 +22,7 @@
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
 
-(def ^:private valid-storages #{"jdbc" "dynamo" "cosmos"})
+(def ^:private valid-storages #{"jdbc" "dynamo" "cosmos" "cassandra"})
 
 (def ^:private subprotocol-defaults
   "Default port and database per JDBC subprotocol."
@@ -47,13 +48,13 @@
                      "or both 'subprotocol' and 'host'")
                 {:path path})))
 
-      ("dynamo" "cosmos")
+      ("dynamo" "cosmos" "cassandra")
       (when-not contact-points
         (throw (ex-info
                 (str "Managed DB config (" storage
                      "): 'contact-points' is required")
                 {:path path}))))
-    (when (and (#{"jdbc" "dynamo"} storage) (not username))
+    (when (and (#{"jdbc" "dynamo" "cassandra"} storage) (not username))
       (throw (ex-info (str "Managed DB config (" storage
                            "): 'username' is required")
                       {:path path})))
