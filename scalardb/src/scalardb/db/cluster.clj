@@ -339,18 +339,26 @@
    :tidb      'scalardb.db.cluster-db.tidb/gen-cluster-db
    :sqlserver 'scalardb.db.cluster-db.sqlserver/gen-cluster-db
    :oracle    'scalardb.db.cluster-db.oracle/gen-cluster-db
-   :db2       'scalardb.db.cluster-db.db2/gen-cluster-db})
+   :db2       'scalardb.db.cluster-db.db2/gen-cluster-db
+   :managed   'scalardb.db.cluster-db.managed/gen-cluster-db})
+
+(def ^:private managed-db-types
+  "DB types whose backend is provisioned outside the test (e.g., AWS Aurora).
+  Their constructors receive the test options so they can read the user-supplied
+  --managed-db-config YAML file."
+  #{:managed})
 
 (defn- cluster-backend-db
-  [db-type]
+  [db-type opts]
   (if-let [v (get dbtype->gen-var db-type)]
-    ((requiring-resolve v))
+    (let [f (requiring-resolve v)]
+      (if (managed-db-types db-type) (f opts) (f)))
     (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
 
 (defn gen-db
-  [faults admin db-type]
+  [faults admin db-type & [opts]]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
-  (let [backend-db (cluster-backend-db db-type)
+  (let [backend-db (cluster-backend-db db-type opts)
         db (ext/extend-db (db backend-db) (->ExtCluster backend-db))]
     [db (n/nemesis-package db 60 faults) 1]))

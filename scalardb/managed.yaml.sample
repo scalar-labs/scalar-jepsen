@@ -1,0 +1,49 @@
+# Sample managed DB connection config.
+# Copy this file to managed.yaml (gitignored), fill in your details, and pass
+# it with --db managed --managed-db-config managed.yaml.
+#
+# Pick ONE of the storage blocks below and delete the others.
+
+# ============================================================
+# Example A: JDBC (Aurora Postgres / MySQL, Cloud SQL, etc.)
+# ============================================================
+storage: jdbc
+
+# Option A1: build the JDBC URL from parts.
+# port and database default per subprotocol (postgresql: 5432/postgres,
+# mysql: 3306/jepsen).
+subprotocol: postgresql
+host: your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com
+# port: 5432
+# database: postgres
+
+# Option A2: provide the full JDBC URL (overrides A1).
+# Use this when you need SSL or other JDBC parameters.
+# contact-points: jdbc:postgresql://your-cluster.cluster-xxxxxxxx.us-east-1.rds.amazonaws.com:5432/postgres?ssl=true&sslmode=require
+
+username: postgres
+password: changeme
+
+# ============================================================
+# Example B: Amazon DynamoDB
+# ============================================================
+# storage: dynamo
+# contact-points: us-east-1                # AWS region
+# username: AKIAxxxxxxxxxxxxxxxx           # AWS_ACCESS_KEY_ID
+# password: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # AWS_SECRET_ACCESS_KEY
+
+# ============================================================
+# Example C: Azure Cosmos DB for NoSQL
+# ============================================================
+# storage: cosmos
+# contact-points: https://your-account.documents.azure.com:443/   # Cosmos DB URI
+# password: your-cosmos-primary-key                                # Cosmos DB key
+# username is not required for cosmos
+
+# ============================================================
+# Example D: External Cassandra cluster
+# ============================================================
+# storage: cassandra
+# contact-points: cass-node-1,cass-node-2,cass-node-3   # comma-separated host(s)
+# username: cassandra
+# password: cassandra
