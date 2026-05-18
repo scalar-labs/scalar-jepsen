@@ -269,6 +269,20 @@ jobs:
         path: triage-${{ matrix.tests.name }}/triage.md
       continue-on-error: true
 
+    - name: Create JIRA ticket on failure
+      if: failure()
+      env:
+        JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
+        JIRA_ASSIGNEE_ID: ${{ secrets.JIRA_ASSIGNEE_ID }}
+      run: |
+        bash .github/scripts/create_jira_ticket.sh \
+          "${{ matrix.tests.name }}" \
+          "ScalarDB" \
+          "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          "${{ github.sha }}" \
+          "triage-${{ matrix.tests.name }}/triage.md"
+      continue-on-error: true
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v6
