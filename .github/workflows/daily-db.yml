@@ -243,14 +243,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        LOG=store-${{ matrix.tests.name }}/current/jepsen.log
-        if [ ! -f "$LOG" ]; then
-          echo "No jepsen.log found at $LOG; skipping triage"
-          exit 0
-        fi
-        mkdir -p triage-${{ matrix.tests.name }}
         python3 .github/scripts/triage.py \
-          --log "$LOG" \
+          --log store-${{ matrix.tests.name }}/current/jepsen.log \
           --summary triage-${{ matrix.tests.name }}/triage.md
       continue-on-error: true
 
@@ -299,16 +293,22 @@ jobs:
       - name: Install GitHub CLI
         run: sudo apt-get install -y gh
 
-      - name: Download result artifacts only
+      - name: Download result and triage artifacts
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          mkdir -p results
+          mkdir -p results triages
           gh api --paginate repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
             --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
             while read name; do
               echo "Downloading $name"
               gh run download ${{ github.run_id }} -n "$name" -D results -R "${{ github.repository }}"
+            done
+          gh api --paginate repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq '.artifacts[] | select(.name | startswith("triage-")) | .name' | \
+            while read name; do
+              echo "Downloading $name"
+              gh run download ${{ github.run_id }} -n "$name" -D "triages/${name#triage-}" -R "${{ github.repository }}" || true
             done
 
       - name: Generate Slack message
@@ -324,6 +324,14 @@ jobs:
           expected_tests=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
             --paginate --jq '.jobs[] | select(.name | startswith("DB-")) | .name | sub("^DB-"; "")')
 
+          # Extract the triage label for a given test, if any.
+          get_label() {
+            local triage="triages/$1/triage.md"
+            [ -f "$triage" ] || return
+            grep -E '^- label:' "$triage" | head -n1 \
+              | sed -E 's/.*\*\*([^*]+)\*\*.*/\1/'
+          }
+
           found_tests=""
           for file in results/result-*.txt; do
             [ -f "$file" ] || continue
@@ -334,10 +342,15 @@ jobs:
 
               if [ "$status" = "success" ]; then
                 successes="${successes}- $name\n"
-              elif [ "$status" = "timeout" ]; then
-                timeouts="${timeouts}- $name\n"
               else
-                failures="${failures}- $name\n"
+                label=$(get_label "$name")
+                suffix=""
+                [ -n "$label" ] && suffix=" ($label)"
+                if [ "$status" = "timeout" ]; then
+                  timeouts="${timeouts}- $name$suffix\n"
+                else
+                  failures="${failures}- $name$suffix\n"
+                fi
               fi
             done < "$file"
           done

@@ -179,6 +179,20 @@ ERROR_SNIPPETS:
     return parse_json_content(content)
 
 
+def write_no_log_summary(summary_path: Path, log_path: Path) -> None:
+    md = [
+        "## Jepsen triage",
+        "",
+        "- label: **NO_JEPSEN_LOG**",
+        "",
+        "### reasoning",
+        f"No jepsen.log was found at `{log_path}`; "
+        "the test likely failed before Jepsen could write a log.",
+        "",
+    ]
+    summary_path.write_text("\n".join(md), encoding="utf-8")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--log", required=True)
@@ -187,6 +201,13 @@ def main():
 
     log_path = Path(args.log)
     summary_path = Path(args.summary)
+
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not log_path.is_file():
+        print(f"No jepsen.log at {log_path}; emitting NO_JEPSEN_LOG triage")
+        write_no_log_summary(summary_path, log_path)
+        return
 
     tail, errors, final_line = scan_log(log_path)
     category = categorize_final_line(final_line)
