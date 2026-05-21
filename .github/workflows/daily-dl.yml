@@ -169,14 +169,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        LOG=store-${{ matrix.tests.name }}/current/jepsen.log
-        if [ ! -f "$LOG" ]; then
-          echo "No jepsen.log found at $LOG; skipping triage"
-          exit 0
-        fi
-        mkdir -p triage-${{ matrix.tests.name }}
         python3 .github/scripts/triage.py \
-          --log "$LOG" \
+          --log store-${{ matrix.tests.name }}/current/jepsen.log \
           --summary triage-${{ matrix.tests.name }}/triage.md
       continue-on-error: true
 
@@ -195,6 +189,20 @@ jobs:
         path: triage-${{ matrix.tests.name }}/triage.md
       continue-on-error: true
 
+    - name: Create JIRA ticket on failure
+      if: failure()
+      env:
+        JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
+        JIRA_ASSIGNEE_ID: ${{ secrets.JIRA_ASSIGNEE_ID }}
+      run: |
+        bash .github/scripts/create_jira_ticket.sh \
+          "${{ matrix.tests.name }}" \
+          "ScalarDL" \
+          "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          "${{ github.sha }}" \
+          "triage-${{ matrix.tests.name }}/triage.md"
+      continue-on-error: true
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v6
@@ -207,63 +215,9 @@ jobs:
     if: always()
     needs: daily-dl
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
-      - name: Install GitHub CLI
-        run: sudo apt-get install -y gh
-
-      - name: Download result artifacts only
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          mkdir -p results
-          gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-            --jq '.artifacts[] | select(.name | startswith("result-")) | .name' | \
-            while read name; do
-              echo "Downloading $name"
-              gh run download ${{ github.run_id }} -n "$name" -D results -R "${{ github.repository }}"
-            done
-
-      - name: Generate Slack message
-        id: message
-        run: |
-          successes=""
-          failures=""
-          timeouts=""
-
-          for file in results/result-*.txt; do
-            [ -f "$file" ] || continue
-            while read -r line; do
-              name=$(echo "$line" | cut -d: -f1)
-              status=$(echo "$line" | cut -d: -f2)
-
-              if [ "$status" = "success" ]; then
-                successes="${successes}- $name\n"
-              elif [ "$status" = "timeout" ]; then
-                timeouts="${timeouts}- $name\n"
-              else
-                failures="${failures}- $name\n"
-              fi
-            done < "$file"
-          done
-
-          if [ -n "$failures" ] || [ -n "$timeouts" ]; then
-            icon=":fire:"
-          else
-            icon=":white_check_mark:"
-          fi
-
-          {
-            echo "message<<EOF"
-            printf "${icon} *ScalarDL tests completed*\n\n"
-            printf "*Success:*\n%s\n" "$successes"
-            printf "*Failed:*\n%s\n" "$failures"
-            printf "*Timed out:*\n%s\n" "$timeouts"
-            printf "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\n"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Post to Slack
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\": \"${{ steps.message.outputs.message }}\"}" \
-            ${{ secrets.SLACK_WEBHOOK_URL }}
+      - uses: actions/checkout@v6
+      - run: bash .github/scripts/notify_slack.sh "ScalarDL" "DL-"
