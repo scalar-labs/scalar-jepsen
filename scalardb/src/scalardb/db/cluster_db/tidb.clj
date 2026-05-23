@@ -46,9 +46,9 @@
                  #(k8s/kubectl! test :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(helm/uninstall! test {:release TIDB_OPERATOR_NAME
-                                        :namespace "tidb-admin"
-                                        :timeout WIPE_TIMEOUT
-                                        :ignore-not-found? true})
+                                         :namespace "tidb-admin"
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
                  #(k8s/kubectl! test :delete :namespace "tidb-admin"
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(k8s/kubectl! test :delete :-f TIDB_CRD_URL
