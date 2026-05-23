@@ -119,9 +119,15 @@ jobs:
         EOF
 
     - name: ScalarDB Cluster test
+      env:
+        DOCKER_USERNAME: ${{ github.repository_owner }}
+        DOCKER_ACCESS_TOKEN: ${{ secrets.CR_PAT }}
       run: |
         cd scalardb
-        DOCKER_USERNAME=${{ github.repository_owner }} DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} lein with-profile cluster run test --workload transfer --nodes localhost --db postgres --username runner --ssh-private-key ~/.ssh/id_rsa --nemesis crash
+        lein with-profile cluster run test \
+          --workload transfer \
+          --db postgres \
+          --nemesis crash
 
     - name: Check test result
       run: |
