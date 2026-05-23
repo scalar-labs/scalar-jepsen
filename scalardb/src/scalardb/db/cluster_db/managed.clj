@@ -92,16 +92,16 @@
 
   (get-password [_] (or (:password config) ""))
 
-  (install! [_]
+  (install! [_ _]
     (info "Managed DB; skipping install"))
 
-  (configure! [_]
+  (configure! [_ _]
     (info "Managed DB; skipping configure"))
 
-  (start! [_]
+  (start! [_ _]
     (info "Managed DB; skipping start"))
 
-  (wipe! [_]
+  (wipe! [_ _]
     (warn "Managed DB; skipping wipe."
           " Existing test data is not cleaned up automatically."))
 

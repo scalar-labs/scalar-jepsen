@@ -1,6 +1,5 @@
 (ns scalardb.db.cluster-db.db2
-  (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.k8s.core :as k8s]
+  (:require [jepsen.k8s.core :as k8s]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
