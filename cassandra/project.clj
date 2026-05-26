@@ -5,11 +5,11 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clojure/java.jmx "0.3.1"]
-                 [jepsen "0.3.3" :exclusions [net.java.dev.jna/jna
-                                              net.java.dev.jna/jna-platform]]
+                 [jepsen "0.3.10" :exclusions [net.java.dev.jna/jna
+                                               net.java.dev.jna/jna-platform]]
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
-                 [cc.qbits/alia "4.3.6"]
+                 [cc.qbits/alia "5.0.0" :exclusions [org.slf4j/slf4j-api]]
                  [cc.qbits/hayt "4.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
                    :plugins [[lein-cloverage "1.1.2"]]}}

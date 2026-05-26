@@ -16,7 +16,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
@@ -31,7 +31,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :add :value 1})]
       (is (spy/called-with? alia/execute
@@ -52,7 +52,7 @@
                                          (when (contains? cql :select)
                                            [{:id 0 :count 123}])))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (spy/called-with? alia/execute
@@ -78,7 +78,7 @@
                                                    {:type ::execute
                                                     :exception (ReadTimeoutException. nil nil 0 0 false)})))))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
@@ -93,7 +93,7 @@
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
                                                    :exception (WriteTimeoutException. nil nil WriteType/COUNTER 0 0)})))))]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :add :value 1})]
@@ -110,7 +110,7 @@
                                                    {:type ::execute
                                                     :exception (UnavailableException. nil nil 0 0)})))))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
@@ -126,7 +126,7 @@
                                                    {:type ::execute
                                                     :exception (NoHostAvailableException. {})})))))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->CQLCounterClient (atom false) nil nil :quorum)
+    (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
