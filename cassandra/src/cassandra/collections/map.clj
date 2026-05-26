@@ -9,12 +9,10 @@
             [cassandra.core :as cass])
   (:import (clojure.lang ExceptionInfo)))
 
-(defrecord CQLMapClient [tbl-created? cluster session writec]
+(defrecord CQLMapClient [tbl-created? session writec]
   client/Client
   (open! [_ test _]
-    (let [cluster (alia/cluster {:contact-points (:nodes test)})
-          session (alia/connect cluster)]
-      (->CQLMapClient tbl-created? cluster session writec)))
+    (->CQLMapClient tbl-created? (cass/open-cassandra test) writec))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -57,13 +55,13 @@
         (cass/handle-exception op e))))
 
   (close! [_ _]
-    (cass/close-cassandra cluster session))
+    (cass/close-cassandra session))
 
   (teardown! [_ _]))
 
 (defn workload
   [_]
-  {:client (->CQLMapClient (atom false) nil nil :quorum)
+  {:client (->CQLMapClient (atom false) nil :quorum)
    :generator [(cass/adds)]
    :final-generator (cass/read-once)
    :checker (checker/set)})

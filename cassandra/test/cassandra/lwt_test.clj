@@ -14,7 +14,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
@@ -30,7 +30,7 @@
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :update)
                                            [{lwt/ak true}])))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :cas
@@ -52,7 +52,7 @@
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :update)
                                            [{lwt/ak true}])))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :write
@@ -76,7 +76,7 @@
                                            [{lwt/ak false}]
                                            (when (contains? cql :insert)
                                              [{lwt/ak true}]))))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :write
@@ -103,7 +103,7 @@
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:id 0 :value 4}])))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :read
@@ -129,7 +129,7 @@
                                   (throw (ex-info  "Timed out"
                                                    {:type ::execute
                                                     :exception (ReadTimeoutException. nil nil 0 0 false)})))))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :read
@@ -146,7 +146,7 @@
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
                                                    :exception (WriteTimeoutException. nil nil WriteType/CAS 0 0)})))))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :write
@@ -163,7 +163,7 @@
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
                                                     :exception (UnavailableException. nil nil 0 0)})))))]
-    (let [client (client/open! (->CasRegisterClient (atom false) nil nil)
+    (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :read

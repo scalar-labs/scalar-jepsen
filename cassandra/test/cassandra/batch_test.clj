@@ -14,7 +14,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
@@ -28,7 +28,7 @@
   (with-redefs [alia/cluster (spy/spy)
                 alia/connect (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :add :value 1})]
       (is (spy/called-with? alia/execute
@@ -55,7 +55,7 @@
                                             {:pid 1 :cid 0 :value 1}
                                             {:pid 1 :cid 1 :value 1}])))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (spy/called-with? alia/execute
@@ -80,7 +80,7 @@
                                             {:pid 1 :cid 0 :value 1}
                                             {:pid 1 :cid 1 :value 1}])))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
@@ -95,7 +95,7 @@
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
                                                    :exception (WriteTimeoutException. nil nil WriteType/BATCH_LOG 0 0)})))))]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
                                      {:type :invoke :f :add :value 1})]
@@ -112,7 +112,7 @@
                                                    {:type ::execute
                                                     :exception (UnavailableException. nil nil 0 0)})))))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))
@@ -128,7 +128,7 @@
                                                    {:type ::execute
                                                     :exception (NoHostAvailableException. {})})))))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))

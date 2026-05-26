@@ -20,12 +20,10 @@
 (defn w [_ _] {:type :invoke :f :write :value (rand-int 5)})
 (defn cas [_ _] {:type :invoke :f :cas :value [(rand-int 5) (rand-int 5)]})
 
-(defrecord CasRegisterClient [tbl-created? cluster session]
+(defrecord CasRegisterClient [tbl-created? session]
   client/Client
   (open! [_ test _]
-    (let [cluster (alia/cluster {:contact-points (:nodes test)})
-          session (alia/connect cluster)]
-      (->CasRegisterClient tbl-created? cluster session)))
+    (->CasRegisterClient tbl-created? (cass/open-cassandra test)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -87,13 +85,13 @@
         (cass/handle-exception op e true))))
 
   (close! [_ _]
-    (cass/close-cassandra cluster session))
+    (cass/close-cassandra session))
 
   (teardown! [_ _]))
 
 (defn workload
   [opts]
-  {:client (->CasRegisterClient (atom false) nil nil)
+  {:client (->CasRegisterClient (atom false) nil)
    :generator (independent/concurrent-generator
                (:concurrency opts)
                (range)
