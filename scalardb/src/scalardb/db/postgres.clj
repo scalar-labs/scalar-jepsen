@@ -133,7 +133,7 @@
                         "main: background writer"
                         "main: walwriter"
                         "main: autovacuum launcher"])]
-        (Thread/sleep (rand-int 100))
+        (Thread/sleep (long (rand-int 100)))
         (info "Killing" pattern "-" (cu/grepkill! pattern))))
 
     db/LogFiles

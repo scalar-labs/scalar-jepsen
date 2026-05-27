@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-db.mariadb
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
@@ -22,36 +23,35 @@
 
   (get-password [_] MARIADB_PASSWORD)
 
-  (install! [_]
-    (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami"))
+  (install! [_ test]
+    (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 
-  (configure! [_])
+  (configure! [_ _])
 
-  (start! [_]
-    (c/exec :helm :install MARIADB_NAME "bitnami/mariadb"
-            :--set (str "auth.rootPassword=" MARIADB_PASSWORD)
-            :--set (str "auth.database=" scalar/KEYSPACE)
-            :--set "primary.persistence.enabled=true"
-            ;; Need an external IP for storage APIs
-            :--set "primary.service.type=LoadBalancer"
-            ;; Use legacy images
-            :--set "image.repository=bitnamilegacy/mariadb"
-            :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-            :--set "metrics.image.repository=bitnamilegacy/mysqld-exporter"
-            :--set "global.security.allowInsecureImages=true"
-            :--version "24.1.1"))
+  (start! [_ test]
+    (helm/install! test {:release MARIADB_NAME
+                         :chart "bitnami/mariadb"
+                         :version "24.1.1"
+                         :set {:auth.rootPassword MARIADB_PASSWORD
+                               :auth.database scalar/KEYSPACE
+                               :primary.persistence.enabled true
+                               :primary.service.type "LoadBalancer"
+                               :image.repository "bitnamilegacy/mariadb"
+                               :volumePermissions.image.repository "bitnamilegacy/os-shell"
+                               :metrics.image.repository "bitnamilegacy/mysqld-exporter"
+                               :global.security.allowInsecureImages true}}))
 
-  (wipe! [_]
-    (doseq [cmd [[:helm :uninstall MARIADB_NAME
-                  :--timeout WIPE_TIMEOUT :--ignore-not-found]
-                 [:kubectl :delete :pvc "data-mariadb-scalardb-cluster-0"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(helm/uninstall! test {:release MARIADB_NAME
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
+                 #(k8s/kubectl! test :delete :pvc "data-mariadb-scalardb-cluster-0"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip MARIADB_NAME))]
+    (let [ip (get-load-balancer-ip test MARIADB_NAME)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

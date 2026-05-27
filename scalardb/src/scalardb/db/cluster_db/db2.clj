@@ -1,5 +1,5 @@
 (ns scalardb.db.cluster-db.db2
-  (:require [jepsen.control :as c]
+  (:require [jepsen.k8s.core :as k8s]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
@@ -22,36 +22,31 @@
 
   (get-password [_] DB2_PASSWORD)
 
-  (install! [_]
-    (c/upload DB2_MANIFEST_YAML "/tmp"))
+  (install! [_ _])
 
-  (configure! [_]
-    (binding [c/*dir* (System/getProperty "user.dir")]
-      (try
-        (c/exec :kubectl :delete :secret "db2-scalardb-cluster-secret")
-        ;; ignore the failure when the secret doesn't exist
-        (catch Exception _))
-      (c/exec :kubectl :create :secret :generic "db2-scalardb-cluster-secret"
-              (str "--from-literal=DB2INST1_PASSWORD=" DB2_PASSWORD))))
+  (configure! [_ test]
+    (try
+      (k8s/kubectl! test :delete :secret "db2-scalardb-cluster-secret")
+      (catch Exception _))
+    (k8s/kubectl! test :create :secret :generic "db2-scalardb-cluster-secret"
+                  (str "--from-literal=DB2INST1_PASSWORD=" DB2_PASSWORD)))
 
-  (start! [_]
-    (c/exec :kubectl :apply :-f (str "/tmp/" DB2_MANIFEST_YAML))
-    (c/exec :kubectl :wait
-            "--for=condition=Ready"
-            "pod"
-            :-l (str "app=" DB2_NAME)
-            "--timeout=600s"))
+  (start! [_ test]
+    (k8s/kubectl! test :apply :-f DB2_MANIFEST_YAML)
+    (k8s/wait! test {:resource "pod"
+                     :selector {"app" DB2_NAME}
+                     :for "condition=Ready"
+                     :timeout "600s"}))
 
-  (wipe! [_]
-    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" DB2_MANIFEST_YAML)
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
-                 [:kubectl :delete :pvc "data-db2-scalardb-cluster-0"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd) (catch Exception _ nil))))
+  (wipe! [_ test]
+    (doseq [cmd [#(k8s/kubectl! test :delete :-f DB2_MANIFEST_YAML
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
+                 #(k8s/kubectl! test :delete :pvc "data-db2-scalardb-cluster-0"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd) (catch Exception _ nil))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-k8s-node-ip))]
+    (let [ip (get-k8s-node-ip test)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

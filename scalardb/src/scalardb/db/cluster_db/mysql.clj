@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-db.mysql
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
@@ -22,36 +23,35 @@
 
   (get-password [_] MYSQL_PASSWORD)
 
-  (install! [_]
-    (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami"))
+  (install! [_ test]
+    (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 
-  (configure! [_])
+  (configure! [_ _])
 
-  (start! [_]
-    (c/exec :helm :install MYSQL_NAME "bitnami/mysql"
-            :--set (str "auth.rootPassword=" MYSQL_PASSWORD)
-            :--set (str "auth.database=" scalar/KEYSPACE)
-            :--set "primary.persistence.enabled=true"
-            ;; Need an external IP for storage APIs
-            :--set "primary.service.type=LoadBalancer"
-            ;; Use legacy images
-            :--set "image.repository=bitnamilegacy/mysql"
-            :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-            :--set "metrics.image.repository=bitnamilegacy/mysqld-exporter"
-            :--set "global.security.allowInsecureImages=true"
-            :--version "14.0.3"))
+  (start! [_ test]
+    (helm/install! test {:release MYSQL_NAME
+                         :chart "bitnami/mysql"
+                         :version "14.0.3"
+                         :set {:auth.rootPassword MYSQL_PASSWORD
+                               :auth.database scalar/KEYSPACE
+                               :primary.persistence.enabled true
+                               :primary.service.type "LoadBalancer"
+                               :image.repository "bitnamilegacy/mysql"
+                               :volumePermissions.image.repository "bitnamilegacy/os-shell"
+                               :metrics.image.repository "bitnamilegacy/mysqld-exporter"
+                               :global.security.allowInsecureImages true}}))
 
-  (wipe! [_]
-    (doseq [cmd [[:helm :uninstall MYSQL_NAME
-                  :--timeout WIPE_TIMEOUT :--ignore-not-found]
-                 [:kubectl :delete :pvc "data-mysql-scalardb-cluster-0"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(helm/uninstall! test {:release MYSQL_NAME
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
+                 #(k8s/kubectl! test :delete :pvc "data-mysql-scalardb-cluster-0"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip MYSQL_NAME))]
+    (let [ip (get-load-balancer-ip test MYSQL_NAME)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

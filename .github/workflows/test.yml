@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Buildx
       id: buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Setup Cache
       uses: satackey/action-docker-layer-caching@v0.0.11
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     # Need ssh to the localhost
     - name: Install SSH server
@@ -61,9 +61,9 @@ jobs:
         sudo service ssh restart
 
     - name: Setup Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v5
       with:
-        java-version: '11'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Install leiningen
@@ -72,7 +72,7 @@ jobs:
         lein: latest
 
     - name: Cache m2 repository
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
@@ -119,9 +119,15 @@ jobs:
         EOF
 
     - name: ScalarDB Cluster test
+      env:
+        DOCKER_USERNAME: ${{ github.repository_owner }}
+        DOCKER_ACCESS_TOKEN: ${{ secrets.CR_PAT }}
       run: |
         cd scalardb
-        DOCKER_USERNAME=${{ github.repository_owner }} DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} lein with-profile cluster run test --workload transfer --nodes localhost --db postgres --username runner --ssh-private-key ~/.ssh/id_rsa --nemesis crash
+        lein with-profile cluster run test \
+          --workload transfer \
+          --db postgres \
+          --nemesis crash
 
     - name: Check test result
       run: |
@@ -134,7 +140,7 @@ jobs:
 
     - name: Upload logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: jepsen-logs
         path: scalardb/store

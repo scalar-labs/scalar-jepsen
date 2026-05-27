@@ -9,12 +9,10 @@
             [cassandra.core :as cass])
   (:import (clojure.lang ExceptionInfo)))
 
-(defrecord CQLSetClient [tbl-created? cluster session writec]
+(defrecord CQLSetClient [tbl-created? session writec]
   client/Client
   (open! [_ test _]
-    (let [cluster (alia/cluster {:contact-points (:nodes test)})
-          session (alia/connect cluster)]
-      (->CQLSetClient tbl-created? cluster session writec)))
+    (->CQLSetClient tbl-created? (cass/open-cassandra test) writec))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -39,14 +37,14 @@
                                           (clause/set-columns
                                            {:elements [+ #{(:value op)}]})
                                           (clause/where [[= :id 0]]))
-                               {:consistency writec})
+                               {:consistency-level writec})
                  (assoc op :type :ok))
         :read (do (cass/wait-rf-nodes test)
                   (let [value (->> (alia/execute session
                                                  (st/select
                                                   :sets
                                                   (clause/where [[= :id 0]]))
-                                                 {:consistency :all})
+                                                 {:consistency-level :all})
                                    first
                                    :elements
                                    (into (sorted-set)))]
@@ -56,13 +54,13 @@
         (cass/handle-exception op e))))
 
   (close! [_ _]
-    (cass/close-cassandra cluster session))
+    (cass/close-cassandra session))
 
   (teardown! [_ _]))
 
 (defn workload
   [_]
-  {:client (->CQLSetClient (atom false) nil nil :quorum)
+  {:client (->CQLSetClient (atom false) nil :quorum)
    :generator [(cass/adds)]
    :final-generator (cass/read-once)
    :checker (checker/set)})

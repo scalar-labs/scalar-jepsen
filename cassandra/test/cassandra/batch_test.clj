@@ -5,16 +5,14 @@
             [cassandra.core :as cass]
             [cassandra.batch :as batch :refer (->BatchSetClient)]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core WriteType)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                WriteTimeoutException
-                                                UnavailableException)))
+  (:import (com.datastax.oss.driver.api.core NoNodeAvailableException)
+           (com.datastax.oss.driver.api.core.servererrors WriteTimeoutException
+                                                          WriteType)))
 
 (deftest batch-client-init-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)]
       (client/setup! client {:rf 3})
       (is (true? @(.tbl-created? client)))
@@ -25,10 +23,9 @@
       (is (spy/called-n-times? alia/execute 3)))))
 
 (deftest batch-client-add-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :add :value 1})]
       (is (spy/called-with? alia/execute
@@ -40,12 +37,11 @@
                                  "INSERT INTO bat (pid, cid, value) VALUES (1,0,1); "
                                  "INSERT INTO bat (pid, cid, value) VALUES (1,1,1); "
                                  "APPLY BATCH;")
-                            {:consistency :quorum}))
+                            {:consistency-level :quorum}))
       (is (= :ok (:type result))))))
 
 (deftest batch-client-read-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:pid 0 :cid 0 :value 0}
@@ -55,7 +51,7 @@
                                             {:pid 1 :cid 0 :value 1}
                                             {:pid 1 :cid 1 :value 1}])))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (spy/called-with? alia/execute
@@ -65,13 +61,12 @@
                             "session"
                             {:select :bat
                              :columns :*}
-                            {:consistency :all}))
+                            {:consistency-level :all}))
       (is (= :ok (:type result)))
       (is (= #{0 1 2} (:value result))))))
 
 (deftest batch-client-read-fail-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:pid 0 :cid 0 :value 0}
@@ -80,55 +75,37 @@
                                             {:pid 1 :cid 0 :value 1}
                                             {:pid 1 :cid 1 :value 1}])))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
       (is (= [#{0 1 2} #{0 1}] (:value result))))))
 
 (deftest batch-client-write-timeout-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (and (string? cql) (re-find #"BATCH" cql))
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil WriteType/BATCH_LOG 0 0)})))))]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG)})))))]
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
                                      {:type :invoke :f :add :value 1})]
       (is (= :info (:type add-result)))
       (is (= :write-timed-out (:error add-result))))))
 
-(deftest batch-client-unavailable-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+(deftest batch-client-no-node-available-exception-test
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
-                                                    :exception (UnavailableException. nil nil 0 0)})))))
+                                                    :exception (NoNodeAvailableException.)})))))
                 cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
-                               {:nodes ["n1" "n2" "n3"]} nil)
-          read-result (client/invoke! client {} {:type :invoke :f :read})]
-      (is (= :fail (:type read-result)))
-      (is (= :unavailable (:error read-result))))))
-
-(deftest batch-client-no-host-available-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
-                alia/execute (spy/mock
-                              (fn [_ cql & _]
-                                (when (contains? cql :select)
-                                  (throw (ex-info  "Unavailable"
-                                                   {:type ::execute
-                                                    :exception (NoHostAvailableException. {})})))))
-                cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->BatchSetClient (atom false) nil nil)
+    (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))

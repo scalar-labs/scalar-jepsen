@@ -435,11 +435,8 @@ jobs:
         DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} \
         lein with-profile cluster run test \
           --time-limit ${{ matrix.tests.time_limit }} \
-          --nodes localhost \
           --db ${{ matrix.tests.backend_db }} \
           --concurrency 5 \
-          --username runner \
-          --ssh-private-key ~/.ssh/id_rsa \
           ${OPTS} > /dev/null 2>&1
         EXIT_CODE=$?
         echo "done=true" >> $GITHUB_OUTPUT

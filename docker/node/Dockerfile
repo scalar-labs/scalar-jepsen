@@ -1,11 +1,12 @@
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 RUN apt-get -y -q update && \
     apt-get install -y \
     sudo \
+    build-essential \
     openssh-server \
     psmisc \
-    python \
+    python3 \
     ntpdate \
     gnupg \
     iproute2 \

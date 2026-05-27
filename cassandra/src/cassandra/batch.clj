@@ -7,12 +7,10 @@
             [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)))
 
-(defrecord BatchSetClient [tbl-created? cluster session]
+(defrecord BatchSetClient [tbl-created? session]
   client/Client
   (open! [_ test _]
-    (let [cluster (alia/cluster {:contact-points (map name (:nodes test))})
-          session (alia/connect cluster)]
-      (->BatchSetClient tbl-created? cluster session)))
+    (->BatchSetClient tbl-created? (cass/open-cassandra test)))
 
   (setup! [_ test]
     (locking tbl-created?
@@ -37,12 +35,12 @@
                                   "INSERT INTO bat (pid, cid, value) VALUES ("
                                   value ",1," value "); "
                                   "APPLY BATCH;")
-                             {:consistency :quorum})
+                             {:consistency-level :quorum})
                (assoc op :type :ok))
         :read (do (cass/wait-rf-nodes test)
                   (let [results (alia/execute session
                                               (st/select :bat)
-                                              {:consistency :all})
+                                              {:consistency-level :all})
                         value-a (->> results
                                      (filter (fn [ret] (= (:cid ret) 0)))
                                      (map :value)
@@ -59,13 +57,13 @@
         (cass/handle-exception op e))))
 
   (close! [_ _]
-    (cass/close-cassandra cluster session))
+    (cass/close-cassandra session))
 
   (teardown! [_ _]))
 
 (defn workload
   [_]
-  {:client (->BatchSetClient (atom false) nil nil)
+  {:client (->BatchSetClient (atom false) nil)
    :generator [(cass/adds)]
    :final-generator (cass/read-once)
    :checker (checker/set)})

@@ -150,6 +150,7 @@
 (defn scalardb-test
   [base-opts db-type workload-key faults admin]
   (let [[db nemesis max-nodes] (gen-db base-opts db-type faults admin)
+        ssh (if (= (env :cluster?) "true") {:dummy? true} (:ssh base-opts))
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
                              scalardb-opts
@@ -159,6 +160,7 @@
     (merge tests/noop-test
            workload-opts
            {:name (test-name workload-key faults admin)
+            :ssh ssh
             :client (:client workload)
             :db db
             :pure-generators true
