@@ -3,7 +3,7 @@
   :url "https://github.com/scalar-labs/scalar-jepsen"
   :license {:name ""
             :url ""}
-  :dependencies [[org.clojure/clojure "1.11.1"]
+  :dependencies [[org.clojure/clojure "1.12.5"]
                  [jepsen "0.3.10" :exclusions [com.fasterxml.jackson.core/jackson-annotations
                                                com.fasterxml.jackson.core/jackson-core
                                                net.java.dev.jna/jna
