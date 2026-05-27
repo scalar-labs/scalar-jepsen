@@ -351,11 +351,11 @@ jobs:
     - name: Setup Java
       uses: actions/setup-java@v5
       with:
-        java-version: '11'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Install leiningen
-      uses: DeLaGuardo/setup-clojure@13.5.3
+      uses: DeLaGuardo/setup-clojure@13
       with:
         lein: latest
 
