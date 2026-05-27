@@ -48,7 +48,8 @@
     (live-nodes [_ _] ["n1" "n2" "n3"])
     (wait-for-recovery [_ _])
     (create-table-opts [_ _])
-    (create-properties [_ _])))
+    (create-properties [_ _])
+    (create-storage-properties [_ _])))
 
 (def mock-storage
   (reify

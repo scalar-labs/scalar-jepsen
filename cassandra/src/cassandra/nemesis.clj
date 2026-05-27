@@ -90,7 +90,7 @@
 
       (teardown! [_ test]
         (when-let [ns @nodes]
-          (for [node (reorder-restarting-nodes ns test)]
+          (doseq [node (reorder-restarting-nodes ns test)]
             (c/on node (stop! test node)))
           (reset! nodes nil))))))
 

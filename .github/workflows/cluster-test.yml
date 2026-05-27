@@ -116,7 +116,7 @@ jobs:
         distribution: 'temurin'
 
     - name: Install leiningen
-      uses: DeLaGuardo/setup-clojure@13.0
+      uses: DeLaGuardo/setup-clojure@13
       with:
         lein: latest
 
@@ -225,7 +225,7 @@ jobs:
 
     - name: Upload logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: jepsen-logs
         path: scalardb/store

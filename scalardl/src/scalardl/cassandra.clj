@@ -18,13 +18,14 @@
 (defn committed?
   "Return true/false when the transaction has been committed or aborted"
   [txid {:keys [cass-nodes]}]
-  (let [cluster (alia/cluster {:contact-points cass-nodes})
-        rows (try (alia/execute (alia/connect cluster)
+  (let [session (alia/session {:contact-points (mapv #(str %1 ":9042") cass-nodes)
+                               :load-balancing-local-datacenter "datacenter1"})
+        rows (try (alia/execute session
                                 (st/select :coordinator.state
                                            (clause/where {:tx_id txid}))
-                                {:consistency :serial})
+                                {:consistency-level :serial})
                   (catch Exception e (throw e))
-                  (finally (alia/shutdown cluster)))]
+                  (finally (cassandra/close-cassandra session)))]
     (= (-> rows first :tx_state) TX_COMMITTED)))
 
 (defn spinup-cassandra!
@@ -45,8 +46,9 @@
 (defn create-tables
   [test]
   (info "creating tables")
-  (let [cluster (alia/cluster {:contact-points (:cass-nodes test)})
-        session (alia/connect cluster)]
+  (let [session (alia/session {:contact-points (mapv #(str %1 ":9042")
+                                                     (:cass-nodes test))
+                               :load-balancing-local-datacenter "datacenter1"})]
     (doto session
       (cassandra/create-my-keyspace test {:keyspace "scalar"})
       (cassandra/create-my-table {:keyspace "scalar"
@@ -132,4 +134,4 @@
                                            :tx_state      :int
                                            :tx_created_at :bigint
                                            :primary-key   [:tx_id]}}))
-    (cassandra/close-cassandra cluster session)))
+    (cassandra/close-cassandra session)))

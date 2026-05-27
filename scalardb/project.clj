@@ -1,9 +1,9 @@
 (defproject scalardb "0.1.0-SNAPSHOT"
   :description "Jepsen testing for Scalar DB"
   :url "https://github.com/scalar-labs/scalar-jepsen"
-  :dependencies [[org.clojure/clojure "1.11.1"]
-                 [jepsen "0.3.3" :exclusions [net.java.dev.jna/jna
-                                              net.java.dev.jna/jna-platform]]
+  :dependencies [[org.clojure/clojure "1.12.5"]
+                 [jepsen "0.3.10" :exclusions [net.java.dev.jna/jna
+                                               net.java.dev.jna/jna-platform]]
                  [net.java.dev.jna/jna "5.11.0"]
                  [net.java.dev.jna/jna-platform "5.11.0"]
                  [org.slf4j/slf4j-jdk14 "2.0.6"]
