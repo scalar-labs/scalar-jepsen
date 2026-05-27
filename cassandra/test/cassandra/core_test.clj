@@ -7,8 +7,12 @@
             [cassandra.core :as cass]
             [qbits.alia :as alia]
             [spy.core :as spy])
+<<<<<<< HEAD
   (:import (com.datastax.oss.driver.api.core DriverTimeoutException
                                              NoNodeAvailableException)
+=======
+  (:import (com.datastax.oss.driver.api.core NoNodeAvailableException)
+>>>>>>> f02ac27 (cassandra tests)
            (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
                                                           WriteTimeoutException
                                                           WriteType)
@@ -221,6 +225,7 @@
 (deftest handle-exception-test
   (let [op {}
         cas-timeout (ex-info "Write timed out for CAS"
+<<<<<<< HEAD
                              {}
                              (WriteTimeoutException. nil nil 0 0 WriteType/CAS))
         simple-timeout (ex-info "Write timed out for SIMPLE"
@@ -244,6 +249,39 @@
                               (ReadTimeoutException. nil nil 0 0 false))
         driver-timeout (ex-info "Driver timed out" {} (DriverTimeoutException. ""))
         no-node (ex-info "No node available" {} (NoNodeAvailableException.))]
+=======
+                             {:type :execute
+                              :exception
+                              (WriteTimeoutException. nil nil
+                                                      0 0
+                                                      WriteType/CAS)})
+        simple-timeout (ex-info "Write timed out for SIMPLE"
+                                {:type :execute
+                                 :exception
+                                 (WriteTimeoutException. nil nil
+                                                         0 0
+                                                         WriteType/SIMPLE)})
+        batch-log-timeout (ex-info "Write timed out for BATCH_LOG"
+                                   {:type :execute
+                                    :exception
+                                    (WriteTimeoutException. nil nil
+                                                            0 0
+                                                            WriteType/BATCH_LOG)})
+        batch-timeout (ex-info "Write timed out for BATCH"
+                               {:type :execute
+                                :exception
+                                (WriteTimeoutException. nil nil
+                                                        0 0
+                                                        WriteType/BATCH)})
+
+        read-timeout (ex-info "Read timed out"
+                              {:type :execute
+                               :exception (ReadTimeoutException. nil nil
+                                                                 0 0 false)})
+        no-host (ex-info "No host available"
+                         {:type :execute
+                          :exception (NoNodeAvailableException.)})]
+>>>>>>> f02ac27 (cassandra tests)
     (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op cas-timeout true)))
     (is (= {:type :ok}
@@ -260,7 +298,12 @@
            (cass/handle-exception op unlogged-batch-timeout)))
     (is (= {:type :fail :error :read-timed-out}
            (cass/handle-exception op read-timeout)))
+<<<<<<< HEAD
     (is (= {:type :info :error :driver-timed-out}
            (cass/handle-exception op driver-timeout)))
     (is (= {:type :fail :error :no-node-available}
            (cass/handle-exception op no-node)))))
+=======
+    (is (= {:type :fail :error :no-host-available}
+           (cass/handle-exception op no-host)))))
+>>>>>>> f02ac27 (cassandra tests)

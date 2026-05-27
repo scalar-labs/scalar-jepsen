@@ -141,8 +141,13 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
+<<<<<<< HEAD
                                                   {}
                                                   (WriteTimeoutException. nil nil 0 0 WriteType/CAS))))))]
+=======
+                                                  {:type ::execute
+                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/CAS)})))))]
+>>>>>>> f02ac27 (cassandra tests)
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
@@ -157,12 +162,21 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
+<<<<<<< HEAD
                                                    {}
                                                    (NoNodeAvailableException.))))))]
+=======
+                                                   {:type ::execute
+                                                    :exception (NoNodeAvailableException.)})))))]
+>>>>>>> f02ac27 (cassandra tests)
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :read
                                   :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
+<<<<<<< HEAD
       (is (= :no-node-available (:error result))))))
+=======
+      (is (= :no-host-available (:error result))))))
+>>>>>>> f02ac27 (cassandra tests)
