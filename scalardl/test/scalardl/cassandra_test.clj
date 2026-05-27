@@ -9,21 +9,25 @@
 
 (deftest committed-test
   (with-redefs [alia/session (spy/stub "session")
+                alia/close (spy/stub nil)
                 alia/execute (spy/stub [{:tx_state TX_COMMITTED}])]
     (is (true? (cassandra/committed? "txid" {:cass-nodes ["localhost"]})))))
 
 (deftest committed-when-aborted-test
   (with-redefs [alia/session (spy/stub "session")
+                alia/close (spy/stub nil)
                 alia/execute (spy/stub [{:tx_state TX_ABORTED}])]
     (is (false? (cassandra/committed? "txid" {:cass-nodes ["localhost"]})))))
 
 (deftest committed-when-no-state-test
   (with-redefs [alia/session (spy/stub "session")
+                alia/close (spy/stub nil)
                 alia/execute (spy/stub [])]
     (is (false? (cassandra/committed? "txid" {:cass-nodes ["localhost"]})))))
 
 (deftest committed-when-read-fail-test
   (with-redefs [alia/session (spy/stub "session")
+                alia/close (spy/stub nil)
                 alia/execute (spy/mock (fn [_ _ _]
                                          (throw (ex-info "fail" {}))))]
     (is (thrown? clojure.lang.ExceptionInfo
