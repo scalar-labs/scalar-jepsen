@@ -119,8 +119,8 @@
         local-file (second (re-find #"file://(.+)" url))
         tpath (if local-file "file:///tmp/cassandra.tar.gz" url)]
     (install-jdk-with-retry)
-    ;; latest cqlsh
-    (c/exec :pip3 :install :--break-system-packages "cqlsh")
+    ;; Need the latest cqlsh for python 3.12
+    (c/su (c/exec :pip3 :install :--break-system-packages "cqlsh"))
     (info node "installing Cassandra from" url)
     (when local-file
       (c/upload local-file "/tmp/cassandra.tar.gz"))
