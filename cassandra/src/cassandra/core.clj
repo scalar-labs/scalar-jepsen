@@ -16,7 +16,7 @@
             [qbits.hayt.dsl.clause :as clause]
             [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)
-           (com.datastax.oss.driver.api.core AllNodesFailedException)
+           (com.datastax.oss.driver.api.core NoNodeAvailableException)
            (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
                                                           WriteTimeoutException
                                                           WriteType)
@@ -324,10 +324,10 @@
                                                        :error :write-timed-out)
                               (assoc op :type :fail :error :write-timed-out))
       ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
-      AllNodesFailedException (do
-                                (info "All the servers are down - waiting 2s")
-                                (Thread/sleep 2000)
-                                (assoc op
-                                       :type :fail
-                                       :error :no-host-available))
+      NoNodeAvailableException (do
+                                 (info "All the servers are down - waiting 2s")
+                                 (Thread/sleep 2000)
+                                 (assoc op
+                                        :type :fail
+                                        :error :no-host-available))
       (assoc op :type :fail :error (.getMessage ex)))))

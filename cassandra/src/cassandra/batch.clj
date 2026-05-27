@@ -35,12 +35,12 @@
                                   "INSERT INTO bat (pid, cid, value) VALUES ("
                                   value ",1," value "); "
                                   "APPLY BATCH;")
-                             {:consistency :quorum})
+                             {:consistency-level :quorum})
                (assoc op :type :ok))
         :read (do (cass/wait-rf-nodes test)
                   (let [results (alia/execute session
                                               (st/select :bat)
-                                              {:consistency :all})
+                                              {:consistency-level :all})
                         value-a (->> results
                                      (filter (fn [ret] (= (:cid ret) 0)))
                                      (map :value)

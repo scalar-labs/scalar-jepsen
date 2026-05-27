@@ -5,14 +5,13 @@
             [qbits.alia :as alia]
             [cassandra.lwt :refer [->CasRegisterClient] :as lwt]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core WriteType)
-           (com.datastax.driver.core.exceptions ReadTimeoutException
-                                                WriteTimeoutException
-                                                UnavailableException)))
+  (:import (com.datastax.oss.driver.api.core NoNodeAvailableException)
+           (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
+                                                          WriteTimeoutException
+                                                          WriteType)))
 
 (deftest lwt-client-init-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)]
@@ -25,8 +24,7 @@
       (is (spy/called-n-times? alia/execute 3)))))
 
 (deftest lwt-client-cas-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :update)
                                            [{lwt/ak true}])))]
@@ -43,12 +41,12 @@
                             {:update :lwt
                              :set-columns {:value 2}
                              :where [[= :id 0]]
-                             :if [[:value 1]]}))
+                             :if [[:value 1]]}
+                            {:serial-consistency-level :serial}))
       (is (= :ok (:type result))))))
 
 (deftest lwt-client-write-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :update)
                                            [{lwt/ak true}])))]
@@ -65,12 +63,12 @@
                             {:update :lwt
                              :set-columns {:value 3}
                              :where [[= :id 0]]
-                             :if [[:in :value (range 5)]]}))
+                             :if [[:in :value (range 5)]]}
+                            {:serial-consistency-level :serial}))
       (is (= :ok (:type result))))))
 
 (deftest lwt-client-insert-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (if (contains? cql :update)
                                            [{lwt/ak false}]
@@ -89,17 +87,18 @@
                             {:update :lwt
                              :set-columns {:value 4}
                              :where [[= :id 0]]
-                             :if [[:in :value (range 5)]]}))
+                             :if [[:in :value (range 5)]]}
+                            {:serial-consistency-level :serial}))
       (is (spy/called-with? alia/execute
                             "session"
                             {:insert :lwt
                              :values [[:id 0] [:value 4]]
-                             :if-exists false}))
+                             :if-exists false}
+                            {:serial-consistency-level :serial}))
       (is (= :ok (:type result))))))
 
 (deftest lwt-client-read-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:id 0 :value 4}])))]
@@ -116,13 +115,12 @@
                             {:select :lwt
                              :columns :*
                              :where [[= :id 0]]}
-                            {:consistency :serial}))
+                            {:consistency-level :serial}))
       (is (= :ok (:type result)))
       (is (= [0 4] (:value result))))))
 
 (deftest lwt-client-read-timeout-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
@@ -138,14 +136,13 @@
       (is (= :read-timed-out (:error result))))))
 
 (deftest lwt-client-write-timeout-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil WriteType/CAS 0 0)})))))]
+                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/CAS)})))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
@@ -154,19 +151,18 @@
       (is (= :info (:type result)))
       (is (= :write-timed-out (:error result))))))
 
-(deftest lwt-client-unavailable-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+(deftest lwt-client-no-node-available-exception-test
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
-                                                    :exception (UnavailableException. nil nil 0 0)})))))]
+                                                    :exception (NoNodeAvailableException.)})))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
                                  {:type :invoke :f :read
                                   :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
-      (is (= :unavailable (:error result))))))
+      (is (= :no-host-available (:error result))))))

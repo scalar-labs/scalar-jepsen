@@ -46,7 +46,8 @@
                            (st/update :lwt
                                       (clause/set-columns {:value new})
                                       (clause/where [[= :id id]])
-                                      (clause/only-if [[:value old]])))]
+                                      (clause/only-if [[:value old]]))
+                           {:serial-consistency-level :serial})]
                (assoc op :type (if (-> result first ak) :ok :fail)))
 
         :write (let [id (key (:value op))
@@ -58,7 +59,8 @@
                                       (clause/only-if [[:in
                                                         :value
                                                         (range 5)]])
-                                      (clause/where [[= :id id]])))]
+                                      (clause/where [[= :id id]]))
+                             {:serial-consistency-level :serial})]
                  (if (-> result first ak)
                    (assoc op :type :ok)
                    (let [result' (alia/execute
@@ -66,7 +68,8 @@
                                   (st/insert :lwt
                                              (clause/values [[:id id]
                                                              [:value v]])
-                                             (clause/if-exists false)))]
+                                             (clause/if-exists false))
+                                  {:serial-consistency-level :serial})]
                      (if (-> result' first ak)
                        (assoc op :type :ok)
                        (assoc op :type :fail)))))
@@ -75,7 +78,7 @@
                     v (->> (alia/execute
                             session
                             (st/select :lwt (clause/where [[= :id id]]))
-                            {:consistency :serial})
+                            {:consistency-level :serial})
                            first
                            :value)]
                 (assoc op :type :ok

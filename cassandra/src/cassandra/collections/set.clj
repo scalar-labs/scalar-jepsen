@@ -37,14 +37,14 @@
                                           (clause/set-columns
                                            {:elements [+ #{(:value op)}]})
                                           (clause/where [[= :id 0]]))
-                               {:consistency writec})
+                               {:consistency-level writec})
                  (assoc op :type :ok))
         :read (do (cass/wait-rf-nodes test)
                   (let [value (->> (alia/execute session
                                                  (st/select
                                                   :sets
                                                   (clause/where [[= :id 0]]))
-                                                 {:consistency :all})
+                                                 {:consistency-level :all})
                                    first
                                    :elements
                                    (into (sorted-set)))]

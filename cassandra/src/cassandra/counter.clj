@@ -38,14 +38,14 @@
                                           (clause/set-columns
                                            {:count [+ (:value op)]})
                                           (clause/where [[= :id 0]]))
-                               {:consistency  writec})
+                               {:consistency-level writec})
                  (assoc op :type :ok))
         :read (do (cass/wait-rf-nodes test)
                   (let [value (->> (alia/execute
                                     session
                                     (st/select :counters
                                                (clause/where [[= :id 0]]))
-                                    {:consistency  :all})
+                                    {:consistency-level :all})
                                    first
                                    :count)]
                     (assoc op :type :ok, :value value))))

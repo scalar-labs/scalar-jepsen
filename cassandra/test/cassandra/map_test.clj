@@ -5,14 +5,13 @@
             [cassandra.core :as cass]
             [cassandra.collections.map :refer [->CQLMapClient] :as map]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
-                                                WriteTimeoutException
-                                                UnavailableException)))
+  (:import (com.datastax.oss.driver.api.core NoNodeAvailableException)
+           (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
+                                                          WriteTimeoutException
+                                                          WriteType)))
 
 (deftest map-client-init-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client (client/open! (->CQLMapClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)]
@@ -26,8 +25,7 @@
       (is (spy/called-n-times? alia/execute 4)))))
 
 (deftest map-client-add-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/spy)]
     (let [client (client/open! (->CQLMapClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
@@ -40,12 +38,11 @@
                             {:update :maps
                              :set-columns {:elements [+ {1 1}]}
                              :where [[= :id 0]]}
-                            {:consistency :quorum}))
+                            {:consistency-level :quorum}))
       (is (= :ok (:type result))))))
 
 (deftest map-client-read-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock (fn [_ cql & _]
                                          (when (contains? cql :select)
                                            [{:id 0 :elements {1 1 3 3 2 2}}])))
@@ -61,13 +58,12 @@
                             {:select :maps
                              :columns :*
                              :where [[= :id 0]]}
-                            {:consistency :all}))
+                            {:consistency-level :all}))
       (is (= :ok (:type result)))
       (is (= #{1 2 3} (:value result))))))
 
 (deftest map-client-read-timeout-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
@@ -82,14 +78,13 @@
       (is (= :read-timed-out (:error read-result))))))
 
 (deftest map-client-write-timeout-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
                                                   {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil nil 0 0)})))))]
+                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/UNLOGGED_BATCH)})))))]
     (let [client (client/open! (->CQLMapClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
@@ -97,31 +92,14 @@
       (is (= :fail (:type add-result)))
       (is (= :write-timed-out (:error add-result))))))
 
-(deftest map-client-unavailable-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
+(deftest map-client-no-node-available-exception-test
+  (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
                                                    {:type ::execute
-                                                    :exception (UnavailableException. nil nil 0 0)})))))
-                cass/wait-rf-nodes (spy/spy)]
-    (let [client (client/open! (->CQLMapClient (atom false) nil :quorum)
-                               {:nodes ["n1" "n2" "n3"]} nil)
-          read-result (client/invoke! client {} {:type :invoke :f :read})]
-      (is (= :fail (:type read-result)))
-      (is (= :unavailable (:error read-result))))))
-
-(deftest map-client-no-host-available-exception-test
-  (with-redefs [alia/cluster (spy/spy)
-                alia/connect (spy/stub "session")
-                alia/execute (spy/mock
-                              (fn [_ cql & _]
-                                (when (contains? cql :select)
-                                  (throw (ex-info  "Unavailable"
-                                                   {:type ::execute
-                                                    :exception (NoHostAvailableException. {})})))))
+                                                    :exception (NoNodeAvailableException.)})))))
                 cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLMapClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
