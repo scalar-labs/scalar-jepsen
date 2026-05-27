@@ -257,6 +257,14 @@
     (primaries [_ test] (or (:cass-nodes test) (:nodes test)))
     (setup-primary! [_ _ _])
 
+    db/Kill
+    (kill! [_ _test _node])
+    (start! [_ _test _node])
+
+    db/Pause
+    (pause! [_ _test _node])
+    (resume! [_ _test _node])
+
     db/LogFiles
     (log-files [_ test _] [(cassandra-log test)])))
 

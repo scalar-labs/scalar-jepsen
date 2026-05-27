@@ -1,10 +1,11 @@
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 ENV LEIN_ROOT=true
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get -y -q update && \
     apt-get install -y \
-        openjdk-11-jdk \
+        build-essential \
+        openjdk-21-jdk \
         libjna-java \
         git \
         gnuplot \
