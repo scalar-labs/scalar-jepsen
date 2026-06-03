@@ -89,4 +89,4 @@
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))
-      (is (= :no-host-available (:error read-result))))))
+      (is (= :no-node-available (:error read-result))))))

@@ -92,7 +92,7 @@
       (is (= :info (:type result)))
       (is (= :write-timed-out (:error result))))))
 
-(deftest counter-client-no-host-available-exception-test
+(deftest counter-client-no-node-available-exception-test
   (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
@@ -105,4 +105,4 @@
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
-      (is (= :no-host-available (:error result))))))
+      (is (= :no-node-available (:error result))))))

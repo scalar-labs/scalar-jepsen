@@ -331,5 +331,5 @@
                                  (Thread/sleep 2000)
                                  (assoc op
                                         :type :fail
-                                        :error :no-host-available))
+                                        :error :no-node-available))
       (assoc op :type :fail :error (.getMessage ex)))))

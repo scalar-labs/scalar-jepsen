@@ -165,4 +165,4 @@
                                  {:type :invoke :f :read
                                   :value (independent/tuple 0 nil)})]
       (is (= :fail (:type result)))
-      (is (= :no-host-available (:error result))))))
+      (is (= :no-node-available (:error result))))))

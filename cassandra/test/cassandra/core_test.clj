@@ -232,12 +232,18 @@
         batch-timeout (ex-info "Write timed out for BATCH"
                                {}
                                (WriteTimeoutException. nil nil 0 0 WriteType/BATCH))
+        counter-timeout (ex-info "Write timed out for COUNTER"
+                                 {}
+                                 (WriteTimeoutException. nil nil 0 0 WriteType/COUNTER))
+        unlogged-batch-timeout (ex-info "Write timed out for UNLOGGED_BATCH"
+                                        {}
+                                        (WriteTimeoutException. nil nil 0 0 WriteType/UNLOGGED_BATCH))
 
         read-timeout (ex-info "Read timed out"
                               {}
                               (ReadTimeoutException. nil nil 0 0 false))
         driver-timeout (ex-info "Driver timed out" {} (DriverTimeoutException. ""))
-        no-host (ex-info "No host available" {} (NoNodeAvailableException.))]
+        no-node (ex-info "No node available" {} (NoNodeAvailableException.))]
     (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op cas-timeout true)))
     (is (= {:type :ok}
@@ -248,9 +254,13 @@
            (cass/handle-exception op batch-log-timeout)))
     (is (= {:type :ok}
            (cass/handle-exception op batch-timeout)))
+    (is (= {:type :info :error :write-timed-out}
+           (cass/handle-exception op counter-timeout)))
+    (is (= {:type :fail :error :write-timed-out}
+           (cass/handle-exception op unlogged-batch-timeout)))
     (is (= {:type :fail :error :read-timed-out}
            (cass/handle-exception op read-timeout)))
     (is (= {:type :info :error :driver-timed-out}
            (cass/handle-exception op driver-timeout)))
-    (is (= {:type :fail :error :no-host-available}
-           (cass/handle-exception op no-host)))))
+    (is (= {:type :fail :error :no-node-available}
+           (cass/handle-exception op no-node)))))
