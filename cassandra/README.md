@@ -3,7 +3,7 @@
 This is based on [riptano's jepsen](https://github.com/riptano/jepsen/tree/cassandra/cassandra).
 
 ## Current status
-- Supports Apache Cassandra 3.11.x
+- Supports Apache Cassandra 5.0.x
 - Support `collections.map-test`, `collections.set-test`, `batch-test`, `counter-test`(only add) and `lwt-test`
   - Removed `lww-test` and `mv-test`
 
