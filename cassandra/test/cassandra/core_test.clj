@@ -7,7 +7,8 @@
             [cassandra.core :as cass]
             [qbits.alia :as alia]
             [spy.core :as spy])
-  (:import (com.datastax.oss.driver.api.core NoNodeAvailableException)
+  (:import (com.datastax.oss.driver.api.core DriverTimeoutException
+                                             NoNodeAvailableException)
            (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
                                                           WriteTimeoutException
                                                           WriteType)
@@ -235,6 +236,7 @@
         read-timeout (ex-info "Read timed out"
                               {}
                               (ReadTimeoutException. nil nil 0 0 false))
+        driver-timeout (ex-info "Driver timed out" {} (DriverTimeoutException. ""))
         no-host (ex-info "No host available" {} (NoNodeAvailableException.))]
     (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op cas-timeout true)))
@@ -248,5 +250,7 @@
            (cass/handle-exception op batch-timeout)))
     (is (= {:type :fail :error :read-timed-out}
            (cass/handle-exception op read-timeout)))
+    (is (= {:type :info :error :driver-timed-out}
+           (cass/handle-exception op driver-timeout)))
     (is (= {:type :fail :error :no-host-available}
            (cass/handle-exception op no-host)))))
