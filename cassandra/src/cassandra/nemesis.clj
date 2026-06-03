@@ -82,8 +82,8 @@
                            :no-target)
                    :start (if-let [ns @nodes]
                             (let [reordered (reorder-restarting-nodes ns test)
-                                  restarted (for [node reordered]
-                                              (c/on node (stop! test node)))]
+                                  restarted (mapv #(c/on % (stop! test %))
+                                                  reordered)]
                               (reset! nodes nil)
                               restarted)
                             :not-started)))))
