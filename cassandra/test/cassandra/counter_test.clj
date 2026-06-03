@@ -68,8 +68,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Timed out"
-                                                   {:type ::execute
-                                                    :exception (ReadTimeoutException. nil nil 0 0 false)})))))
+                                                   {}
+                                                   (ReadTimeoutException. nil nil 0 0 false))))))
                 cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
@@ -83,8 +83,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
-                                                  {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/COUNTER)})))))]
+                                                  {}
+                                                  (WriteTimeoutException. nil nil 0 0 WriteType/COUNTER))))))]
     (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
@@ -98,8 +98,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
-                                                   {:type ::execute
-                                                    :exception (NoNodeAvailableException.)})))))
+                                                   {}
+                                                   (NoNodeAvailableException.))))))
                 cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)

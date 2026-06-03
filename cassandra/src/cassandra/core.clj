@@ -303,7 +303,7 @@
 
 (defn handle-exception
   [op ^ExceptionInfo e & conditional?]
-  (let [ex (:exception (ex-data e))
+  (let [ex (ex-cause e)
         exception-class (class ex)]
     (condp = exception-class
       WriteTimeoutException (condp = (.getWriteType ex)

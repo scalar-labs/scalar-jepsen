@@ -87,8 +87,8 @@
                               (fn [_ cql & _]
                                 (when (and (string? cql) (re-find #"BATCH" cql))
                                   (throw (ex-info "Timed out"
-                                                  {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG)})))))]
+                                                  {}
+                                                  (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG))))))]
     (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
@@ -102,8 +102,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
-                                                   {:type ::execute
-                                                    :exception (NoNodeAvailableException.)})))))
+                                                   {}
+                                                   (NoNodeAvailableException.))))))
                 cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)

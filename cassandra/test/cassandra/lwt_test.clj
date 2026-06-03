@@ -125,8 +125,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Timed out"
-                                                   {:type ::execute
-                                                    :exception (ReadTimeoutException. nil nil 0 0 false)})))))]
+                                                   {}
+                                                   (ReadTimeoutException. nil nil 0 0 false))))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
@@ -141,8 +141,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
-                                                  {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/CAS)})))))]
+                                                  {}
+                                                  (WriteTimeoutException. nil nil 0 0 WriteType/CAS))))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
@@ -157,8 +157,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
-                                                   {:type ::execute
-                                                    :exception (NoNodeAvailableException.)})))))]
+                                                   {}
+                                                   (NoNodeAvailableException.))))))]
     (let [client (client/open! (->CasRegisterClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}

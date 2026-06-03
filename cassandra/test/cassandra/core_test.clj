@@ -220,37 +220,22 @@
 (deftest handle-exception-test
   (let [op {}
         cas-timeout (ex-info "Write timed out for CAS"
-                             {:type :execute
-                              :exception
-                              (WriteTimeoutException. nil nil
-                                                      0 0
-                                                      WriteType/CAS)})
+                             {}
+                             (WriteTimeoutException. nil nil 0 0 WriteType/CAS))
         simple-timeout (ex-info "Write timed out for SIMPLE"
-                                {:type :execute
-                                 :exception
-                                 (WriteTimeoutException. nil nil
-                                                         0 0
-                                                         WriteType/SIMPLE)})
+                                {}
+                                (WriteTimeoutException. nil nil 0 0 WriteType/SIMPLE))
         batch-log-timeout (ex-info "Write timed out for BATCH_LOG"
-                                   {:type :execute
-                                    :exception
-                                    (WriteTimeoutException. nil nil
-                                                            0 0
-                                                            WriteType/BATCH_LOG)})
+                                   {}
+                                   (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG))
         batch-timeout (ex-info "Write timed out for BATCH"
-                               {:type :execute
-                                :exception
-                                (WriteTimeoutException. nil nil
-                                                        0 0
-                                                        WriteType/BATCH)})
+                               {}
+                               (WriteTimeoutException. nil nil 0 0 WriteType/BATCH))
 
         read-timeout (ex-info "Read timed out"
-                              {:type :execute
-                               :exception (ReadTimeoutException. nil nil
-                                                                 0 0 false)})
-        no-host (ex-info "No host available"
-                         {:type :execute
-                          :exception (NoNodeAvailableException.)})]
+                              {}
+                              (ReadTimeoutException. nil nil 0 0 false))
+        no-host (ex-info "No host available" {} (NoNodeAvailableException.))]
     (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op cas-timeout true)))
     (is (= {:type :ok}
