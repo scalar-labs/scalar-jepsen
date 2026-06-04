@@ -29,9 +29,9 @@ $ docker exec -it jepsen-control bash
 1. Launch debian machines as a control machine and Cassandra nodes
   - We recommend 1 control machine and 5 node machines
     - You can decrease the number of nodes. If you do so then you will need to specify the nodes when starting a test.
-2. Install Java8 on each machine
+2. Install Java 17 on each machine
 ```sh
-sudo apt install openjdk-8-jre
+sudo apt install openjdk-17-jre
 ```
 
 3. Install Leiningen (https://leiningen.org/) on the control machine

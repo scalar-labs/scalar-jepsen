@@ -7,12 +7,11 @@
             [cassandra.core :as cass]
             [qbits.alia :as alia]
             [spy.core :as spy])
-  (:import (com.datastax.driver.core WriteType)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
-                                                TransportException
-                                                WriteTimeoutException
-                                                UnavailableException)
+  (:import (com.datastax.oss.driver.api.core DriverTimeoutException
+                                             NoNodeAvailableException)
+           (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
+                                                          WriteTimeoutException
+                                                          WriteType)
            (java.net UnknownHostException)))
 
 (deftest dns-resolve-test
@@ -82,6 +81,7 @@
   (let [test {:tarball "http://some.where/tarball-file"
               :cassandra-dir "/root/cassandra"}]
     (with-redefs [debian/install (spy/spy)
+                  c/exec (spy/spy)
                   c/upload (spy/spy)
                   cu/install-archive! (spy/spy)]
       (cass/install! "n1" test)
@@ -95,6 +95,7 @@
   (let [test {:tarball "file:///local-dir/tarball-file"
               :cassandra-dir "/root/cassandra"}]
     (with-redefs [debian/install (spy/spy)
+                  c/exec (spy/spy)
                   c/upload (spy/spy)
                   cu/install-archive! (spy/spy)]
       (cass/install! "n1" test)
@@ -220,43 +221,29 @@
 (deftest handle-exception-test
   (let [op {}
         cas-timeout (ex-info "Write timed out for CAS"
-                             {:type :execute
-                              :exception
-                              (WriteTimeoutException. nil nil
-                                                      WriteType/CAS
-                                                      0 0)})
+                             {}
+                             (WriteTimeoutException. nil nil 0 0 WriteType/CAS))
         simple-timeout (ex-info "Write timed out for SIMPLE"
-                                {:type :execute
-                                 :exception
-                                 (WriteTimeoutException. nil nil
-                                                         WriteType/SIMPLE
-                                                         0 0)})
+                                {}
+                                (WriteTimeoutException. nil nil 0 0 WriteType/SIMPLE))
         batch-log-timeout (ex-info "Write timed out for BATCH_LOG"
-                                   {:type :execute
-                                    :exception
-                                    (WriteTimeoutException. nil nil
-                                                            WriteType/BATCH_LOG
-                                                            0 0)})
+                                   {}
+                                   (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG))
         batch-timeout (ex-info "Write timed out for BATCH"
-                               {:type :execute
-                                :exception
-                                (WriteTimeoutException. nil nil
-                                                        WriteType/BATCH
-                                                        0 0)})
+                               {}
+                               (WriteTimeoutException. nil nil 0 0 WriteType/BATCH))
+        counter-timeout (ex-info "Write timed out for COUNTER"
+                                 {}
+                                 (WriteTimeoutException. nil nil 0 0 WriteType/COUNTER))
+        unlogged-batch-timeout (ex-info "Write timed out for UNLOGGED_BATCH"
+                                        {}
+                                        (WriteTimeoutException. nil nil 0 0 WriteType/UNLOGGED_BATCH))
 
         read-timeout (ex-info "Read timed out"
-                              {:type :execute
-                               :exception (ReadTimeoutException. nil nil
-                                                                 0 0 false)})
-        node-down (ex-info "Transport failed"
-                           {:type :execute
-                            :exception (TransportException. nil nil)})
-        unavailable (ex-info "Unavailable exception"
-                             {:type :execute
-                              :exception (UnavailableException. nil nil 0 0)})
-        no-host (ex-info "No host available"
-                         {:type :execute
-                          :exception (NoHostAvailableException. {})})]
+                              {}
+                              (ReadTimeoutException. nil nil 0 0 false))
+        driver-timeout (ex-info "Driver timed out" {} (DriverTimeoutException. ""))
+        no-node (ex-info "No node available" {} (NoNodeAvailableException.))]
     (is (= {:type :info :error :write-timed-out}
            (cass/handle-exception op cas-timeout true)))
     (is (= {:type :ok}
@@ -267,11 +254,13 @@
            (cass/handle-exception op batch-log-timeout)))
     (is (= {:type :ok}
            (cass/handle-exception op batch-timeout)))
+    (is (= {:type :info :error :write-timed-out}
+           (cass/handle-exception op counter-timeout)))
+    (is (= {:type :fail :error :write-timed-out}
+           (cass/handle-exception op unlogged-batch-timeout)))
     (is (= {:type :fail :error :read-timed-out}
            (cass/handle-exception op read-timeout)))
-    (is (= {:type :info :error :node-down}
-           (cass/handle-exception op node-down)))
-    (is (= {:type :fail :error :unavailable}
-           (cass/handle-exception op unavailable)))
-    (is (= {:type :fail :error :no-host-available}
-           (cass/handle-exception op no-host)))))
+    (is (= {:type :info :error :driver-timed-out}
+           (cass/handle-exception op driver-timeout)))
+    (is (= {:type :fail :error :no-node-available}
+           (cass/handle-exception op no-node)))))

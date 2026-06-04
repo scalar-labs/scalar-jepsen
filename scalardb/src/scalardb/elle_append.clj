@@ -75,10 +75,11 @@
 
 (defn add-tables
   [test next-id]
-  (let [current-id @(:table-id test)]
+  (let [table-id (:table-id test)
+        current-id @table-id]
     (when (< current-id next-id)
-      (locking (:table-id test)
-        (when (compare-and-set! (:table-id test) current-id next-id)
+      (locking table-id
+        (when (compare-and-set! table-id current-id next-id)
           (info (str "Creating new tables for " next-id))
           (doseq [i (range DEFAULT_TABLE_COUNT)]
             (scalar/setup-transaction-tables

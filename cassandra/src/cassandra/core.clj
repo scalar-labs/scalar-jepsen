@@ -16,14 +16,12 @@
             [qbits.hayt.dsl.clause :as clause]
             [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)
-           (com.datastax.driver.core WriteType)
-           (com.datastax.driver.core.exceptions NoHostAvailableException
-                                                ReadTimeoutException
-                                                TransportException
-                                                WriteTimeoutException
-                                                UnavailableException)
-           (java.net InetAddress)
-           (java.util.concurrent TimeUnit)))
+           (com.datastax.oss.driver.api.core DriverTimeoutException
+                                             NoNodeAvailableException)
+           (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
+                                                          WriteTimeoutException
+                                                          WriteType)
+           (java.net InetAddress)))
 
 (def ^:private ^:const TIMEOUT_SEC 600)
 (def ^:private ^:const INTERVAL_SEC 10)
@@ -107,7 +105,7 @@
             (when (pos? tries)
               (exponential-backoff tries))
             (try
-              (c/su (debian/install [:openjdk-8-jre]))
+              (c/su (debian/install [:openjdk-17-jre :python3 :python3-pip]))
               (catch clojure.lang.ExceptionInfo e
                 (debian/update!)
                 (if (= tries 7)
@@ -122,6 +120,8 @@
         local-file (second (re-find #"file://(.+)" url))
         tpath (if local-file "file:///tmp/cassandra.tar.gz" url)]
     (install-jdk-with-retry)
+    ;; Need the latest cqlsh for python 3.12
+    (c/su (c/exec :pip3 :install :--break-system-packages "cqlsh"))
     (info node "installing Cassandra from" url)
     (when local-file
       (c/upload local-file "/tmp/cassandra.tar.gz"))
@@ -150,9 +150,7 @@
                       (str "\"s/rpc_address: .*/rpc_address: " (cn/ip node) "/g\"")
                       (str "\"s/hinted_handoff_enabled:.*/hinted_handoff_enabled: " (disable-hints?) "/g\"")
                       "\"s/commitlog_sync: .*/commitlog_sync: batch/g\""
-                      (str "\"s/# commitlog_sync_batch_window_in_ms: .*/"
-                           "commitlog_sync_batch_window_in_ms: 1.0/g\"")
-                      "\"s/commitlog_sync_period_in_ms: .*/#/g\""
+                      "\"s/commitlog_sync_period: .*/#/g\""
                       "\"/auto_bootstrap: .*/d\""
                       "\"s/# commitlog_compression.*/commitlog_compression:/g\""
                       "\"s/#hints_compression.*/hints_compression:/g\""
@@ -205,8 +203,7 @@
   "Wait until the Cassandra node is ready. Check the readiness each interval-sec."
   [node timeout-sec interval-sec test]
   (try
-    (c/exec (lit (str (:cassandra-dir test) "/bin/cqlsh " node))
-            :-e (lit "'describe cluster'"))
+    (c/exec :cqlsh node :-e (lit "'describe cluster'"))
     (catch Exception e
       (info (str "wating for " node))
       (Thread/sleep (* interval-sec 1000))
@@ -257,6 +254,14 @@
     (primaries [_ test] (or (:cass-nodes test) (:nodes test)))
     (setup-primary! [_ _ _])
 
+    db/Kill
+    (kill! [_ _test _node])
+    (start! [_ _test _node])
+
+    db/Pause
+    (pause! [_ _test _node])
+    (resume! [_ _test _node])
+
     db/LogFiles
     (log-files [_ test _] [(cassandra-log test)])))
 
@@ -290,18 +295,16 @@
 
 (defn open-cassandra
   [test]
-  (let [cluster (alia/cluster {:contact-points (:nodes test)})
-        session (alia/connect cluster)]
-    [cluster session]))
+  (alia/session {:contact-points (mapv #(str %1 ":9042") (:nodes test))
+                 :load-balancing-local-datacenter "datacenter1"}))
 
 (defn close-cassandra
-  [cluster session]
-  (some-> session alia/shutdown (.get 10 TimeUnit/SECONDS))
-  (some-> cluster alia/shutdown (.get 10 TimeUnit/SECONDS)))
+  [session]
+  (alia/close session))
 
 (defn handle-exception
   [op ^ExceptionInfo e & conditional?]
-  (let [ex (:exception (ex-data e))
+  (let [ex (ex-cause e)
         exception-class (class ex)]
     (condp = exception-class
       WriteTimeoutException (condp = (.getWriteType ex)
@@ -322,12 +325,11 @@
                                                        :error :write-timed-out)
                               (assoc op :type :fail :error :write-timed-out))
       ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
-      TransportException (assoc op :type :info :error :node-down)
-      UnavailableException (assoc op :type :fail :error :unavailable)
-      NoHostAvailableException (do
+      DriverTimeoutException (assoc op :type :info :error :driver-timed-out)
+      NoNodeAvailableException (do
                                  (info "All the servers are down - waiting 2s")
                                  (Thread/sleep 2000)
                                  (assoc op
                                         :type :fail
-                                        :error :no-host-available))
+                                        :error :no-node-available))
       (assoc op :type :fail :error (.getMessage ex)))))
