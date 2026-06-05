@@ -83,13 +83,8 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :update)
                                   (throw (ex-info "Timed out"
-<<<<<<< HEAD
                                                   {}
                                                   (WriteTimeoutException. nil nil 0 0 WriteType/COUNTER))))))]
-=======
-                                                  {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/COUNTER)})))))]
->>>>>>> f02ac27 (cassandra tests)
     (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {}
@@ -97,30 +92,17 @@
       (is (= :info (:type result)))
       (is (= :write-timed-out (:error result))))))
 
-<<<<<<< HEAD
 (deftest counter-client-no-node-available-exception-test
-=======
-(deftest counter-client-no-host-available-exception-test
->>>>>>> f02ac27 (cassandra tests)
   (with-redefs [alia/session (spy/stub "session")
                 alia/execute (spy/mock
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
-<<<<<<< HEAD
                                                    {}
                                                    (NoNodeAvailableException.))))))
-=======
-                                                   {:type ::execute
-                                                    :exception (NoNodeAvailableException.)})))))
->>>>>>> f02ac27 (cassandra tests)
                 cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->CQLCounterClient (atom false) nil :quorum)
                                {:nodes ["n1" "n2" "n3"]} nil)
           result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type result)))
-<<<<<<< HEAD
       (is (= :no-node-available (:error result))))))
-=======
-      (is (= :no-host-available (:error result))))))
->>>>>>> f02ac27 (cassandra tests)

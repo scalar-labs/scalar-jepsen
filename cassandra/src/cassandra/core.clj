@@ -16,12 +16,8 @@
             [qbits.hayt.dsl.clause :as clause]
             [qbits.hayt.dsl.statement :as st])
   (:import (clojure.lang ExceptionInfo)
-<<<<<<< HEAD
            (com.datastax.oss.driver.api.core DriverTimeoutException
                                              NoNodeAvailableException)
-=======
-           (com.datastax.oss.driver.api.core NoNodeAvailableException)
->>>>>>> f02ac27 (cassandra tests)
            (com.datastax.oss.driver.api.core.servererrors ReadTimeoutException
                                                           WriteTimeoutException
                                                           WriteType)
@@ -329,18 +325,11 @@
                                                        :error :write-timed-out)
                               (assoc op :type :fail :error :write-timed-out))
       ReadTimeoutException (assoc op :type :fail :error :read-timed-out)
-<<<<<<< HEAD
       DriverTimeoutException (assoc op :type :info :error :driver-timed-out)
-=======
->>>>>>> f02ac27 (cassandra tests)
       NoNodeAvailableException (do
                                  (info "All the servers are down - waiting 2s")
                                  (Thread/sleep 2000)
                                  (assoc op
                                         :type :fail
-<<<<<<< HEAD
                                         :error :no-node-available))
-=======
-                                        :error :no-host-available))
->>>>>>> f02ac27 (cassandra tests)
       (assoc op :type :fail :error (.getMessage ex)))))

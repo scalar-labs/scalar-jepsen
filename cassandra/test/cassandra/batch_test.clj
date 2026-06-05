@@ -87,13 +87,8 @@
                               (fn [_ cql & _]
                                 (when (and (string? cql) (re-find #"BATCH" cql))
                                   (throw (ex-info "Timed out"
-<<<<<<< HEAD
                                                   {}
                                                   (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG))))))]
-=======
-                                                  {:type ::execute
-                                                   :exception (WriteTimeoutException. nil nil 0 0 WriteType/BATCH_LOG)})))))]
->>>>>>> f02ac27 (cassandra tests)
     (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           add-result (client/invoke! client {}
@@ -107,20 +102,11 @@
                               (fn [_ cql & _]
                                 (when (contains? cql :select)
                                   (throw (ex-info  "Unavailable"
-<<<<<<< HEAD
                                                    {}
                                                    (NoNodeAvailableException.))))))
-=======
-                                                   {:type ::execute
-                                                    :exception (NoNodeAvailableException.)})))))
->>>>>>> f02ac27 (cassandra tests)
                 cass/wait-rf-nodes (spy/spy)]
     (let [client (client/open! (->BatchSetClient (atom false) nil)
                                {:nodes ["n1" "n2" "n3"]} nil)
           read-result (client/invoke! client {} {:type :invoke :f :read})]
       (is (= :fail (:type read-result)))
-<<<<<<< HEAD
       (is (= :no-node-available (:error read-result))))))
-=======
-      (is (= :no-host-available (:error read-result))))))
->>>>>>> f02ac27 (cassandra tests)
