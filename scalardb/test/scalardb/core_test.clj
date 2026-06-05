@@ -32,7 +32,8 @@
       (condp = column
         "tx_id" false
         "tx_state" false
-        "tx_created_at" false))))
+        "tx_created_at" false
+        "tx_write_set" true))))
 
 (def mock-db
   (reify
