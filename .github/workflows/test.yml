@@ -7,16 +7,11 @@ on:
   pull_request:
 
 jobs:
-  cassandra-scaladb:
-
+  cassandra:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v6
-
-    - name: Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v4
 
     - name: Setup Cache
       uses: satackey/action-docker-layer-caching@v0.0.11
@@ -32,10 +27,77 @@ jobs:
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
 
+  scalardb:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup Cache
+      uses: satackey/action-docker-layer-caching@v0.0.11
+      # Ignore the failure of a step and avoid terminating the job.
+      continue-on-error: true
+
+    - name: docker-compose up
+      run: |
+        cd docker
+        docker compose up -d
+
     - name: ScalarDB test
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
         docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein with-profile cassandra run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+
+  scalardl:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout scalar-jepsen
+      uses: actions/checkout@v6
+
+    - name: Checkout ScalarDL
+      uses: actions/checkout@v6
+      with:
+        repository: scalar-labs/scalardl
+        path: scalardl-build
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('scalardl-build/**/*.gradle*', 'scalardl-build/**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Build ScalarDL
+      run: |
+        cd scalardl-build
+        ./gradlew distTar
+        # Copy the built tarball to the expected location
+        cp ledger/build/distributions/ledger.tar $GITHUB_WORKSPACE/scalardl/resources/ledger.tar
+
+    - name: Setup Cache
+      uses: satackey/action-docker-layer-caching@v0.0.11
+      # Ignore the failure of a step and avoid terminating the job.
+      continue-on-error: true
+
+    - name: docker-compose up
+      run: |
+        cd docker
+        docker compose up -d
+
+    - name: ScalarDL test
+      run: |
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardl && lein run test --workload transfer --ssh-private-key ~/.ssh/id_rsa"
 
   cluster:
     runs-on: ubuntu-latest
@@ -78,9 +140,6 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
         restore-keys: |
           ${{ runner.os }}-m2-
-
-    - name: Set up Docker
-      uses: docker/setup-buildx-action@v3
 
     - name: Set up Kind cluster
       uses: helm/kind-action@v1.12.0
