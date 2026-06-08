@@ -12,7 +12,7 @@
                  [net.java.dev.jna/jna-platform "5.11.0"]
                  [org.slf4j/slf4j-jdk14 "2.0.6"]
                  [cassandra "0.1.0-SNAPSHOT" :exclusions [org.apache.commons/commons-lang3]]
-                 [cc.qbits/alia "5.0.0"]
+                 [cc.qbits/alia "5.0.0" :exclusions [org.apache.commons/commons-lang3]]
                  [cc.qbits/hayt "4.1.0" :exclusions [org.apache.commons/commons-lang3]]]
   :repositories {"sonartype" "https://central.sonatype.com/repository/maven-snapshots/"}
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]
