@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-db.db2
-  (:require [jepsen.k8s.core :as k8s]
+  (:require [clojure.tools.logging :refer [warn]]
+            [jepsen.k8s.core :as k8s]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
@@ -43,7 +44,7 @@
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
                  #(k8s/kubectl! test :delete :pvc "data-db2-scalardb-cluster-0"
                                 :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
-      (try (cmd) (catch Exception _ nil))))
+      (try (cmd) (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
     (let [ip (get-k8s-node-ip test)]

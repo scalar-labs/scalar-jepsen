@@ -49,6 +49,7 @@
     (helm/install! test {:release ALLOYDB_OPERATOR_NAME
                          :chart (operator-tgz)
                          :namespace ALLOYDB_OPERATOR_NAMESPACE
+                         :wait? true
                          :timeout "5m"}))
 
   (configure! [_ test]

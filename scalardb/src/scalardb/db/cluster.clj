@@ -7,6 +7,7 @@
             [jepsen.k8s.chaos-mesh.core :as cm]
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
+            [jepsen.store :as store]
             [scalardb.db.cluster-db.cluster-db :as cluster-db]
             [scalardb.db-extend :as ext])
   (:import (java.io File)
@@ -157,12 +158,10 @@
        (map #(get-in % [:metadata :name]))))
 
 (defn- get-logs
+  "Collect ScalarDB Cluster pod logs into the test's store directory directly."
   [test]
-  (let [dir (System/getProperty "user.dir")
-        pods (get-pod-list test)
-        logs (mapv #(str dir "/" % ".log") pods)]
-    (mapv #(spit %1 (k8s/pod-logs! test {:pod %2})) logs pods)
-    logs))
+  (k8s/collect-logs! test {:selector NODE_SELECTOR
+                           :output-dir (store/path! test "pods")}))
 
 (defn get-load-balancer-ip
   "Get the external IP of a LoadBalancer service whose name includes prefix"
@@ -247,7 +246,10 @@
 
     db/LogFiles
     (log-files [_ test _]
-      (get-logs test))))
+      ;; Collect pod logs into store/ ourselves and return [] so jepsen's
+      ;; snarf-logs! doesn't try to fetch them over the dummy SSH connection.
+      (get-logs test)
+      [])))
 
 (defrecord ExtCluster [backend-db]
   ext/DbExtension
