@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-db.sqlserver
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -20,35 +21,36 @@
 
   (get-password [_] SQLSERVER_PASSWORD)
 
-  (install! [_]
-    (c/exec :helm :repo :add
-            "simcube"
-            "https://simcubeltd.github.io/simcube-helm-charts"))
+  (install! [_ test]
+    (helm/repo-add! test
+                    "simcube"
+                    "https://simcubeltd.github.io/simcube-helm-charts"))
 
-  (configure! [_])
+  (configure! [_ _])
 
-  (start! [_]
-    (c/exec :helm :install SQLSERVER_NAME "simcube/mssqlserver-2022"
-            :--set "image.repository=mcr.microsoft.com/mssql/server"
-            :--set "image.tag=2022-latest"
-            :--set "acceptEula.value=Y"
-            :--set (str "sapassword=" SQLSERVER_PASSWORD)
-            :--set "persistence.enabled=true"
-            :--set "service.type=LoadBalancer"
-            :--version "1.2.3"))
+  (start! [_ test]
+    (helm/install! test {:release SQLSERVER_NAME
+                         :chart "simcube/mssqlserver-2022"
+                         :version "1.2.3"
+                         :set {:image.repository "mcr.microsoft.com/mssql/server"
+                               :image.tag "2022-latest"
+                               :acceptEula.value "Y"
+                               :sapassword SQLSERVER_PASSWORD
+                               :persistence.enabled true
+                               :service.type "LoadBalancer"}}))
 
-  (wipe! [_]
-    (doseq [cmd [[:helm :uninstall SQLSERVER_NAME
-                  :--timeout WIPE_TIMEOUT :--ignore-not-found]
-                 [:kubectl :delete
-                  :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(helm/uninstall! test {:release SQLSERVER_NAME
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
+                 #(k8s/kubectl! test :delete
+                                :pvc "sqlserver-scalardb-cluster-mssqlserver-2022-data"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip SQLSERVER_NAME))]
+    (let [ip (get-load-balancer-ip test SQLSERVER_NAME)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

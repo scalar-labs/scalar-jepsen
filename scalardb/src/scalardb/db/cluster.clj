@@ -1,22 +1,21 @@
 (ns scalardb.db.cluster
-  (:require [cheshire.core :as cheshire]
-            [clj-yaml.core :as yaml]
+  (:require [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.tools.logging :refer [info warn]]
             [environ.core :refer [env]]
-            [jepsen
-             [control :as c]
-             [db :as db]]
+            [jepsen.db :as db]
+            [jepsen.k8s.chaos-mesh.core :as cm]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
+            [jepsen.store :as store]
             [scalardb.db.cluster-db.cluster-db :as cluster-db]
-            [scalardb.db-extend :as ext]
-            [scalardb.nemesis.cluster :as n])
+            [scalardb.db-extend :as ext])
   (:import (java.io File)
            (java.util Properties)))
 
 (def ^:private ^:const CLUSTER_VALUES_YAML "scalardb-cluster-custom-values.yaml")
 (def ^:private ^:const DEFAULT_SCALARDB_CLUSTER_VERSION "4.0.0-SNAPSHOT")
 (def ^:private ^:const DEFAULT_HELM_CHART_VERSION "1.7.2")
-(def ^:private ^:const DEFAULT_CHAOS_MESH_VERSION "2.7.2")
 
 (def ^:const WIPE_TIMEOUT "180s")
 (def ^:private ^:const TIMEOUT_SEC 600)
@@ -24,8 +23,7 @@
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
-(def ^:private ^:const CLUSTER_NODE_NAME (str CLUSTER_NAME "-node"))
-(def ^:private ^:const CLUSTER2_NODE_NAME (str CLUSTER2_NAME "-node"))
+(def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
@@ -38,12 +36,10 @@
 
     :scalardbClusterNodeProperties
     (str/join "\n"
-              ;; ScalarDB Cluster configurations
               ["scalar.db.cluster.membership.type=KUBERNETES"
                "scalar.db.cluster.membership.kubernetes.endpoint.namespace_name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAMESPACE_NAME}"
                "scalar.db.cluster.membership.kubernetes.endpoint.name=${env:SCALAR_DB_CLUSTER_MEMBERSHIP_KUBERNETES_ENDPOINT_NAME}"
                ""
-               ;; Set to true to include transaction metadata in the records
                "scalar.db.consensus_commit.include_metadata.enabled=true"])
 
     :imagePullSecrets [{:name "scalardb-ghcr-secret"}]}})
@@ -58,12 +54,10 @@
         new-db-props (-> values
                          (get-in path)
                          (str
-                          ;; Storage configurations
                           "\nscalar.db.storage=" storage-type
                           "\nscalar.db.contact_points=" contact-points
                           "\nscalar.db.username=" username
                           "\nscalar.db.password=" password
-                          ;; isolation level
                           "\nscalar.db.consensus_commit.isolation_level="
                           (-> test
                               :isolation-level
@@ -76,14 +70,11 @@
                               name
                               str/upper-case
                               (str/replace #"-" "_"))
-                          ;; connection pool min idle
                           "\nscalar.db.jdbc.connection_pool.min_idle=0"
                           "\nscalar.db.jdbc.table_metadata.connection_pool.min_idle=0"
                           "\nscalar.db.jdbc.admin.connection_pool.min_idle=0"
-                          ;; one phase commit
                           (when (:enable-one-phase-commit test)
                             "\nscalar.db.consensus_commit.one_phase_commit.enabled=true")
-                          ;; group commit - set hard-coded configurations for now
                           (when (:enable-group-commit test)
                             (str/join
                              "\n"
@@ -101,155 +92,112 @@
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
-  [backend-db]
-  ;; Cluster backend DB
-  (cluster-db/install! backend-db)
-
-  ;; ScalarDB Cluster
-  (c/exec :helm :repo :add
-          "scalar-labs" "https://scalar-labs.github.io/helm-charts")
-  ;; Chaos mesh
-  (c/exec :helm :repo :add "chaos-mesh" "https://charts.chaos-mesh.org")
-
-  (c/exec :helm :repo :update))
+  [test backend-db]
+  (cluster-db/install! backend-db test)
+  (helm/repo-add! test "scalar-labs" "https://scalar-labs.github.io/helm-charts")
+  (helm/repo-update! test))
 
 (defn- configure!
-  [backend-db]
+  [test backend-db]
   (when (and (seq (env :docker-username)) (seq (env :docker-access-token)))
-    (binding [c/*dir* (System/getProperty "user.dir")]
-      (try
-        (c/exec :kubectl :delete :secret "scalardb-ghcr-secret")
-        ;; ignore the failure when the secret doesn't exist
-        (catch Exception _))
-      (c/exec :kubectl :create :secret :docker-registry "scalardb-ghcr-secret"
-              "--docker-server=ghcr.io"
-              (str "--docker-username=" (env :docker-username))
-              (str "--docker-password=" (env :docker-access-token)))))
-
-  (cluster-db/configure! backend-db)
-
-  ;; Chaos Mesh
-  (try
-    (c/exec :kubectl :get :namespaces "chaos-mesh")
-    (catch Exception _
-      (c/exec :kubectl :create :ns "chaos-mesh"))))
+    (try
+      (k8s/kubectl! test :delete :secret "scalardb-ghcr-secret")
+      (catch Exception _))
+    (k8s/kubectl! test :create :secret :docker-registry "scalardb-ghcr-secret"
+                  "--docker-server=ghcr.io"
+                  (str "--docker-username=" (env :docker-username))
+                  (str "--docker-password=" (env :docker-access-token))))
+  (cluster-db/configure! backend-db test))
 
 (defn- start!
   [test backend-db]
-  ;; Cluster backend DB
-  (cluster-db/start! backend-db)
+  (cluster-db/start! backend-db test)
 
-  ;; ScalarDB Cluster
   (let [chart-version (or (some-> (env :helm-chart-version) not-empty)
                           DEFAULT_HELM_CHART_VERSION)]
-    (info "helm chart version: " chart-version)
-    (binding [c/*dir* (System/getProperty "user.dir")]
-      (->> CLUSTER_VALUES
-           (update-cluster-values test backend-db)
-           yaml/generate-string
-           (spit CLUSTER_VALUES_YAML))
-      (mapv #(c/exec :helm :install % "scalar-labs/scalardb-cluster"
-                     :-f CLUSTER_VALUES_YAML
-                     :--version chart-version
-                     :-n "default")
-            (if (need-two-clusters? test)
-              [CLUSTER_NAME CLUSTER2_NAME]
-              [CLUSTER_NAME]))
-      (-> CLUSTER_VALUES_YAML File. .delete)))
+    (info "helm chart version:" chart-version)
+    (->> CLUSTER_VALUES
+         (update-cluster-values test backend-db)
+         yaml/generate-string
+         (spit CLUSTER_VALUES_YAML))
+    (doseq [name (if (need-two-clusters? test)
+                   [CLUSTER_NAME CLUSTER2_NAME]
+                   [CLUSTER_NAME])]
+      (helm/install! test {:release name
+                           :chart "scalar-labs/scalardb-cluster"
+                           :values [CLUSTER_VALUES_YAML]
+                           :version chart-version
+                           :namespace "default"}))
+    (.delete (File. CLUSTER_VALUES_YAML)))
 
-  ;; Chaos mesh
-  (c/exec :helm :install "chaos-mesh" "chaos-mesh/chaos-mesh"
-          :-n "chaos-mesh"
-          :--version DEFAULT_CHAOS_MESH_VERSION))
+  (cm/setup! test {}))
 
 (defn- wipe!
-  [backend-db]
+  [test backend-db]
   (info "wiping old logs...")
-  (binding [c/*dir* (System/getProperty "user.dir")]
-    (try
-      (some->> (-> (c/exec :ls) (str/split #"\s+"))
-               (filter #(re-matches #"scalardb-cluster-.*\.log" %))
-               seq
-               (apply c/exec :rm :-f))
-      (catch Exception _ nil)))
+  (doseq [f (.listFiles (File. (System/getProperty "user.dir")))]
+    (when (and (.isFile f)
+               (re-matches #"scalardb-cluster-.*\.log" (.getName f)))
+      (.delete f)))
   (info "wiping the pods...")
-  (cluster-db/wipe! backend-db)
-  (doseq [cmd [[:helm :uninstall CLUSTER_NAME
-                :--timeout WIPE_TIMEOUT :--ignore-not-found]
-               [:helm :uninstall CLUSTER2_NAME
-                :--timeout WIPE_TIMEOUT :--ignore-not-found]
-               [:helm :uninstall "chaos-mesh" :-n "chaos-mesh"
-                :--timeout WIPE_TIMEOUT :--ignore-not-found]]]
-    (try (apply c/exec cmd)
-         (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (cluster-db/wipe! backend-db test)
+  (doseq [release [CLUSTER_NAME CLUSTER2_NAME]]
+    (try (helm/uninstall! test {:release release
+                                :timeout WIPE_TIMEOUT
+                                :ignore-not-found? true})
+         (catch Exception e (warn e "Failed to uninstall:" release))))
+  (try (cm/wipe! test {})
+       (catch Exception e (warn e "Failed to wipe Chaos Mesh"))))
 
 (defn- get-pod-list
-  "Get the pod list whose name starts with prefix"
-  [prefix]
-  (let [pods (-> (c/exec :kubectl :get :pod :-o :json)
-                 (cheshire/parse-string true))]
-    (->> pods
-         :items
-         (filter #(str/starts-with? (get-in % [:metadata :name]) prefix))
-         (filter #(= "Running" (get-in % [:status :phase])))
-         (map #(get-in % [:metadata :name])))))
+  "Get names of running ScalarDB Cluster node pods across all releases."
+  [test]
+  (->> (k8s/pods test {:selector NODE_SELECTOR})
+       :items
+       (filter #(= "Running" (get-in % [:status :phase])))
+       (map #(get-in % [:metadata :name]))))
 
 (defn- get-logs
-  [_test]
-  (binding [c/*dir* (System/getProperty "user.dir")]
-    (let [pods (concat (get-pod-list CLUSTER_NODE_NAME)
-                       (get-pod-list CLUSTER2_NODE_NAME))
-          logs (map #(str c/*dir* \/ % ".log") pods)]
-      (mapv #(spit %1 (c/exec :kubectl :logs %2)) logs pods)
-      logs)))
+  "Collect ScalarDB Cluster pod logs into the test's store directory directly."
+  [test]
+  (k8s/collect-logs! test {:selector NODE_SELECTOR
+                           :output-dir (store/path! test "pods")}))
 
 (defn get-load-balancer-ip
   "Get the external IP of a LoadBalancer service whose name includes prefix"
-  [prefix]
-  (let [svc (-> (c/exec :kubectl :get :svc :-o :json)
-                (cheshire/parse-string true))]
-    (->> svc
-         :items
-         (filter #(str/includes? (get-in % [:metadata :name]) prefix))
-         (filter #(= "LoadBalancer" (get-in % [:spec :type])))
-         (map #(get-in % [:status :loadBalancer :ingress 0 :ip]))
-         (remove nil?)
-         first)))
+  [test prefix]
+  (->> (k8s/services test {})
+       :items
+       (filter #(str/includes? (get-in % [:metadata :name]) prefix))
+       (filter #(= "LoadBalancer" (get-in % [:spec :type])))
+       (map #(get-in % [:status :loadBalancer :ingress 0 :ip]))
+       (remove nil?)
+       first))
 
 (defn get-k8s-node-ip
   "Get the internal IP of a Kubernetes node"
-  []
-  (let [nodes (-> (c/exec :kubectl :get :nodes :-o :json)
-                  (cheshire/parse-string true))]
-    (->> nodes
-         :items
-         (mapcat #(get-in % [:status :addresses]))
-         (filter #(= "InternalIP" (:type %)))
-         (map :address)
-         first)))
+  [test]
+  (->> (k8s/nodes test)
+       :items
+       (mapcat #(get-in % [:status :addresses]))
+       (filter #(= "InternalIP" (:type %)))
+       (map :address)
+       first))
 
 (defn- running-pods?
   "Check a live node."
   [test]
-  (-> test
-      :nodes
-      first
-      (c/on (concat (get-pod-list CLUSTER_NODE_NAME)
-                    (get-pod-list CLUSTER2_NODE_NAME)))
-      count
-      (= (if (need-two-clusters? test) 6 3))))
+  (= (count (get-pod-list test))
+     (if (need-two-clusters? test) 6 3)))
 
 (defn- cluster-nodes-ready?
   [test]
   (and (running-pods? test)
        (try
-         (c/on (-> test :nodes first)
-               (->> (concat (get-pod-list CLUSTER_NODE_NAME)
-                            (get-pod-list CLUSTER2_NODE_NAME))
-                    (mapv #(c/exec :kubectl :wait
-                                   "--for=condition=Ready"
-                                   "--timeout=120s"
-                                   (str "pod/" %)))))
+         (k8s/wait! test {:resource "pod"
+                          :selector NODE_SELECTOR
+                          :for "condition=Ready"
+                          :timeout "120s"})
          true
          (catch Exception e
            (warn e "An error occurred")
@@ -274,36 +222,34 @@
     db/DB
     (setup! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe! backend-db))
-      (install! backend-db)
-      (configure! backend-db)
+        (wipe! test backend-db))
+      (install! test backend-db)
+      (configure! test backend-db)
       (start! test backend-db)
-      ;; wait for the pods
       (wait-for-recovery test))
 
     (teardown! [_ test _]
       (when-not (:leave-db-running? test)
-        (wipe! backend-db)))
+        (wipe! test backend-db)))
 
     db/Primary
     (primaries [_ test] (:nodes test))
     (setup-primary! [_ _ _])
 
-    db/Pause
-    (pause! [_ _ _]
-      (n/apply-pod-fault-exp :pause))
-    (resume! [_ _ _]
-      (n/delete-pod-fault-exp))
-
     db/Kill
-    (start! [_ _ _]
-      (n/delete-pod-fault-exp))
-    (kill! [_ _ _]
-      (n/apply-pod-fault-exp :kill))
+    (kill! [_ _test _node])
+    (start! [_ _test _node])
+
+    db/Pause
+    (pause! [_ _test _node])
+    (resume! [_ _test _node])
 
     db/LogFiles
     (log-files [_ test _]
-      (get-logs test))))
+      ;; Collect pod logs into store/ ourselves and return [] so jepsen's
+      ;; snarf-logs! doesn't try to fetch them over the dummy SSH connection.
+      (get-logs test)
+      [])))
 
 (defrecord ExtCluster [backend-db]
   ext/DbExtension
@@ -313,9 +259,8 @@
   (create-properties
     [_ test]
     (or (ext/load-config test)
-        (let [node (-> test :nodes first)
-              ip (c/on node (get-load-balancer-ip (str CLUSTER_NAME "-envoy")))
-              ip2 (c/on node (get-load-balancer-ip (str CLUSTER2_NAME "-envoy")))
+        (let [ip (get-load-balancer-ip test (str CLUSTER_NAME "-envoy"))
+              ip2 (get-load-balancer-ip test (str CLUSTER2_NAME "-envoy"))
               create-fn
               (fn [ip]
                 (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
@@ -360,5 +305,6 @@
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
   (let [backend-db (cluster-backend-db db-type opts)
-        db (ext/extend-db (db backend-db) (->ExtCluster backend-db))]
-    [db (n/nemesis-package db 60 faults) 1]))
+        db (ext/extend-db (db backend-db) (->ExtCluster backend-db))
+        nemesis (cm/nemesis-package db 60 faults)]
+    [db nemesis 1]))

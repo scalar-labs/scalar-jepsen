@@ -35,7 +35,8 @@
                                                     com.oracle.database.jdbc/ojdbc8-production
                                                     com.azure/azure-cosmos
                                                     com.datastax.cassandra/cassandra-driver-core
-                                                    com.google.cloud/*]]]
+                                                    com.google.cloud/*]]
+                                      [com.scalar-labs/jepsen-k8s "0.1.0-SNAPSHOT"]]
                        :env {:cluster? "true"
                              :scalardb-cluster-version "4.0.0-SNAPSHOT"
                              :helm-chart-version "1.7.2"}}

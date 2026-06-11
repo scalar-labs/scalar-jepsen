@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-db.tidb
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -8,7 +9,7 @@
 (def ^:private ^:const TIDB_NAME "tidb-scalardb-cluster-tidb")
 (def ^:private ^:const TIDB_OPERATOR_NAME "tidb-operator")
 (def ^:private ^:const TIDB_USER "root")
-(def ^:private ^:const TIDB_PASSWORD "") ;; empty
+(def ^:private ^:const TIDB_PASSWORD "")
 (def ^:private ^:const TIDB_CRD_URL "https://raw.githubusercontent.com/pingcap/tidb-operator/v1.6.5/manifests/crd.yaml")
 (def ^:private ^:const TIDB_MANIFEST_YAML "tidb-cluster.yaml")
 
@@ -23,41 +24,40 @@
 
   (get-password [_] TIDB_PASSWORD)
 
-  (install! [_]
-    (c/exec :helm :repo :add "pingcap" "https://charts.pingcap.org/")
-    (c/exec :kubectl :create :namespace "tidb-admin")
-    (c/exec :kubectl :create :-f TIDB_CRD_URL)
-    (c/exec :helm :install
-            TIDB_OPERATOR_NAME "pingcap/tidb-operator"
-            :--namespace "tidb-admin"
-            :--version "v1.6.5")
-    (c/upload TIDB_MANIFEST_YAML "/tmp"))
+  (install! [_ test]
+    (helm/repo-add! test "pingcap" "https://charts.pingcap.org/")
+    (k8s/kubectl! test :create :namespace "tidb-admin")
+    (k8s/kubectl! test :create :-f TIDB_CRD_URL)
+    (helm/install! test {:release TIDB_OPERATOR_NAME
+                         :chart "pingcap/tidb-operator"
+                         :namespace "tidb-admin"
+                         :version "v1.6.5"}))
 
-  (configure! [_])
+  (configure! [_ _])
 
-  (start! [_]
-    (c/exec :kubectl :apply :-f (str "/tmp/" TIDB_MANIFEST_YAML)))
+  (start! [_ test]
+    (k8s/kubectl! test :apply :-f TIDB_MANIFEST_YAML))
 
-  (wipe! [_]
-    (doseq [cmd [[:kubectl :delete :-f (str "/tmp/" TIDB_MANIFEST_YAML)
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
-                 [:kubectl :delete :pvc "pd-tidb-scalardb-cluster-pd-0"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
-                 [:kubectl :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
-                 [:helm :uninstall TIDB_OPERATOR_NAME
-                  :--namespace "tidb-admin" :--timeout WIPE_TIMEOUT
-                  :--ignore-not-found]
-                 [:kubectl :delete :namespace "tidb-admin"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]
-                 [:kubectl :delete :-f TIDB_CRD_URL
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(k8s/kubectl! test :delete :-f TIDB_MANIFEST_YAML
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
+                 #(k8s/kubectl! test :delete :pvc "pd-tidb-scalardb-cluster-pd-0"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
+                 #(k8s/kubectl! test :delete :pvc "tikv-tidb-scalardb-cluster-tikv-0"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
+                 #(helm/uninstall! test {:release TIDB_OPERATOR_NAME
+                                         :namespace "tidb-admin"
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
+                 #(k8s/kubectl! test :delete :namespace "tidb-admin"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")
+                 #(k8s/kubectl! test :delete :-f TIDB_CRD_URL
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip TIDB_NAME))]
+    (let [ip (get-load-balancer-ip test TIDB_NAME)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-db.postgres
   (:require [clojure.tools.logging :refer [warn]]
-            [jepsen.control :as c]
+            [jepsen.k8s.core :as k8s]
+            [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
   (:import (java.util Properties)))
@@ -20,38 +21,37 @@
 
   (get-password [_] POSTGRESQL_PASSWORD)
 
-  (install! [_]
-    (c/exec :helm :repo :add "bitnami" "https://charts.bitnami.com/bitnami"))
+  (install! [_ test]
+    (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 
-  (configure! [_])
+  (configure! [_ _])
 
-  (start! [_]
-    (c/exec :helm :install POSTGRESQL_NAME "bitnami/postgresql"
-            :--set (str "auth.postgresPassword=" POSTGRESQL_PASSWORD)
-            :--set "primary.persistence.enabled=true"
-            ;; Need an external IP for storage APIs
-            :--set "service.type=LoadBalancer"
-            :--set "primary.service.type=LoadBalancer"
-            ;; Use legacy images
-            :--set "image.repository=bitnamilegacy/postgresql"
-            :--set "volumePermissions.image.repository=bitnamilegacy/os-shell"
-            :--set "metrics.image.repository=bitnamilegacy/postgres-exporter"
-            :--set "global.security.allowInsecureImages=true"
-            :--version "16.7.0"))
+  (start! [_ test]
+    (helm/install! test {:release POSTGRESQL_NAME
+                         :chart "bitnami/postgresql"
+                         :version "16.7.0"
+                         :set {:auth.postgresPassword POSTGRESQL_PASSWORD
+                               :primary.persistence.enabled true
+                               :service.type "LoadBalancer"
+                               :primary.service.type "LoadBalancer"
+                               :image.repository "bitnamilegacy/postgresql"
+                               :volumePermissions.image.repository "bitnamilegacy/os-shell"
+                               :metrics.image.repository "bitnamilegacy/postgres-exporter"
+                               :global.security.allowInsecureImages true}}))
 
-  (wipe! [_]
-    (doseq [cmd [[:helm :uninstall POSTGRESQL_NAME
-                  :--timeout WIPE_TIMEOUT :--ignore-not-found]
-                 [:kubectl :delete
-                  :pvc
-                  :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"
-                  :--timeout WIPE_TIMEOUT "--ignore-not-found=true"]]]
-      (try (apply c/exec cmd)
-           (catch Exception e (warn e "Failed to exec:" cmd)))))
+  (wipe! [_ test]
+    (doseq [cmd [#(helm/uninstall! test {:release POSTGRESQL_NAME
+                                         :timeout WIPE_TIMEOUT
+                                         :ignore-not-found? true})
+                 #(k8s/kubectl! test :delete
+                                :pvc
+                                :-l "app.kubernetes.io/instance=postgresql-scalardb-cluster"
+                                :--timeout WIPE_TIMEOUT "--ignore-not-found=true")]]
+      (try (cmd)
+           (catch Exception e (warn e "Failed to exec wipe command")))))
 
   (create-storage-properties [_ test]
-    (let [node (-> test :nodes first)
-          ip (c/on node (get-load-balancer-ip POSTGRESQL_NAME))]
+    (let [ip (get-load-balancer-ip test POSTGRESQL_NAME)]
       (doto (Properties.)
         (.setProperty "scalar.db.storage" "jdbc")
         (.setProperty "scalar.db.contact_points"

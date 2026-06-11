@@ -21,7 +21,7 @@ jobs:
         distribution: 'temurin'
 
     - name: Install leiningen
-      uses: DeLaGuardo/setup-clojure@13.0
+      uses: DeLaGuardo/setup-clojure@13
       with:
         lein: latest
 
@@ -46,7 +46,7 @@ jobs:
     - name: Run test for ScalarDB
       run: |
         cd scalardb
-        lein with-profile dev,cassandra cloverage
+        lein with-profile dev,cassandra,cluster cloverage
 
     - name: Run test for ScalarDL
       run: |
