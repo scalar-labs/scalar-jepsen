@@ -25,6 +25,9 @@
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
+(def ^:private ^:const LB_SCHEME_ANNOTATION
+  "service.beta.kubernetes.io/aws-load-balancer-scheme")
+
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
            :service {:type "LoadBalancer"}}
@@ -89,6 +92,25 @@
   [test]
   (str/includes? (:name test) "2pc"))
 
+(defn- expose-loadbalancers!
+  "When --lb-internet-facing is set, annotate every LoadBalancer service in the
+  namespace so the cloud provisions it internet-facing. This covers both the
+  Envoy entry point and each backend DB's service: the checker reaches the
+  backend directly via the ScalarDB storage API, so the backend must be
+  reachable from outside the cloud network too. Backends exposed via NodePort +
+  node IP (e.g. Db2, Oracle) are not LoadBalancers and need separate handling.
+  The annotation is ignored by providers that don't recognize it (e.g. MetalLB)."
+  [test]
+  (when (:lb-internet-facing test)
+    (doseq [name (->> (k8s/services test {})
+                      :items
+                      (filter #(= "LoadBalancer" (get-in % [:spec :type])))
+                      (map #(get-in % [:metadata :name])))]
+      (info "exposing LoadBalancer as internet-facing:" name)
+      (k8s/kubectl! test :annotate :svc name
+                    (str LB_SCHEME_ANNOTATION "=internet-facing")
+                    :--overwrite))))
+
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
@@ -130,7 +152,11 @@
                            :namespace "default"}))
     (.delete (File. CLUSTER_VALUES_YAML)))
 
-  (cm/setup! test {}))
+  (cm/setup! test {})
+
+  ;; Expose the Envoy and backend DB LoadBalancers to outside the cloud network
+  ;; when requested (e.g. a Jepsen control running outside the VPC on EKS).
+  (expose-loadbalancers! test))
 
 (defn- wipe!
   [test backend-db]
@@ -164,14 +190,16 @@
                            :output-dir (store/path! test "pods")}))
 
 (defn get-load-balancer-ip
-  "Get the external IP of a LoadBalancer service whose name includes prefix"
+  "Get the external address of a LoadBalancer service whose name includes
+  prefix. Returns the ingress IP when present, otherwise the DNS hostname
+  (clouds like AWS expose LoadBalancers via a hostname rather than an IP)."
   [test prefix]
   (->> (k8s/services test {})
        :items
        (filter #(str/includes? (get-in % [:metadata :name]) prefix))
        (filter #(= "LoadBalancer" (get-in % [:spec :type])))
-       (map #(get-in % [:status :loadBalancer :ingress 0 :ip]))
-       (remove nil?)
+       (keep #(let [ingress (get-in % [:status :loadBalancer :ingress 0])]
+                (or (:ip ingress) (:hostname ingress))))
        first))
 
 (defn get-k8s-node-ip
