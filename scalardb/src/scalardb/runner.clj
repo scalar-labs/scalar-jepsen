@@ -108,7 +108,7 @@
                   s))]
 
    [nil "--lb-internet-facing"
-    "if set, expose the ScalarDB Cluster (Envoy) LoadBalancer as internet-facing (e.g. on EKS, so a Jepsen control outside the VPC can reach it). Requires cloud-side setup such as tagged public subnets and security group rules. Ignored where the LB provider doesn't use the annotation (e.g. MetalLB)."
+    "if set, expose the ScalarDB Cluster (Envoy) and backend DB LoadBalancers as internet-facing (e.g. on EKS, so a Jepsen control outside the VPC can reach both the cluster and, via the storage API, the backend). Requires cloud-side setup such as tagged public subnets and security group rules. Ignored where the LB provider doesn't use the annotation (e.g. MetalLB)."
     :default false]
 
    [nil "--config-file CONFIG_FILE"
