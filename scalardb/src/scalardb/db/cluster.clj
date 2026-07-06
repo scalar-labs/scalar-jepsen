@@ -189,10 +189,7 @@
   (k8s/collect-logs! test {:selector NODE_SELECTOR
                            :output-dir (store/path! test "pods")}))
 
-(defn get-load-balancer-ip
-  "Get the external address of a LoadBalancer service whose name includes
-  prefix. Returns the ingress IP when present, otherwise the DNS hostname
-  (clouds like AWS expose LoadBalancers via a hostname rather than an IP)."
+(defn- find-load-balancer-ip
   [test prefix]
   (->> (k8s/services test {})
        :items
@@ -201,6 +198,23 @@
        (keep #(let [ingress (get-in % [:status :loadBalancer :ingress 0])]
                 (or (:ip ingress) (:hostname ingress))))
        first))
+
+(defn get-load-balancer-ip
+  "Get the external address of a LoadBalancer service whose name includes
+  prefix. Returns the ingress IP when present, otherwise the DNS hostname
+  (clouds like AWS expose LoadBalancers via a hostname rather than an IP).
+  Cloud providers provision the LoadBalancer asynchronously, so poll until an
+  address appears rather than returning nil the instant after service creation."
+  ([test prefix] (get-load-balancer-ip test prefix TIMEOUT_SEC INTERVAL_SEC))
+  ([test prefix timeout-sec interval-sec]
+   (or (find-load-balancer-ip test prefix)
+       (if (<= timeout-sec 0)
+         (throw (ex-info "Timed out waiting for LoadBalancer address"
+                         {:prefix prefix}))
+         (do
+           (info "waiting for LoadBalancer address for" prefix "...")
+           (Thread/sleep (* interval-sec 1000))
+           (recur test prefix (- timeout-sec interval-sec) interval-sec))))))
 
 (defn get-k8s-node-ip
   "Get the IP of a Kubernetes node used to reach NodePort-exposed backends
@@ -294,9 +308,7 @@
   (create-properties
     [_ test]
     (or (ext/load-config test)
-        (let [ip (get-load-balancer-ip test (str CLUSTER_NAME "-envoy"))
-              ip2 (get-load-balancer-ip test (str CLUSTER2_NAME "-envoy"))
-              create-fn
+        (let [create-fn
               (fn [ip]
                 (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
                   (doto (Properties.)
@@ -305,8 +317,9 @@
                     (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled" client-side-optimizations-enabled)
                     (.setProperty "scalar.db.cluster.client.write_buffering.enabled" client-side-optimizations-enabled))))]
           (if (need-two-clusters? test)
-            (mapv create-fn [ip ip2])
-            (create-fn ip)))))
+            (mapv (comp create-fn #(get-load-balancer-ip test (str % "-envoy")))
+                  [CLUSTER_NAME CLUSTER2_NAME])
+            (create-fn (get-load-balancer-ip test (str CLUSTER_NAME "-envoy")))))))
   (create-storage-properties [_ test]
     (cluster-db/create-storage-properties backend-db test)))
 
