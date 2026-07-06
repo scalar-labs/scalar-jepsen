@@ -30,6 +30,14 @@ spec:
         app: oracle-scalardb-cluster
     spec:
       terminationGracePeriodSeconds: 60
+      # The gvenzl/oracle-free image runs as the non-root "oracle" user
+      # (uid/gid 54321). On EKS the EBS CSI driver mounts a fresh volume owned
+      # by root:root, so that user cannot create its datafiles under
+      # /opt/oracle/oradata. fsGroup makes the kubelet chown/setgid the mounted
+      # volume to gid 54321 so the container can write. (kind's local-path
+      # provisioner mounts world-writable, so this is not needed there.)
+      securityContext:
+        fsGroup: 54321
       containers:
         - name: oracle
           image: ghcr.io/gvenzl/oracle-free:23-slim

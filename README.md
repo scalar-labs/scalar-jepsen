@@ -114,7 +114,16 @@ aws ec2 create-tags --region ${REGION} \
     --tags Key=kubernetes.io/role/elb,Value=1
 ```
 
-2. Allow the control machine's IP in the load balancers' security group on the relevant ports (e.g. `60053` for Envoy, `5432` for PostgreSQL).
+2. Allow the control machine's IP in the load balancers' security group on the relevant ports (e.g. `60053` for Envoy, `5432` for PostgreSQL). Use the control's **public** IP as a `/32` (the source the node/LB sees), not its LAN address:
+```sh
+YOUR_IP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${LB_SG_ID} \
+    --protocol tcp --port 60053 --cidr ${YOUR_IP}/32   # Envoy
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${LB_SG_ID} \
+    --protocol tcp --port 5432 --cidr ${YOUR_IP}/32     # PostgreSQL
+```
 
 Then run the test, pointing it at your EKS cluster and requesting internet-facing LoadBalancers:
 ```sh
@@ -126,4 +135,13 @@ lein with-profile cluster run test --workload transfer --db postgres \
 
 Notes:
   - The subnet tags and security group rules (like the `StorageClass`) are one-time cluster setup that persists across test runs — the test's wipe does not remove them — so they are best handled by your IaC rather than applied each run.
-  - Db2 and Oracle backends are exposed via a NodePort on the Kubernetes node rather than a `LoadBalancer`, so `--lb-internet-facing` does not apply to them; external access to those requires the node's external IP and a security group rule on the NodePort.
+  - Db2 and Oracle backends are exposed via a NodePort on the Kubernetes node rather than a `LoadBalancer`, so `--lb-internet-facing` does not apply to them. External access goes to `<node-external-IP>:<nodePort>` (`31500` for Db2, `31521` for Oracle), which requires the worker nodes to have public IPs (public subnets) and a rule on the **node** security group (distinct from the LoadBalancer security group above) allowing your IP to those NodePorts:
+```sh
+YOUR_IP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${NODE_SG_ID} \
+    --protocol tcp --port 31500 --cidr ${YOUR_IP}/32   # Db2
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${NODE_SG_ID} \
+    --protocol tcp --port 31521 --cidr ${YOUR_IP}/32   # Oracle
+```
