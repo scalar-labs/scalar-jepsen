@@ -131,11 +131,12 @@ lein with-profile cluster run test --workload transfer --db postgres \
     --kubeconfig ~/.kube/eks-jepsen-test --lb-internet-facing
 ```
   - `--kubeconfig FILE`: kubeconfig file for kubectl/helm (uses that file's current context).
-  - `--lb-internet-facing`: annotates the Envoy and backend DB `LoadBalancer` services as internet-facing so the control can reach them.
+  - `--lb-internet-facing`: annotates the Envoy and backend DB `LoadBalancer` services as internet-facing so the control can reach them. This is AWS-specific: on EKS a `LoadBalancer` is internal by default, so the annotation is required. On GKE/AKS, `LoadBalancer` services are external by default and the annotation is a no-op, so the flag is not needed there.
 
 Notes:
   - The subnet tags and security group rules (like the `StorageClass`) are one-time cluster setup that persists across test runs — the test's wipe does not remove them — so they are best handled by your IaC rather than applied each run.
-  - Db2 and Oracle backends are exposed via a NodePort on the Kubernetes node rather than a `LoadBalancer`, so `--lb-internet-facing` does not apply to them. External access goes to `<node-external-IP>:<nodePort>` (`31500` for Db2, `31521` for Oracle), which requires the worker nodes to have public IPs (public subnets) and a rule on the **node** security group (distinct from the LoadBalancer security group above) allowing your IP to those NodePorts:
+  - Db2 and Oracle backends are exposed via a NodePort on the Kubernetes node rather than a `LoadBalancer`, so `--lb-internet-facing` does not apply to them. The test reaches them at `<node-external-IP>:<nodePort>` (`31500` for Db2, `31521` for Oracle): it automatically uses the node's `ExternalIP` when the node reports one (falling back to the `InternalIP`, e.g. on local `kind`), so no flag is required. This requires the worker nodes to have public IPs (public subnets) and a firewall/security-group rule allowing your IP to those NodePorts — on the **node** security group on EKS (distinct from the LoadBalancer security group above), or a firewall rule on the node network tag on GKE:
+On EKS (node security group):
 ```sh
 YOUR_IP=$(curl -s https://checkip.amazonaws.com)
 aws ec2 authorize-security-group-ingress --region ${REGION} \
@@ -145,3 +146,15 @@ aws ec2 authorize-security-group-ingress --region ${REGION} \
     --group-id ${NODE_SG_ID} \
     --protocol tcp --port 31521 --cidr ${YOUR_IP}/32   # Oracle
 ```
+On GKE (firewall rule targeting the node network tag; find the tag with
+`gcloud compute instances list --format="table(name, tags.items)"`):
+```sh
+YOUR_IP=$(curl -s https://checkip.amazonaws.com)
+gcloud compute firewall-rules create allow-scalardb-nodeport \
+    --project=${PROJECT} --network=${NETWORK} \
+    --direction=INGRESS --action=ALLOW \
+    --rules=tcp:31500,tcp:31521 \
+    --source-ranges=${YOUR_IP}/32 \
+    --target-tags=${NODE_NETWORK_TAG}
+```
+Note that GKE nodes have public IPs only on a public cluster; a private (or Autopilot) cluster's nodes report no `ExternalIP`, so the test falls back to the unreachable `InternalIP` and NodePort access from outside the VPC is not possible without a bastion/tunnel.

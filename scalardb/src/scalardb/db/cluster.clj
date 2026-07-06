@@ -218,10 +218,11 @@
 
 (defn get-k8s-node-ip
   "Get the IP of a Kubernetes node used to reach NodePort-exposed backends
-  (e.g. Db2, Oracle). With --lb-internet-facing the control runs outside the
-  cloud network, so prefer the node's ExternalIP (its public IP); otherwise use
-  the InternalIP, which is what an in-VPC or local (kind) control can reach.
-  Falls back to InternalIP if no ExternalIP is reported."
+  (e.g. Db2, Oracle). Prefer the node's ExternalIP (its public IP) when the node
+  reports one, so a control outside the cloud network (e.g. on EKS/GKE) can
+  reach the NodePort; fall back to the InternalIP, which is what an in-VPC or
+  local (kind) control uses. kind nodes report no ExternalIP, so they keep using
+  the InternalIP."
   [test]
   (let [addresses (->> (k8s/nodes test)
                        :items
@@ -230,8 +231,7 @@
                              (filter #(= t (:type %)))
                              (map :address)
                              first))]
-    (or (when (:lb-internet-facing test) (by-type "ExternalIP"))
-        (by-type "InternalIP"))))
+    (or (by-type "ExternalIP") (by-type "InternalIP"))))
 
 (defn- running-pods?
   "Check a live node."
