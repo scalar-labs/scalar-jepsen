@@ -1,9 +1,17 @@
 (ns scalardl.cassandra
-  (:require [clojure.tools.logging :refer [info]]
+  (:require [clojure.string :as string]
+            [clojure.tools.logging :refer [info]]
             [cassandra.core :as cassandra]
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :as clause]
-            [qbits.hayt.dsl.statement :as st]))
+            [qbits.hayt.dsl.statement :as st])
+  (:import (com.scalar.db.schemaloader SchemaLoader)
+           (com.scalar.db.storage.cassandra CassandraAdmin
+                                            CassandraAdmin$ReplicationStrategy)
+           (java.util Properties)))
+
+(def ^:private ^:const SCHEMA_URL
+  "https://raw.githubusercontent.com/scalar-labs/scalardl/master/schema-loader/ledger-schema.json")
 
 (def ^:private ^:const TX_COMMITTED 3)
 
@@ -43,95 +51,25 @@
   (when-not (seq (System/getenv "LEAVE_CLUSTER_RUNNING"))
     (cassandra/wipe! test node)))
 
+(defn- create-properties
+  [test]
+  (doto (Properties.)
+    (.setProperty "scalar.db.storage" "cassandra")
+    (.setProperty "scalar.db.contact_points" (string/join "," (:cass-nodes test)))
+    (.setProperty "scalar.db.username" "cassandra")
+    (.setProperty "scalar.db.password" "cassandra")))
+
+(defn- create-table-opts
+  [test]
+  {(keyword CassandraAdmin/REPLICATION_STRATEGY)
+   (str CassandraAdmin$ReplicationStrategy/SIMPLE_STRATEGY)
+   (keyword CassandraAdmin/REPLICATION_FACTOR) (str (:rf test))})
+
 (defn create-tables
   [test]
   (info "creating tables")
-  (let [session (alia/session {:contact-points (mapv #(str %1 ":9042")
-                                                     (:cass-nodes test))
-                               :load-balancing-local-datacenter "datacenter1"})]
-    (doto session
-      (cassandra/create-my-keyspace test {:keyspace "scalar"})
-      (cassandra/create-my-table {:keyspace "scalar"
-                                  :table "asset"
-                                  :schema {:id                     :text
-                                           :age                    :int
-                                           :argument               :text
-                                           :before_argument        :text
-                                           :before_contract_id     :text
-                                           :before_hash            :blob
-                                           :before_input           :text
-                                           :before_output          :text
-                                           :before_prev_hash       :blob
-                                           :before_signature       :blob
-                                           :before_tx_committed_at :bigint
-                                           :before_tx_id           :text
-                                           :before_tx_prepared_at  :bigint
-                                           :before_tx_state        :int
-                                           :before_tx_version      :int
-                                           :contract_id            :text
-                                           :hash                   :blob
-                                           :input                  :text
-                                           :output                 :text
-                                           :prev_hash              :blob
-                                           :signature              :blob
-                                           :tx_committed_at        :bigint
-                                           :tx_id                  :text
-                                           :tx_prepared_at         :bigint
-                                           :tx_state               :int
-                                           :tx_version             :int
-                                           :primary-key            [:id :age]}})
-      (cassandra/create-my-table {:keyspace "scalar"
-                                  :table "asset_metadata"
-                                  :schema {:asset_id               :text
-                                           :latest_age             :int
-                                           :tx_committed_at        :bigint
-                                           :tx_id                  :text
-                                           :tx_prepared_at         :bigint
-                                           :tx_state               :int
-                                           :tx_version             :int
-                                           :before_latest_age      :int
-                                           :before_tx_committed_at :bigint
-                                           :before_tx_id           :text
-                                           :before_tx_prepared_at  :bigint
-                                           :before_tx_state        :int
-                                           :before_tx_version      :int
-                                           :primary-key [:asset_id]}})
-
-      (cassandra/create-my-table {:keyspace "scalar"
-                                  :table "contract"
-                                  :schema {:id             :text
-                                           :cert_holder_id :text
-                                           :cert_version   :int
-                                           :binary_name    :text
-                                           :properties     :text
-                                           :registered_at  :bigint
-                                           :signature      :blob
-                                           :primary-key    [:cert_holder_id
-                                                            :cert_version
-                                                            :id]}})
-      (alia/execute (st/create-index :scalar.contract
-                                     :id
-                                     (clause/if-exists false)))
-      (cassandra/create-my-table {:keyspace "scalar"
-                                  :table "contract_class"
-                                  :schema {:binary_name :text
-                                           :byte_code   :blob
-                                           :primary-key [:binary_name]}})
-
-      (cassandra/create-my-table {:keyspace "scalar"
-                                  :table "certificate"
-                                  :schema {:holder_id     :text
-                                           :version       :int
-                                           :pem           :text
-                                           :registered_at :bigint
-                                           :primary-key   [:holder_id
-                                                           :version]}})
-
-      (cassandra/create-my-keyspace test {:keyspace "coordinator"})
-      (cassandra/create-my-table {:keyspace "coordinator"
-                                  :table "state"
-                                  :schema {:tx_id         :text
-                                           :tx_state      :int
-                                           :tx_created_at :bigint
-                                           :primary-key   [:tx_id]}}))
-    (cassandra/close-cassandra session)))
+  (let [schema (slurp SCHEMA_URL)]
+    (SchemaLoader/load (create-properties test)
+                       schema
+                       (create-table-opts test)
+                       true)))
