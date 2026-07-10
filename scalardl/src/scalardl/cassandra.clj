@@ -61,9 +61,9 @@
 
 (defn- create-table-opts
   [test]
-  {(keyword CassandraAdmin/REPLICATION_STRATEGY)
+  {CassandraAdmin/REPLICATION_STRATEGY
    (str CassandraAdmin$ReplicationStrategy/SIMPLE_STRATEGY)
-   (keyword CassandraAdmin/REPLICATION_FACTOR) (str (:rf test))})
+   CassandraAdmin/REPLICATION_FACTOR (str (:rf test))})
 
 (defn create-tables
   [test]
