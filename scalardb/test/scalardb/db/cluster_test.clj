@@ -52,7 +52,7 @@
   (testing "prefers the node ExternalIP when it reports one (e.g. EKS/GKE)"
     (with-redefs [k8s/nodes
                   (spy/stub {:items [(node [{:type "ExternalIP" :address "1.2.3.4"}
-                                           {:type "InternalIP" :address "10.0.0.1"}])]})]
+                                            {:type "InternalIP" :address "10.0.0.1"}])]})]
       (is (= "1.2.3.4" (cluster/get-k8s-node-ip {})))))
 
   (testing "falls back to the InternalIP when no ExternalIP (e.g. kind)"
