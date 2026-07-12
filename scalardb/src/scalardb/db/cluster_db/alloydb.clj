@@ -33,6 +33,8 @@
 
   (get-password [_] ALLOYDB_PASSWORD)
 
+  (get-lb-service-name [_] (str "al-" ALLOYDB_NAME))
+
   (install! [_ test]
     (helm/repo-add! test "jetstack" "https://charts.jetstack.io")
     (helm/repo-update! test)

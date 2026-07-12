@@ -23,6 +23,9 @@
 
   (get-password [_] DB2_PASSWORD)
 
+  ;; Db2 is reached via NodePort + node IP, not a LoadBalancer.
+  (get-lb-service-name [_] nil)
+
   (install! [_ _])
 
   (configure! [_ test]

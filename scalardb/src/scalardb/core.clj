@@ -8,7 +8,7 @@
            (com.scalar.db.schemaloader SchemaLoader)
            (com.scalar.db.service TransactionFactory
                                   StorageFactory)
-           (com.scalar.db.transaction.consensuscommit Coordinator)))
+           (com.scalar.db.transaction.consensuscommit CoordinatorStateAccessor)))
 
 (def ^:const RETRIES 20)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
@@ -248,7 +248,7 @@
       (when (nil? @(:storage test))
         (prepare-storage-service! test))
       (with-retry prepare-storage-service! test
-        (let [coordinator (Coordinator. @(:storage test))
+        (let [coordinator (CoordinatorStateAccessor. @(:storage test))
               committed (map (partial is-committed-state? coordinator) ids)]
           (if (some nil? committed)
             nil

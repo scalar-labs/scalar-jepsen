@@ -93,23 +93,25 @@
   (str/includes? (:name test) "2pc"))
 
 (defn- expose-loadbalancers!
-  "When --lb-internet-facing is set, annotate every LoadBalancer service in the
-  namespace so the cloud provisions it internet-facing. This covers both the
-  Envoy entry point and each backend DB's service: the checker reaches the
-  backend directly via the ScalarDB storage API, so the backend must be
-  reachable from outside the cloud network too. Backends exposed via NodePort +
-  node IP (e.g. Db2, Oracle) are not LoadBalancers and need separate handling.
-  The annotation is ignored by providers that don't recognize it (e.g. MetalLB)."
-  [test]
+  "When --lb-internet-facing is set, annotate the test's own LoadBalancer
+  services so the cloud provisions them internet-facing."
+  [test backend-db]
   (when (:lb-internet-facing test)
-    (doseq [name (->> (k8s/services test {})
-                      :items
-                      (filter #(= "LoadBalancer" (get-in % [:spec :type])))
-                      (map #(get-in % [:metadata :name])))]
-      (info "exposing LoadBalancer as internet-facing:" name)
-      (k8s/kubectl! test :annotate :svc name
-                    (str LB_SCHEME_ANNOTATION "=internet-facing")
-                    :--overwrite))))
+    (let [envoy-names (map #(str % "-envoy")
+                           (if (need-two-clusters? test)
+                             [CLUSTER_NAME CLUSTER2_NAME]
+                             [CLUSTER_NAME]))
+          names (remove nil? (conj envoy-names
+                                   (cluster-db/get-lb-service-name backend-db)))]
+      (doseq [name (->> (k8s/services test {})
+                        :items
+                        (filter #(= "LoadBalancer" (get-in % [:spec :type])))
+                        (map #(get-in % [:metadata :name]))
+                        (filter (fn [svc] (some #(str/includes? svc %) names))))]
+        (info "exposing LoadBalancer as internet-facing:" name)
+        (k8s/kubectl! test :annotate :svc name :-n (k8s/namespace test)
+                      (str LB_SCHEME_ANNOTATION "=internet-facing")
+                      :--overwrite)))))
 
 (defn- install!
   "Install prerequisites.
@@ -156,7 +158,7 @@
 
   ;; Expose the Envoy and backend DB LoadBalancers to outside the cloud network
   ;; when requested (e.g. a Jepsen control running outside the VPC on EKS).
-  (expose-loadbalancers! test))
+  (expose-loadbalancers! test backend-db))
 
 (defn- wipe!
   [test backend-db]

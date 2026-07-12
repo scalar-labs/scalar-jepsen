@@ -92,6 +92,9 @@
 
   (get-password [_] (or (:password config) ""))
 
+  ;; External managed DB; there is no in-cluster LoadBalancer service.
+  (get-lb-service-name [_] nil)
+
   (install! [_ _]
     (info "Managed DB; skipping install"))
 

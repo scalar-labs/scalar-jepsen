@@ -1,6 +1,7 @@
 (ns scalardb.runner
   (:gen-class)
-  (:require [clojure.string :as string]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [environ.core :refer [env]]
             [jepsen
              [core :as jepsen]
@@ -105,7 +106,9 @@
     :parse-fn (fn [s]
                 (if (string/starts-with? s "~/")
                   (str (System/getProperty "user.home") (subs s 1))
-                  s))]
+                  s))
+    :validate [#(.canRead (io/file %))
+               "Kubeconfig file must exist and be readable"]]
 
    [nil "--lb-internet-facing"
     "if set, expose the ScalarDB Cluster (Envoy) and backend DB LoadBalancers as internet-facing (e.g. on EKS, so a Jepsen control outside the VPC can reach both the cluster and, via the storage API, the backend). Requires cloud-side setup such as tagged public subnets and security group rules. Ignored where the LB provider doesn't use the annotation (e.g. MetalLB)."
