@@ -63,7 +63,16 @@
 (defn- backend-db
   [lb-name]
   (reify cluster-db/ClusterDb
-    (get-lb-service-name [_] lb-name)))
+    (get-lb-service-name [_] lb-name)
+    (get-storage-type [_])
+    (get-contact-points [_])
+    (get-username [_])
+    (get-password [_])
+    (install! [_ _])
+    (configure! [_ _])
+    (start! [_ _])
+    (wipe! [_ _])
+    (create-storage-properties [_ _])))
 
 (defn- annotated-services
   "Runs expose-loadbalancers! against a fixed service list and returns the set of
