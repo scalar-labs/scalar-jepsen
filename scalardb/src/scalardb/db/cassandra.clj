@@ -15,11 +15,11 @@
   (wait-for-recovery [_ test] (cassandra/wait-rf-nodes test))
   (create-table-opts
     [_ test]
-    {(keyword CassandraAdmin/REPLICATION_STRATEGY)
+    {CassandraAdmin/REPLICATION_STRATEGY
      (str CassandraAdmin$ReplicationStrategy/SIMPLE_STRATEGY)
-     (keyword CassandraAdmin/COMPACTION_STRATEGY)
+     CassandraAdmin/COMPACTION_STRATEGY
      (str CassandraAdmin$CompactionStrategy/LCS)
-     (keyword CassandraAdmin/REPLICATION_FACTOR) (:rf test)})
+     CassandraAdmin/REPLICATION_FACTOR (str (:rf test))})
   (create-properties
     [_ test]
     (or (ext/load-config test)
