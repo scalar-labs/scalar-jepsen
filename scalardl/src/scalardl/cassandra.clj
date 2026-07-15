@@ -1,6 +1,6 @@
 (ns scalardl.cassandra
   (:require [clojure.string :as string]
-            [clojure.tools.logging :refer [info]]
+            [clojure.tools.logging :refer [info warn]]
             [cassandra.core :as cassandra]
             [qbits.alia :as alia]
             [qbits.hayt.dsl.clause :as clause]
@@ -13,7 +13,14 @@
 (def ^:private ^:const SCHEMA_URL
   "https://raw.githubusercontent.com/scalar-labs/scalardl/master/schema-loader/ledger-schema.json")
 
+(def ^:private ^:const RETRIES 10)
+(def ^:private ^:const MAX_WAIT_MILLIS 32000)
+
 (def ^:private ^:const TX_COMMITTED 3)
+
+(defn- exponential-backoff
+  [r]
+  (Thread/sleep (min MAX_WAIT_MILLIS (reduce * 1000 (repeat r 2)))))
 
 (defn cassandra-log
   [test]
@@ -66,10 +73,26 @@
    CassandraAdmin/REPLICATION_FACTOR (str (:rf test))})
 
 (defn create-tables
+  "Load the ScalarDL ledger schema with the ScalarDB schema loader."
   [test]
   (info "creating tables")
-  (let [schema (slurp SCHEMA_URL)]
-    (SchemaLoader/load (create-properties test)
-                       schema
-                       (create-table-opts test)
-                       true)))
+  (let [schema (slurp SCHEMA_URL)
+        properties (create-properties test)
+        options (create-table-opts test)]
+    (loop [retries RETRIES]
+      (when (zero? retries)
+        (throw (ex-info "Failed to create tables" {:schema schema})))
+      (when (< retries RETRIES)
+        (exponential-backoff (- RETRIES retries))
+        (try
+          (SchemaLoader/repairAll properties schema options true)
+          (catch Exception e (warn e "Repairing the schema failed")))
+        (exponential-backoff (- RETRIES retries)))
+      (let [result (try
+                     (SchemaLoader/load properties schema options true)
+                     :success
+                     (catch Exception e
+                       (warn e "Loading the schema failed")
+                       :fail))]
+        (when (= result :fail)
+          (recur (dec retries)))))))
