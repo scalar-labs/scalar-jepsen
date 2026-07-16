@@ -25,7 +25,7 @@
   (get-password [_] TIDB_PASSWORD)
 
   (install! [_ test]
-    (helm/repo-add! test "pingcap" "https://charts.pingcap.org/")
+    (helm/repo-add! test "pingcap" "https://charts.pingcap.com/")
     (k8s/kubectl! test :create :namespace "tidb-admin")
     (k8s/kubectl! test :create :-f TIDB_CRD_URL)
     (helm/install! test {:release TIDB_OPERATOR_NAME
