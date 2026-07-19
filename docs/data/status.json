@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-07-19T12:53:54Z",
+  "last_updated": "2026-07-19T15:59:00Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
@@ -1685,7 +1685,7 @@
           {
             "date": "2026-07-19",
             "status": "failure",
-            "run_id": 29649858058
+            "run_id": 29692731088
           },
           {
             "date": "2026-07-17",
@@ -1837,7 +1837,7 @@
           {
             "date": "2026-07-19",
             "status": "success",
-            "run_id": 29649858058
+            "run_id": 29692731088
           },
           {
             "date": "2026-07-17",
@@ -1988,8 +1988,8 @@
         "nemesis-partition": [
           {
             "date": "2026-07-19",
-            "status": "success",
-            "run_id": 29649858058
+            "status": "failure",
+            "run_id": 29692731088
           },
           {
             "date": "2026-07-17",
