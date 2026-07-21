@@ -79,3 +79,82 @@ lein with-profile cluster run test --workload transfer --db postgres \
   - `GITHUB_USER`: Your GitHub username, used to authenticate with ghcr.io for pulling the ScalarDB Cluster Docker image.
   - `GITHUB_ACCESS_TOKEN`: A GitHub access token with permissions to pull images from ghcr.io.
   - All other parameters match those used in standard ScalarDB tests
+
+## Prerequisite for Amazon EKS: a default StorageClass
+The test provisions a backend database (e.g. PostgreSQL) whose pod requests a `PersistentVolumeClaim`. A local `kind` cluster ships with a default `StorageClass`, but **an EKS cluster has none by default**, so the PVC stays `Pending` and the backend pod never starts. Create a default `StorageClass` before running the test.
+
+For an EKS Auto Mode cluster:
+```sh
+kubectl apply -f - <<'EOF'
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: auto-ebs-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.eks.amazonaws.com
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+  encrypted: "true"
+EOF
+```
+  - On a non-Auto-Mode EKS cluster, install the EBS CSI driver add-on and use the `ebs.csi.aws.com` provisioner instead.
+  - Exactly one `StorageClass` should carry the `storageclass.kubernetes.io/is-default-class: "true"` annotation.
+  - Verify with `kubectl get storageclass`; the default is shown as `... (default)`.
+  - This is cluster setup, so it's best added to whatever provisions your EKS cluster (e.g. your IaC) rather than applied by hand each time.
+
+## Prerequisite for Amazon EKS: external access to the LoadBalancers
+The Jepsen control connects to the cluster over `LoadBalancer` services: the ScalarDB Cluster (Envoy) for transactions and schema loading, and the backend DB, which the test's checker reaches directly via the ScalarDB storage API. With a local `kind` cluster (using MetalLB) these are reachable from the control machine, but on EKS they are not reachable from outside the VPC by default. When the control runs outside the VPC (e.g. on your laptop), complete the one-time setup below **before** running the test.
+
+1. Tag the public subnets so the AWS load balancer controller can place internet-facing NLBs. This must be done before the test creates the `LoadBalancer` services; otherwise they stay `Pending` with a `FailedBuildModel` event, and tagging afterwards does not retrigger provisioning.
+```sh
+aws ec2 create-tags --region ${REGION} \
+    --resources ${SUBNET_ID_1} ${SUBNET_ID_2} ${SUBNET_ID_3} \
+    --tags Key=kubernetes.io/role/elb,Value=1
+```
+
+2. Allow the control machine's IP in the load balancers' security group on the relevant ports (e.g. `60053` for Envoy, `5432` for PostgreSQL). Use the control's **public** IP as a `/32` (the source the node/LB sees), not its LAN address:
+```sh
+YOUR_IP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${LB_SG_ID} \
+    --protocol tcp --port 60053 --cidr ${YOUR_IP}/32   # Envoy
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${LB_SG_ID} \
+    --protocol tcp --port 5432 --cidr ${YOUR_IP}/32     # PostgreSQL
+```
+
+Then run the test, pointing it at your EKS cluster and requesting internet-facing LoadBalancers:
+```sh
+lein with-profile cluster run test --workload transfer --db postgres \
+    --kubeconfig ~/.kube/eks-jepsen-test --lb-internet-facing
+```
+  - `--kubeconfig FILE`: kubeconfig file for kubectl/helm (uses that file's current context).
+  - `--lb-internet-facing`: annotates the Envoy and backend DB `LoadBalancer` services as internet-facing so the control can reach them. This is AWS-specific: on EKS a `LoadBalancer` is internal by default, so the annotation is required. On GKE/AKS, `LoadBalancer` services are external by default and the annotation is a no-op, so the flag is not needed there.
+
+Notes:
+  - The subnet tags and security group rules (like the `StorageClass`) are one-time cluster setup that persists across test runs — the test's wipe does not remove them — so they are best handled by your IaC rather than applied each run.
+  - Db2 and Oracle backends are exposed via a NodePort on the Kubernetes node rather than a `LoadBalancer`, so `--lb-internet-facing` does not apply to them. The test reaches them at `<node-external-IP>:<nodePort>` (`31500` for Db2, `31521` for Oracle): it automatically uses the node's `ExternalIP` when the node reports one (falling back to the `InternalIP`, e.g. on local `kind`), so no flag is required. This requires the worker nodes to have public IPs (public subnets) and a firewall/security-group rule allowing your IP to those NodePorts — on the **node** security group on EKS (distinct from the LoadBalancer security group above), or a firewall rule on the node network tag on GKE:
+On EKS (node security group):
+```sh
+YOUR_IP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${NODE_SG_ID} \
+    --protocol tcp --port 31500 --cidr ${YOUR_IP}/32   # Db2
+aws ec2 authorize-security-group-ingress --region ${REGION} \
+    --group-id ${NODE_SG_ID} \
+    --protocol tcp --port 31521 --cidr ${YOUR_IP}/32   # Oracle
+```
+On GKE (firewall rule targeting the node network tag; find the tag with
+`gcloud compute instances list --format="table(name, tags.items)"`):
+```sh
+YOUR_IP=$(curl -s https://checkip.amazonaws.com)
+gcloud compute firewall-rules create allow-scalardb-nodeport \
+    --project=${PROJECT} --network=${NETWORK} \
+    --direction=INGRESS --action=ALLOW \
+    --rules=tcp:31500,tcp:31521 \
+    --source-ranges=${YOUR_IP}/32 \
+    --target-tags=${NODE_NETWORK_TAG}
+```
+Note that GKE nodes have public IPs only on a public cluster; a private (or Autopilot) cluster's nodes report no `ExternalIP`, so the test falls back to the unreachable `InternalIP` and NodePort access from outside the VPC is not possible without a bastion/tunnel.

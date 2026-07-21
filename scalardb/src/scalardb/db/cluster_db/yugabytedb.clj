@@ -22,6 +22,8 @@
 
   (get-password [_] YUGABYTEDB_PASSWORD)
 
+  (get-lb-service-name [_] YUGABYTEDB_LB_SERVICE)
+
   (install! [_ test]
     (helm/repo-add! test "yugabytedb" "https://charts.yugabyte.com"))
 

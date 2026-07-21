@@ -23,6 +23,8 @@
 
   (get-password [_] MYSQL_PASSWORD)
 
+  (get-lb-service-name [_] MYSQL_NAME)
+
   (install! [_ test]
     (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 

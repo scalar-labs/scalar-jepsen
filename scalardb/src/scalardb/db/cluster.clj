@@ -25,6 +25,9 @@
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
+(def ^:private ^:const LB_SCHEME_ANNOTATION
+  "service.beta.kubernetes.io/aws-load-balancer-scheme")
+
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
            :service {:type "LoadBalancer"}}
@@ -89,6 +92,27 @@
   [test]
   (str/includes? (:name test) "2pc"))
 
+(defn- expose-loadbalancers!
+  "When --lb-internet-facing is set, annotate the test's own LoadBalancer
+  services so the cloud provisions them internet-facing."
+  [test backend-db]
+  (when (:lb-internet-facing test)
+    (let [envoy-names (map #(str % "-envoy")
+                           (if (need-two-clusters? test)
+                             [CLUSTER_NAME CLUSTER2_NAME]
+                             [CLUSTER_NAME]))
+          names (remove nil? (conj envoy-names
+                                   (cluster-db/get-lb-service-name backend-db)))]
+      (doseq [name (->> (k8s/services test {})
+                        :items
+                        (filter #(= "LoadBalancer" (get-in % [:spec :type])))
+                        (map #(get-in % [:metadata :name]))
+                        (filter (fn [svc] (some #(str/includes? svc %) names))))]
+        (info "exposing LoadBalancer as internet-facing:" name)
+        (k8s/kubectl! test :annotate :svc name :-n (k8s/namespace test)
+                      (str LB_SCHEME_ANNOTATION "=internet-facing")
+                      :--overwrite)))))
+
 (defn- install!
   "Install prerequisites.
   You should already have installed kind (or similar tool), kubectl and helm."
@@ -130,7 +154,11 @@
                            :namespace "default"}))
     (.delete (File. CLUSTER_VALUES_YAML)))
 
-  (cm/setup! test {}))
+  (cm/setup! test {})
+
+  ;; Expose the Envoy and backend DB LoadBalancers to outside the cloud network
+  ;; when requested (e.g. a Jepsen control running outside the VPC on EKS).
+  (expose-loadbalancers! test backend-db))
 
 (defn- wipe!
   [test backend-db]
@@ -163,26 +191,49 @@
   (k8s/collect-logs! test {:selector NODE_SELECTOR
                            :output-dir (store/path! test "pods")}))
 
-(defn get-load-balancer-ip
-  "Get the external IP of a LoadBalancer service whose name includes prefix"
+(defn- find-load-balancer-ip
   [test prefix]
   (->> (k8s/services test {})
        :items
        (filter #(str/includes? (get-in % [:metadata :name]) prefix))
        (filter #(= "LoadBalancer" (get-in % [:spec :type])))
-       (map #(get-in % [:status :loadBalancer :ingress 0 :ip]))
-       (remove nil?)
+       (keep #(let [ingress (get-in % [:status :loadBalancer :ingress 0])]
+                (or (:ip ingress) (:hostname ingress))))
        first))
 
+(defn get-load-balancer-ip
+  "Get the external address of a LoadBalancer service whose name includes
+  prefix. Returns the ingress IP when present, otherwise the DNS hostname
+  (clouds like AWS expose LoadBalancers via a hostname rather than an IP).
+  Cloud providers provision the LoadBalancer asynchronously, so poll until an
+  address appears rather than returning nil the instant after service creation."
+  ([test prefix] (get-load-balancer-ip test prefix TIMEOUT_SEC INTERVAL_SEC))
+  ([test prefix timeout-sec interval-sec]
+   (or (find-load-balancer-ip test prefix)
+       (if (<= timeout-sec 0)
+         (throw (ex-info "Timed out waiting for LoadBalancer address"
+                         {:prefix prefix}))
+         (do
+           (info "waiting for LoadBalancer address for" prefix "...")
+           (Thread/sleep (* interval-sec 1000))
+           (recur test prefix (- timeout-sec interval-sec) interval-sec))))))
+
 (defn get-k8s-node-ip
-  "Get the internal IP of a Kubernetes node"
+  "Get the IP of a Kubernetes node used to reach NodePort-exposed backends
+  (e.g. Db2, Oracle). Prefer the node's ExternalIP (its public IP) when the node
+  reports one, so a control outside the cloud network (e.g. on EKS/GKE) can
+  reach the NodePort; fall back to the InternalIP, which is what an in-VPC or
+  local (kind) control uses. kind nodes report no ExternalIP, so they keep using
+  the InternalIP."
   [test]
-  (->> (k8s/nodes test)
-       :items
-       (mapcat #(get-in % [:status :addresses]))
-       (filter #(= "InternalIP" (:type %)))
-       (map :address)
-       first))
+  (let [addresses (->> (k8s/nodes test)
+                       :items
+                       (mapcat #(get-in % [:status :addresses])))
+        by-type (fn [t] (->> addresses
+                             (filter #(= t (:type %)))
+                             (map :address)
+                             first))]
+    (or (by-type "ExternalIP") (by-type "InternalIP"))))
 
 (defn- running-pods?
   "Check a live node."
@@ -259,9 +310,7 @@
   (create-properties
     [_ test]
     (or (ext/load-config test)
-        (let [ip (get-load-balancer-ip test (str CLUSTER_NAME "-envoy"))
-              ip2 (get-load-balancer-ip test (str CLUSTER2_NAME "-envoy"))
-              create-fn
+        (let [create-fn
               (fn [ip]
                 (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
                   (doto (Properties.)
@@ -270,8 +319,9 @@
                     (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled" client-side-optimizations-enabled)
                     (.setProperty "scalar.db.cluster.client.write_buffering.enabled" client-side-optimizations-enabled))))]
           (if (need-two-clusters? test)
-            (mapv create-fn [ip ip2])
-            (create-fn ip)))))
+            (mapv (comp create-fn #(get-load-balancer-ip test (str % "-envoy")))
+                  [CLUSTER_NAME CLUSTER2_NAME])
+            (create-fn (get-load-balancer-ip test (str CLUSTER_NAME "-envoy")))))))
   (create-storage-properties [_ test]
     (cluster-db/create-storage-properties backend-db test)))
 

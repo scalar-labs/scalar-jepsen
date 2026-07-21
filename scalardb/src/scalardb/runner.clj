@@ -1,6 +1,7 @@
 (ns scalardb.runner
   (:gen-class)
-  (:require [clojure.string :as string]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [environ.core :refer [env]]
             [jepsen
              [core :as jepsen]
@@ -99,6 +100,20 @@
    [nil "--enable-cluster-client-side-optimizations" "if set, ScalarDB Cluster client-side optimizations are enabled"
     :default false]
 
+   [nil "--kubeconfig FILE"
+    "Path to the kubeconfig file used for kubectl/helm in ScalarDB Cluster tests. Defaults to the host's default kubeconfig."
+    :default nil
+    :parse-fn (fn [s]
+                (if (string/starts-with? s "~/")
+                  (str (System/getProperty "user.home") (subs s 1))
+                  s))
+    :validate [#(.canRead (io/file %))
+               "Kubeconfig file must exist and be readable"]]
+
+   [nil "--lb-internet-facing"
+    "if set, expose the ScalarDB Cluster (Envoy) and backend DB LoadBalancers as internet-facing (e.g. on EKS, so a Jepsen control outside the VPC can reach both the cluster and, via the storage API, the backend). Requires cloud-side setup such as tagged public subnets and security group rules. Ignored where the LB provider doesn't use the annotation (e.g. MetalLB)."
+    :default false]
+
    [nil "--config-file CONFIG_FILE"
     "ScalarDB config file. When this is given, other configuration options are ignored."
     :default ""]
@@ -155,7 +170,11 @@
         workload-opts (merge base-opts
                              scalardb-opts
                              {:nodes (vec (take max-nodes (:nodes base-opts)))
-                              :consistency-model consistency-model})
+                              :consistency-model consistency-model
+                              ;; jepsen-k8s reads [:k8s :kubeconfig] to pass
+                              ;; --kubeconfig to kubectl/helm. nil means the
+                              ;; host's default kubeconfig.
+                              :k8s {:kubeconfig (:kubeconfig base-opts)}})
         workload ((workload-key workloads) workload-opts)]
     (merge tests/noop-test
            workload-opts

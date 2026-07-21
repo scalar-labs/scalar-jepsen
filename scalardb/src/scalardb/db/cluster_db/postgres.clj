@@ -21,6 +21,8 @@
 
   (get-password [_] POSTGRESQL_PASSWORD)
 
+  (get-lb-service-name [_] POSTGRESQL_NAME)
+
   (install! [_ test]
     (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 

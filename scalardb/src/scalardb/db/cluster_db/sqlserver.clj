@@ -21,6 +21,8 @@
 
   (get-password [_] SQLSERVER_PASSWORD)
 
+  (get-lb-service-name [_] SQLSERVER_NAME)
+
   (install! [_ test]
     (helm/repo-add! test
                     "simcube"

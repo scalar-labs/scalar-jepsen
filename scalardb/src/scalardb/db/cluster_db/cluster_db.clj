@@ -5,6 +5,7 @@
   (get-contact-points [this])
   (get-username [this])
   (get-password [this])
+  (get-lb-service-name [this])
   (install! [this test])
   (configure! [this test])
   (start! [this test])
