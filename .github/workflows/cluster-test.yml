@@ -122,7 +122,7 @@ jobs:
         lein: latest
 
     - name: Cache m2 repository
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/project.clj') }}
@@ -130,7 +130,7 @@ jobs:
           ${{ runner.os }}-m2-
 
     - name: Set up Kind cluster
-      uses: helm/kind-action@v1.12.0
+      uses: helm/kind-action@v1.14.0
       with:
         cluster_name: test-cluster
 
