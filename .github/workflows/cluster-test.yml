@@ -16,6 +16,7 @@ on:
         type: choice
         default: postgres
         options:
+          - cassandra
           - postgres
           - alloydb
           - yugabytedb

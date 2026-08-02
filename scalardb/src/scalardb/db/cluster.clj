@@ -276,7 +276,8 @@
     (cluster-db/create-storage-properties backend-db test)))
 
 (def ^:private dbtype->gen-var
-  {:postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
+  {:cassandra 'scalardb.db.cluster-db.cassandra/gen-cluster-db
+   :postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
    :alloydb   'scalardb.db.cluster-db.alloydb/gen-cluster-db
    :yugabytedb  'scalardb.db.cluster-db.yugabytedb/gen-cluster-db
    :mysql     'scalardb.db.cluster-db.mysql/gen-cluster-db
