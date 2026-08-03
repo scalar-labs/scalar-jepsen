@@ -3,7 +3,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :as cluster]
             [scalardb.db.cluster-db.cassandra :as cassandra]
-            [scalardb.db.cluster-db.cluster-db :as cluster-db]))
+            [scalardb.db.cluster-db.cluster-db :as cluster-db]
+            [scalardb.db-extend :as ext]))
 
 (deftest connection-settings-test
   (let [db (cassandra/gen-cluster-db)]
@@ -62,3 +63,14 @@
              (.getProperty properties "scalar.db.username")))
       (is (= "cassandra"
              (.getProperty properties "scalar.db.password"))))))
+
+(deftest create-table-opts-test
+  (let [backend-db (cassandra/gen-cluster-db)
+        expected {"replication-strategy" "SimpleStrategy"
+                  "compaction-strategy" "LCS"
+                  "replication-factor" "3"}]
+    (is (= expected (cluster-db/create-table-opts backend-db {})))
+    (is (= expected
+           (ext/create-table-opts (cluster/->ExtCluster backend-db) {})))
+    (is (= {}
+           (ext/create-table-opts (cluster/->ExtCluster (Object.)) {})))))

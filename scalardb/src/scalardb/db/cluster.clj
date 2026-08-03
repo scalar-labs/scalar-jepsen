@@ -255,7 +255,10 @@
   ext/DbExtension
   (live-nodes [_ test] (running-pods? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
-  (create-table-opts [_ _] {})
+  (create-table-opts [_ test]
+    (if (satisfies? cluster-db/ClusterDbTableOptions backend-db)
+      (cluster-db/create-table-opts backend-db test)
+      {}))
   (create-properties
     [_ test]
     (or (ext/load-config test)

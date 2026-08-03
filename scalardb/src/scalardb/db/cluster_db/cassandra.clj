@@ -4,7 +4,8 @@
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbTableOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const CASSANDRA_NAME "cassandra-scalardb-cluster")
@@ -96,6 +97,12 @@
         (.setProperty "scalar.db.storage" "cassandra")
         (.setProperty "scalar.db.contact_points" ip)
         (.setProperty "scalar.db.username" CASSANDRA_USER)
-        (.setProperty "scalar.db.password" CASSANDRA_PASSWORD)))))
+        (.setProperty "scalar.db.password" CASSANDRA_PASSWORD))))
+
+  ClusterDbTableOptions
+  (create-table-opts [_ _]
+    {"replication-strategy" "SimpleStrategy"
+     "compaction-strategy" "LCS"
+     "replication-factor" (str CASSANDRA_REPLICA_COUNT)}))
 
 (defn gen-cluster-db [] (->ClusterDbCassandra))
