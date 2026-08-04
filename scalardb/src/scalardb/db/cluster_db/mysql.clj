@@ -4,7 +4,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
@@ -59,6 +60,14 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
         (.setProperty "scalar.db.username" MYSQL_USER)
-        (.setProperty "scalar.db.password" MYSQL_PASSWORD)))))
+        (.setProperty "scalar.db.password" MYSQL_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/bitnami/mysql"
+     :file-path "/bitnami/mysql/data/**/*"
+     :pod-selector {"app.kubernetes.io/instance" MYSQL_NAME
+                    "app.kubernetes.io/component" "primary"}
+     :container-names ["mysql"]}))
 
 (defn gen-cluster-db [] (->ClusterDbMySql))

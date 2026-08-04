@@ -4,7 +4,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const MARIADB_NAME "mariadb-scalardb-cluster")
@@ -59,6 +60,14 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:mariadb://" ip ":3306/" scalar/KEYSPACE))
         (.setProperty "scalar.db.username" MARIADB_USER)
-        (.setProperty "scalar.db.password" MARIADB_PASSWORD)))))
+        (.setProperty "scalar.db.password" MARIADB_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/bitnami/mariadb"
+     :file-path "/bitnami/mariadb/data/**/*"
+     :pod-selector {"app.kubernetes.io/instance" MARIADB_NAME
+                    "app.kubernetes.io/component" "primary"}
+     :container-names ["mariadb"]}))
 
 (defn gen-cluster-db [] (->ClusterDbMariaDb))

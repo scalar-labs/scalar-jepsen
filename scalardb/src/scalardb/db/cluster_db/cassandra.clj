@@ -5,6 +5,7 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions
                                                        ClusterDbTableOptions]])
   (:import (java.util Properties)))
 
@@ -100,6 +101,17 @@
         (.setProperty "scalar.db.contact_points" ip)
         (.setProperty "scalar.db.username" CASSANDRA_USER)
         (.setProperty "scalar.db.password" CASSANDRA_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    ;; The persistent volume is mounted at /bitnami/cassandra and holds the
+    ;; SSTables, the commit log, the hints and the saved caches. Fault the
+    ;; whole volume so a write can't reach any of them.
+    {:volume-path "/bitnami/cassandra"
+     :file-path "/bitnami/cassandra/**/*"
+     :pod-selector {"app.kubernetes.io/instance" CASSANDRA_NAME
+                    "app.kubernetes.io/name" "cassandra"}
+     :container-names ["cassandra"]})
 
   ClusterDbTableOptions
   (create-table-opts [_ _]

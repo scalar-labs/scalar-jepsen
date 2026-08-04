@@ -14,3 +14,7 @@
 
 (defprotocol ClusterDbTableOptions
   (create-table-opts [this test]))
+
+(defprotocol ClusterDbFileOptions
+  (file-io-options [this]
+    "Returns the Chaos Mesh file I/O configuration for this backend."))

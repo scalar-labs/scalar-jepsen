@@ -2,7 +2,8 @@
   (:require [clojure.tools.logging :refer [warn]]
             [jepsen.k8s.core :as k8s]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
@@ -54,6 +55,13 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:oracle:thin:@" ip ":31521/FREEPDB1"))
         (.setProperty "scalar.db.username" ORACLE_USER)
-        (.setProperty "scalar.db.password" ORACLE_PASSWORD)))))
+        (.setProperty "scalar.db.password" ORACLE_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/opt/oracle/oradata"
+     :file-path "/opt/oracle/oradata/**/*"
+     :pod-selector {:app ORACLE_NAME}
+     :container-names ["oracle"]}))
 
 (defn gen-cluster-db [] (->ClusterDbOracle))
