@@ -10,3 +10,7 @@
   (start! [this test])
   (wipe! [this test])
   (create-storage-properties [this test]))
+
+(defprotocol ClusterDbFileOptions
+  (file-io-options [this]
+    "Returns the Chaos Mesh file I/O configuration for this backend."))

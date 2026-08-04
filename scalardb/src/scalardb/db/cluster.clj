@@ -300,11 +300,21 @@
       (if (managed-db-types db-type) (f opts) (f)))
     (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
 
+(defn- nemesis-options
+  [backend-db db-type faults]
+  (if (contains? (set faults) :file-io)
+    (if (satisfies? cluster-db/ClusterDbFileOptions backend-db)
+      {:file-io (cluster-db/file-io-options backend-db)}
+      (throw (ex-info "Backend does not support the file-io nemesis"
+                      {:db db-type})))
+    {}))
+
 (defn gen-db
   [faults admin db-type & [opts]]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
   (let [backend-db (cluster-backend-db db-type opts)
         db (ext/extend-db (db backend-db) (->ExtCluster backend-db))
-        nemesis (cm/nemesis-package db 60 faults)]
+        nemesis (cm/nemesis-package db 60 faults
+                                    (nemesis-options backend-db db-type faults))]
     [db nemesis 1]))

@@ -3,7 +3,8 @@
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const TIDB_NAME "tidb-scalardb-cluster-tidb")
@@ -63,6 +64,14 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:mysql://" ip ":4000/mysql"))
         (.setProperty "scalar.db.username" TIDB_USER)
-        (.setProperty "scalar.db.password" TIDB_PASSWORD)))))
+        (.setProperty "scalar.db.password" TIDB_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/var/lib/tikv"
+     :file-path "/var/lib/tikv/**/*"
+     :pod-selector {"app.kubernetes.io/instance" "tidb-scalardb-cluster"
+                    "app.kubernetes.io/component" "tikv"}
+     :container-names ["tikv"]}))
 
 (defn gen-cluster-db [] (->ClusterDbTiDb))

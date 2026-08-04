@@ -3,7 +3,8 @@
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const YUGABYTEDB_NAME "yugabytedb-scalardb-cluster")
@@ -64,6 +65,14 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:yugabytedb://" ip ":5433/yugabyte"))
         (.setProperty "scalar.db.username" YUGABYTEDB_USER)
-        (.setProperty "scalar.db.password" YUGABYTEDB_PASSWORD)))))
+        (.setProperty "scalar.db.password" YUGABYTEDB_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/mnt/disk0"
+     :file-path "/mnt/disk0/**/*"
+     :pod-selector {:app "yb-tserver"
+                    :release YUGABYTEDB_NAME}
+     :container-names ["yb-tserver"]}))
 
 (defn gen-cluster-db [] (->ClusterDbYugabyteDb))

@@ -3,7 +3,8 @@
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
@@ -58,6 +59,14 @@
                            ip
                            ":1433;encrypt=true;trustServerCertificate=true"))
         (.setProperty "scalar.db.username" SQLSERVER_USER)
-        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD)))))
+        (.setProperty "scalar.db.password" SQLSERVER_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/var/opt/mssql"
+     :file-path "/var/opt/mssql/**/*"
+     :pod-selector {:app (str SQLSERVER_NAME "-mssqlserver-2022")
+                    :release SQLSERVER_NAME}
+     :container-names ["mssqlserver-2022"]}))
 
 (defn gen-cluster-db [] (->ClusterDbSqlServer))
