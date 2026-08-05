@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
             [jepsen.k8s.core :as k8s]
             [jepsen.store :as store]
             [scalardb.db.cluster :as cluster]
@@ -21,27 +22,37 @@
     cluster-db/ClusterDbLogs
     (log-selector [_] {:app "database"})))
 
-(defn- collected-selectors
-  "Runs get-logs with a mocked k8s, returning the selectors it collected."
+(defn- collected-logs
+  "Runs get-logs with a mocked k8s, returning the log requests it made."
   [backend-db]
-  (let [selectors (atom [])]
-    (with-redefs [store/path! (fn [_ dir] dir)
+  (let [requests (atom [])]
+    (with-redefs [store/path! (fn [_ & dirs] (str/join "/" dirs))
                   k8s/collect-logs! (fn [_ opts]
-                                      (swap! selectors conj opts))]
+                                      (swap! requests conj opts))]
       (#'cluster/get-logs {} backend-db))
-    @selectors))
+    @requests))
+
+(def cluster-logs
+  {:selector "app.kubernetes.io/app=scalardb-cluster" :output-dir "pods"})
+
+(def chaos-mesh-logs
+  {:namespace "chaos-mesh" :output-dir "pods/chaos-mesh"})
 
 (deftest get-logs-test
-  (testing "collects the cluster node logs and the backend DB logs"
-    (is (= [{:selector "app.kubernetes.io/app=scalardb-cluster"
-             :output-dir "pods"}
-            {:selector {:app "database"} :output-dir "pods"}]
-           (collected-selectors backend-with-logs))))
+  (testing "collects the cluster node, backend DB and Chaos Mesh logs"
+    (is (= [cluster-logs
+            {:selector {:app "database"} :output-dir "pods"}
+            chaos-mesh-logs]
+           (collected-logs backend-with-logs))))
 
-  (testing "collects only the cluster node logs for a backend without pods"
-    (is (= [{:selector "app.kubernetes.io/app=scalardb-cluster"
-             :output-dir "pods"}]
-           (collected-selectors (Object.))))))
+  (testing "skips the backend DB logs for a backend without pods"
+    (is (= [cluster-logs chaos-mesh-logs]
+           (collected-logs (Object.)))))
+
+  (testing "keeps collecting when one of the requests fails"
+    (with-redefs [store/path! (fn [_ & dirs] (str/join "/" dirs))
+                  k8s/collect-logs! (fn [_ _] (throw (ex-info "boom" {})))]
+      (is (nil? (#'cluster/get-logs {} backend-with-logs))))))
 
 (deftest nemesis-options-test
   (testing "adds backend-specific options for the file-io nemesis"

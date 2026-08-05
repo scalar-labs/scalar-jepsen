@@ -157,15 +157,27 @@
        (filter #(= "Running" (get-in % [:status :phase])))
        (map #(get-in % [:metadata :name]))))
 
+(defn- collect-logs!
+  [test opts]
+  (try
+    (k8s/collect-logs! test opts)
+    (catch Exception e
+      (warn e "Failed to collect pod logs:" opts))))
+
 (defn- get-logs
-  "Collect ScalarDB Cluster and backend DB pod logs into the test's store
-  directory directly."
+  "Collect ScalarDB Cluster, backend DB and Chaos Mesh pod logs into the test's
+  store directory directly."
   [test backend-db]
   (let [output-dir (store/path! test "pods")]
-    (k8s/collect-logs! test {:selector NODE_SELECTOR :output-dir output-dir})
+    (collect-logs! test {:selector NODE_SELECTOR :output-dir output-dir})
     (when (satisfies? cluster-db/ClusterDbLogs backend-db)
-      (k8s/collect-logs! test {:selector (cluster-db/log-selector backend-db)
-                               :output-dir output-dir}))))
+      (collect-logs! test {:selector (cluster-db/log-selector backend-db)
+                           :output-dir output-dir}))
+    ;; Chaos Mesh's own logs tell whether a fault was really injected: the
+    ;; controller manager reconciles the experiment and the chaos daemons
+    ;; apply it on each node.
+    (collect-logs! test {:namespace cm/default-namespace
+                         :output-dir (store/path! test "pods" "chaos-mesh")})))
 
 (defn get-load-balancer-ip
   "Get the external IP of a LoadBalancer service whose name includes prefix"
