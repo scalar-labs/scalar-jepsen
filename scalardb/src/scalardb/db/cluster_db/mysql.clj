@@ -5,7 +5,8 @@
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
@@ -66,6 +67,9 @@
      :file-path "/bitnami/mysql/data/**/*"
      :pod-selector {"app.kubernetes.io/instance" MYSQL_NAME
                     "app.kubernetes.io/component" "primary"}
-     :container-names ["mysql"]}))
+     :container-names ["mysql"]})
+
+  ClusterDbLogs
+  (log-selector [_] {"app.kubernetes.io/instance" MYSQL_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbMySql))

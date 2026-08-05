@@ -158,10 +158,14 @@
        (map #(get-in % [:metadata :name]))))
 
 (defn- get-logs
-  "Collect ScalarDB Cluster pod logs into the test's store directory directly."
-  [test]
-  (k8s/collect-logs! test {:selector NODE_SELECTOR
-                           :output-dir (store/path! test "pods")}))
+  "Collect ScalarDB Cluster and backend DB pod logs into the test's store
+  directory directly."
+  [test backend-db]
+  (let [output-dir (store/path! test "pods")]
+    (k8s/collect-logs! test {:selector NODE_SELECTOR :output-dir output-dir})
+    (when (satisfies? cluster-db/ClusterDbLogs backend-db)
+      (k8s/collect-logs! test {:selector (cluster-db/log-selector backend-db)
+                               :output-dir output-dir}))))
 
 (defn get-load-balancer-ip
   "Get the external IP of a LoadBalancer service whose name includes prefix"
@@ -248,7 +252,7 @@
     (log-files [_ test _]
       ;; Collect pod logs into store/ ourselves and return [] so jepsen's
       ;; snarf-logs! doesn't try to fetch them over the dummy SSH connection.
-      (get-logs test)
+      (get-logs test backend-db)
       [])))
 
 (defrecord ExtCluster [backend-db]

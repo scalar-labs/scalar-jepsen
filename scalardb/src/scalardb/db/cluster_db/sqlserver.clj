@@ -4,7 +4,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const SQLSERVER_NAME "sqlserver-scalardb-cluster")
@@ -67,6 +68,9 @@
      :file-path "/var/opt/mssql/**/*"
      :pod-selector {:app (str SQLSERVER_NAME "-mssqlserver-2022")
                     :release SQLSERVER_NAME}
-     :container-names ["mssqlserver-2022"]}))
+     :container-names ["mssqlserver-2022"]})
+
+  ClusterDbLogs
+  (log-selector [_] {:release SQLSERVER_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbSqlServer))

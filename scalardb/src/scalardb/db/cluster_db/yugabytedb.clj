@@ -4,7 +4,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const YUGABYTEDB_NAME "yugabytedb-scalardb-cluster")
@@ -73,6 +74,10 @@
      :file-path "/mnt/disk0/**/*"
      :pod-selector {:app "yb-tserver"
                     :release YUGABYTEDB_NAME}
-     :container-names ["yb-tserver"]}))
+     :container-names ["yb-tserver"]})
+
+  ClusterDbLogs
+  ;; Covers both the yb-master and yb-tserver pods.
+  (log-selector [_] {:release YUGABYTEDB_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbYugabyteDb))

@@ -4,7 +4,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
@@ -66,6 +67,9 @@
      :file-path "/bitnami/postgresql/data/**/*"
      :pod-selector {"app.kubernetes.io/instance" POSTGRESQL_NAME
                     "app.kubernetes.io/component" "primary"}
-     :container-names ["postgresql"]}))
+     :container-names ["postgresql"]})
+
+  ClusterDbLogs
+  (log-selector [_] {"app.kubernetes.io/instance" POSTGRESQL_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbPostgres))
