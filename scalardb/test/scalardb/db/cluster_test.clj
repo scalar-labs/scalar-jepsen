@@ -54,6 +54,14 @@
                   k8s/collect-logs! (fn [_ _] (throw (ex-info "boom" {})))]
       (is (nil? (#'cluster/get-logs {} backend-with-logs))))))
 
+(deftest chaos-mesh-values-test
+  (testing "chaos-daemon uses the container runtime of the test cluster"
+    ;; The chart defaults to Docker, which makes every fault that enters the
+    ;; pod's namespaces fail to apply on a containerd cluster.
+    (is (= {:set {:chaosDaemon.runtime "containerd"
+                  :chaosDaemon.socketPath "/run/containerd/containerd.sock"}}
+           @#'cluster/CHAOS_MESH_VALUES))))
+
 (deftest nemesis-options-test
   (testing "adds backend-specific options for the file-io nemesis"
     (is (= {:file-io file-io-options}

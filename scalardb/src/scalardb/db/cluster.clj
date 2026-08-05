@@ -25,6 +25,18 @@
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
+;; The Chaos Mesh chart defaults to Docker. Without these, chaos-daemon can't
+;; resolve the container PID on a containerd cluster (kind, EKS) and every
+;; fault needing to enter the pod's namespaces (file I/O, network, clock)
+;; fails to apply. Override them for a cluster with another runtime.
+(def ^:private CHAOS_MESH_VALUES
+  {:set {:chaosDaemon.runtime (or (some-> (env :chaos-daemon-runtime)
+                                          not-empty)
+                                  "containerd")
+         :chaosDaemon.socketPath (or (some-> (env :chaos-daemon-socket-path)
+                                             not-empty)
+                                     "/run/containerd/containerd.sock")}})
+
 (def ^:private ^:const CLUSTER_VALUES
   {:envoy {:enabled true
            :service {:type "LoadBalancer"}}
@@ -130,7 +142,7 @@
                            :namespace "default"}))
     (.delete (File. CLUSTER_VALUES_YAML)))
 
-  (cm/setup! test {}))
+  (cm/setup! test CHAOS_MESH_VALUES))
 
 (defn- wipe!
   [test backend-db]
@@ -317,6 +329,10 @@
     (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
 
 (defn- nemesis-options
+  "Note: the file-io nemesis needs amd64 nodes. Chaos Mesh injects IOChaos with
+  toda, and the binary shipped even in the arm64 chaos-daemon image is x86-64,
+  so it dies under emulation and no fault is ever applied (the chaos controller
+  manager logs it). Run this fault on an amd64 cluster."
   [backend-db db-type faults]
   (if (contains? (set faults) :file-io)
     (if (satisfies? cluster-db/ClusterDbFileOptions backend-db)
