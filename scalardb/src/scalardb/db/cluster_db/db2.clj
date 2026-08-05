@@ -4,7 +4,8 @@
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const DB2_NAME "db2-scalardb-cluster")
@@ -64,6 +65,9 @@
     {:volume-path "/database"
      :file-path "/database/**/*"
      :pod-selector {:app DB2_NAME}
-     :container-names ["db2"]}))
+     :container-names ["db2"]})
+
+  ClusterDbLogs
+  (log-selector [_] {:app DB2_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbDb2))

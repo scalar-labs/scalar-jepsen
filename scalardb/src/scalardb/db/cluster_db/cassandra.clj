@@ -6,6 +6,7 @@
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
                                                        ClusterDbFileOptions
+                                                       ClusterDbLogs
                                                        ClusterDbTableOptions]])
   (:import (java.util Properties)))
 
@@ -112,6 +113,9 @@
      :pod-selector {"app.kubernetes.io/instance" CASSANDRA_NAME
                     "app.kubernetes.io/name" "cassandra"}
      :container-names ["cassandra"]})
+
+  ClusterDbLogs
+  (log-selector [_] {"app.kubernetes.io/instance" CASSANDRA_NAME})
 
   ClusterDbTableOptions
   (create-table-opts [_ _]

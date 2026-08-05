@@ -5,7 +5,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.io File)
            (java.util Properties)))
 
@@ -103,6 +104,10 @@
      :file-path "/mnt/disks/pgsql/data/**/*"
      :pod-selector {"alloydbomni.internal.dbadmin.goog/dbcluster" ALLOYDB_NAME
                     "alloydbomni.internal.dbadmin.goog/task-type" "database"}
-     :container-names ["database"]}))
+     :container-names ["database"]})
+
+  ClusterDbLogs
+  (log-selector [_]
+    {"alloydbomni.internal.dbadmin.goog/dbcluster" ALLOYDB_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbAlloyDb))

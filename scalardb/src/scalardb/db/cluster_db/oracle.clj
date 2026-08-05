@@ -3,7 +3,8 @@
             [jepsen.k8s.core :as k8s]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const ORACLE_NAME "oracle-scalardb-cluster")
@@ -62,6 +63,9 @@
     {:volume-path "/opt/oracle/oradata"
      :file-path "/opt/oracle/oradata/**/*"
      :pod-selector {:app ORACLE_NAME}
-     :container-names ["oracle"]}))
+     :container-names ["oracle"]})
+
+  ClusterDbLogs
+  (log-selector [_] {:app ORACLE_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbOracle))

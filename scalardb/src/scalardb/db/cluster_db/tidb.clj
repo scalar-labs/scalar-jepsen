@@ -4,7 +4,8 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
             [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
-                                                       ClusterDbFileOptions]])
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const TIDB_NAME "tidb-scalardb-cluster-tidb")
@@ -74,6 +75,10 @@
      :file-path "/var/lib/tikv/**/*"
      :pod-selector {"app.kubernetes.io/instance" "tidb-scalardb-cluster"
                     "app.kubernetes.io/component" "tikv"}
-     :container-names ["tikv"]}))
+     :container-names ["tikv"]})
+
+  ClusterDbLogs
+  ;; Covers the PD, TiKV and TiDB pods. The operator lives in tidb-admin.
+  (log-selector [_] {"app.kubernetes.io/instance" "tidb-scalardb-cluster"}))
 
 (defn gen-cluster-db [] (->ClusterDbTiDb))
