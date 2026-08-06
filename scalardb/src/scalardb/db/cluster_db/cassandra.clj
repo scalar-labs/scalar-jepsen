@@ -57,6 +57,8 @@
             :dbUser.password CASSANDRA_PASSWORD
             :replicaCount CASSANDRA_REPLICA_COUNT
             :persistence.enabled true
+            ;; See the comment in the PostgreSQL backend.
+            :containerSecurityContext.readOnlyRootFilesystem false
             :service.type "LoadBalancer"
             :jvm.maxHeapSize "1024M"
             :jvm.newHeapSize "256M"

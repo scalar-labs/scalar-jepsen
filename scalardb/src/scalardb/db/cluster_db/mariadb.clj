@@ -39,6 +39,8 @@
                          :set {:auth.rootPassword MARIADB_PASSWORD
                                :auth.database scalar/KEYSPACE
                                :primary.persistence.enabled true
+                               ;; See the comment in the PostgreSQL backend.
+                               :primary.containerSecurityContext.readOnlyRootFilesystem false
                                :primary.service.type "LoadBalancer"
                                :image.repository "bitnamilegacy/mariadb"
                                :volumePermissions.image.repository "bitnamilegacy/os-shell"
