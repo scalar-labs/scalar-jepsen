@@ -34,6 +34,10 @@
                          :version "16.7.0"
                          :set {:auth.postgresPassword POSTGRESQL_PASSWORD
                                :primary.persistence.enabled true
+                               ;; toda, which Chaos Mesh injects IOChaos with,
+                               ;; sets up its mount inside the container and
+                               ;; can't start on a read-only root filesystem.
+                               :primary.containerSecurityContext.readOnlyRootFilesystem false
                                :service.type "LoadBalancer"
                                :primary.service.type "LoadBalancer"
                                :image.repository "bitnamilegacy/postgresql"
