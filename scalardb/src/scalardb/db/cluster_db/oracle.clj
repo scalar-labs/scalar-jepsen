@@ -21,6 +21,9 @@
 
   (get-password [_] ORACLE_PASSWORD)
 
+  ;; Oracle is reached via NodePort + node IP, not a LoadBalancer.
+  (get-lb-service-name [_] nil)
+
   (install! [_ _])
 
   (configure! [_ test]

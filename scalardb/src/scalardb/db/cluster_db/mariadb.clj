@@ -23,6 +23,8 @@
 
   (get-password [_] MARIADB_PASSWORD)
 
+  (get-lb-service-name [_] MARIADB_NAME)
+
   (install! [_ test]
     (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 
