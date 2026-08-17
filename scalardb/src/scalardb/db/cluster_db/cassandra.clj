@@ -36,6 +36,8 @@
 
   (get-password [_] CASSANDRA_PASSWORD)
 
+  (get-lb-service-name [_] CASSANDRA_NAME)
+
   (install! [_ test]
     (helm/repo-add! test "bitnami" "https://charts.bitnami.com/bitnami"))
 
