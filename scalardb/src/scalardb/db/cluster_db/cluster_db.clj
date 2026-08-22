@@ -11,3 +11,6 @@
   (start! [this test])
   (wipe! [this test])
   (create-storage-properties [this test]))
+
+(defprotocol ClusterDbTableOptions
+  (create-table-opts [this test]))

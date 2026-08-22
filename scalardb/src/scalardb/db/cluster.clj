@@ -306,7 +306,10 @@
   ext/DbExtension
   (live-nodes [_ test] (running-pods? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
-  (create-table-opts [_ _] {})
+  (create-table-opts [_ test]
+    (if (satisfies? cluster-db/ClusterDbTableOptions backend-db)
+      (cluster-db/create-table-opts backend-db test)
+      {}))
   (create-properties
     [_ test]
     (or (ext/load-config test)
@@ -326,7 +329,8 @@
     (cluster-db/create-storage-properties backend-db test)))
 
 (def ^:private dbtype->gen-var
-  {:postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
+  {:cassandra 'scalardb.db.cluster-db.cassandra/gen-cluster-db
+   :postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
    :alloydb   'scalardb.db.cluster-db.alloydb/gen-cluster-db
    :yugabytedb  'scalardb.db.cluster-db.yugabytedb/gen-cluster-db
    :mysql     'scalardb.db.cluster-db.mysql/gen-cluster-db
