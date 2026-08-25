@@ -1,11 +1,16 @@
 {
-  "last_updated": "2026-08-25T15:59:06Z",
+  "last_updated": "2026-08-25T22:39:29Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
       "tests": {
         "GroupCommit": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -149,15 +154,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "OnePhaseCommit_SI": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -301,15 +306,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "OnePhaseCommit_Serializable": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -453,15 +458,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "RCSI": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -605,15 +610,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "RCSI_2PC": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -757,15 +762,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "ReadCommitted": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -909,15 +914,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "ReadCommitted_2PC": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -1061,15 +1066,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "Serializable": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -1213,15 +1218,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "Serializable_2PC": [
           {
+            "date": "2026-08-25",
+            "status": "success",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -1365,15 +1370,15 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "success",
-            "run_id": 29776292560
           }
         ],
         "Transfers_2PC_SI": [
           {
+            "date": "2026-08-25",
+            "status": "timeout",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "success",
             "run_id": 32771946459
@@ -1517,15 +1522,15 @@
             "date": "2026-07-21",
             "status": "timeout",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "timeout",
-            "run_id": 29776292560
           }
         ],
         "Transfers_SI": [
           {
+            "date": "2026-08-25",
+            "status": "timeout",
+            "run_id": 32893313641
+          },
+          {
             "date": "2026-08-24",
             "status": "timeout",
             "run_id": 32771946459
@@ -1669,11 +1674,6 @@
             "date": "2026-07-21",
             "status": "success",
             "run_id": 29865710557
-          },
-          {
-            "date": "2026-07-20",
-            "status": "timeout",
-            "run_id": 29776292560
           }
         ]
       }
