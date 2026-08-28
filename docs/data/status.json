@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-08-28T01:33:17Z",
+  "last_updated": "2026-08-28T17:03:31Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
@@ -2144,6 +2144,11 @@
       "tests": {
         "AlloyDB_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -2287,15 +2292,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "AlloyDB_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -2439,15 +2444,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "ClientSideOptimizations": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -2591,15 +2596,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Db2_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -2743,15 +2748,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Db2_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "failure",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -2895,15 +2900,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "GroupCommit": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3047,15 +3052,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "MariaDB_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3199,15 +3204,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "MariaDB_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3351,15 +3356,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "MySQL_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3503,15 +3508,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "failure",
-            "run_id": 30445211807
           }
         ],
         "MySQL_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3655,15 +3660,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "OnePhaseCommit_SI": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3807,15 +3812,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "OnePhaseCommit_Serializable": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -3959,15 +3964,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Oracle_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -4111,15 +4116,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Oracle_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -4263,15 +4268,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "RCSI": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -4415,15 +4420,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "RCSI_2PC": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -4567,15 +4572,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "ReadCommitted": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -4719,15 +4724,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "ReadCommitted_2PC": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -4871,15 +4876,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "SQLServer_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -5023,15 +5028,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "SQLServer_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "failure",
             "run_id": 33077100800
@@ -5175,15 +5180,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Serializable": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -5327,15 +5332,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Serializable_2PC": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -5479,15 +5484,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "TiDB_Elle": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -5631,15 +5636,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "TiDB_Transfers": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -5783,15 +5788,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Transfers_2PC_SI": [
           {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -5935,15 +5940,15 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Transfers_SI": [
           {
+            "date": "2026-08-28",
+            "status": "failure",
+            "run_id": 33177907102
+          },
+          {
             "date": "2026-08-27",
             "status": "success",
             "run_id": 33077100800
@@ -6087,14 +6092,14 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "YugabyteDB_Elle": [
+          {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
           {
             "date": "2026-08-27",
             "status": "success",
@@ -6239,14 +6244,14 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "YugabyteDB_Transfers": [
+          {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
           {
             "date": "2026-08-27",
             "status": "success",
@@ -6391,14 +6396,14 @@
             "date": "2026-07-30",
             "status": "failure",
             "run_id": 30535597159
-          },
-          {
-            "date": "2026-07-29",
-            "status": "success",
-            "run_id": 30445211807
           }
         ],
         "Cassandra_Elle": [
+          {
+            "date": "2026-08-28",
+            "status": "timeout",
+            "run_id": 33177907102
+          },
           {
             "date": "2026-08-27",
             "status": "success",
@@ -6431,6 +6436,11 @@
           }
         ],
         "Cassandra_Transfers": [
+          {
+            "date": "2026-08-28",
+            "status": "success",
+            "run_id": 33177907102
+          },
           {
             "date": "2026-08-27",
             "status": "success",
