@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-09-02T13:07:36Z",
+  "last_updated": "2026-09-02T15:57:21Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
@@ -1683,6 +1683,11 @@
       "tests": {
         "nemesis-crash": [
           {
+            "date": "2026-09-02",
+            "status": "failure",
+            "run_id": 33647450051
+          },
+          {
             "date": "2026-09-01",
             "status": "success",
             "run_id": 33524480945
@@ -1826,15 +1831,15 @@
             "date": "2026-07-29",
             "status": "failure",
             "run_id": 30466912134
-          },
-          {
-            "date": "2026-07-28",
-            "status": "success",
-            "run_id": 30375181250
           }
         ],
         "nemesis-none": [
           {
+            "date": "2026-09-02",
+            "status": "failure",
+            "run_id": 33647450051
+          },
+          {
             "date": "2026-09-01",
             "status": "success",
             "run_id": 33524480945
@@ -1978,15 +1983,15 @@
             "date": "2026-07-29",
             "status": "failure",
             "run_id": 30466912134
-          },
-          {
-            "date": "2026-07-28",
-            "status": "success",
-            "run_id": 30375181250
           }
         ],
         "nemesis-partition": [
           {
+            "date": "2026-09-02",
+            "status": "success",
+            "run_id": 33647450051
+          },
+          {
             "date": "2026-09-01",
             "status": "success",
             "run_id": 33524480945
@@ -2130,11 +2135,6 @@
             "date": "2026-07-29",
             "status": "failure",
             "run_id": 30466912134
-          },
-          {
-            "date": "2026-07-28",
-            "status": "success",
-            "run_id": 30375181250
           }
         ]
       }
