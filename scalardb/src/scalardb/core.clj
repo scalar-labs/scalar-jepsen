@@ -86,7 +86,7 @@
             .getStorage)
 
         :transaction
-        (-> (if (vector? props) (first props) props)
+        (-> props
             TransactionFactory/create
             .getTransactionManager)
 

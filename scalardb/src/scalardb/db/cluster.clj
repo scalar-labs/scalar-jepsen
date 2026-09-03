@@ -22,7 +22,6 @@
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
-(def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
 (def ^:private ^:const LB_SCHEME_ANNOTATION
@@ -93,9 +92,8 @@
   services so the cloud provisions them internet-facing."
   [test backend-db]
   (when (:lb-internet-facing test)
-    (let [envoy-names [(str CLUSTER_NAME "-envoy")]
-          names (remove nil? (conj envoy-names
-                                   (cluster-db/get-lb-service-name backend-db)))]
+    (let [names (remove nil? [(str CLUSTER_NAME "-envoy")
+                              (cluster-db/get-lb-service-name backend-db)])]
       (doseq [name (->> (k8s/services test {})
                         :items
                         (filter #(= "LoadBalancer" (get-in % [:spec :type])))
@@ -137,7 +135,7 @@
          (update-cluster-values test backend-db)
          yaml/generate-string
          (spit CLUSTER_VALUES_YAML))
-    (helm/install! test {:release [CLUSTER_NAME]
+    (helm/install! test {:release CLUSTER_NAME
                          :chart "scalar-labs/scalardb-cluster"
                          :values [CLUSTER_VALUES_YAML]
                          :version chart-version
@@ -159,16 +157,15 @@
       (.delete f)))
   (info "wiping the pods...")
   (cluster-db/wipe! backend-db test)
-  (doseq [release [CLUSTER_NAME CLUSTER2_NAME]]
-    (try (helm/uninstall! test {:release release
-                                :timeout WIPE_TIMEOUT
-                                :ignore-not-found? true})
-         (catch Exception e (warn e "Failed to uninstall:" release))))
+  (try (helm/uninstall! test {:release CLUSTER_NAME
+                              :timeout WIPE_TIMEOUT
+                              :ignore-not-found? true})
+       (catch Exception e (warn e "Failed to uninstall:" CLUSTER_NAME)))
   (try (cm/wipe! test {})
        (catch Exception e (warn e "Failed to wipe Chaos Mesh"))))
 
 (defn- get-pod-list
-  "Get names of running ScalarDB Cluster node pods across all releases."
+  "Get names of running ScalarDB Cluster node pods."
   [test]
   (->> (k8s/pods test {:selector NODE_SELECTOR})
        :items
