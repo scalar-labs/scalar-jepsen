@@ -88,19 +88,12 @@
                               "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled=true"]))))]
     (assoc-in values path new-db-props)))
 
-(defn- need-two-clusters?
-  [test]
-  (str/includes? (:name test) "2pc"))
-
 (defn- expose-loadbalancers!
   "When --lb-internet-facing is set, annotate the test's own LoadBalancer
   services so the cloud provisions them internet-facing."
   [test backend-db]
   (when (:lb-internet-facing test)
-    (let [envoy-names (map #(str % "-envoy")
-                           (if (need-two-clusters? test)
-                             [CLUSTER_NAME CLUSTER2_NAME]
-                             [CLUSTER_NAME]))
+    (let [envoy-names [(str CLUSTER_NAME "-envoy")]
           names (remove nil? (conj envoy-names
                                    (cluster-db/get-lb-service-name backend-db)))]
       (doseq [name (->> (k8s/services test {})
@@ -144,14 +137,11 @@
          (update-cluster-values test backend-db)
          yaml/generate-string
          (spit CLUSTER_VALUES_YAML))
-    (doseq [name (if (need-two-clusters? test)
-                   [CLUSTER_NAME CLUSTER2_NAME]
-                   [CLUSTER_NAME])]
-      (helm/install! test {:release name
-                           :chart "scalar-labs/scalardb-cluster"
-                           :values [CLUSTER_VALUES_YAML]
-                           :version chart-version
-                           :namespace "default"}))
+    (helm/install! test {:release [CLUSTER_NAME]
+                         :chart "scalar-labs/scalardb-cluster"
+                         :values [CLUSTER_VALUES_YAML]
+                         :version chart-version
+                         :namespace "default"})
     (.delete (File. CLUSTER_VALUES_YAML)))
 
   (cm/setup! test {})
@@ -238,8 +228,7 @@
 (defn- running-pods?
   "Check a live node."
   [test]
-  (= (count (get-pod-list test))
-     (if (need-two-clusters? test) 6 3)))
+  (= (count (get-pod-list test)) 3))
 
 (defn- cluster-nodes-ready?
   [test]
@@ -313,18 +302,16 @@
   (create-properties
     [_ test]
     (or (ext/load-config test)
-        (let [create-fn
-              (fn [ip]
-                (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
-                  (doto (Properties.)
-                    (.setProperty "scalar.db.transaction_manager" "cluster")
-                    (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
-                    (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled" client-side-optimizations-enabled)
-                    (.setProperty "scalar.db.cluster.client.write_buffering.enabled" client-side-optimizations-enabled))))]
-          (if (need-two-clusters? test)
-            (mapv (comp create-fn #(get-load-balancer-ip test (str % "-envoy")))
-                  [CLUSTER_NAME CLUSTER2_NAME])
-            (create-fn (get-load-balancer-ip test (str CLUSTER_NAME "-envoy")))))))
+        (let [ip (get-load-balancer-ip test (str CLUSTER_NAME "-envoy"))
+              client-side-optimizations-enabled
+              (str (:enable-cluster-client-side-optimizations test))]
+          (doto (Properties.)
+            (.setProperty "scalar.db.transaction_manager" "cluster")
+            (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
+            (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled"
+                          client-side-optimizations-enabled)
+            (.setProperty "scalar.db.cluster.client.write_buffering.enabled"
+                          client-side-optimizations-enabled)))))
   (create-storage-properties [_ test]
     (cluster-db/create-storage-properties backend-db test)))
 
