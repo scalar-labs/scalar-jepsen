@@ -118,19 +118,31 @@ jobs:
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
 
+    - name: Start resource sampler
+      run: |
+        nohup bash -c 'while true; do
+          echo "===== $(date -u +%H:%M:%S)"
+          free -m | head -2
+          df -m / | tail -1
+          docker stats --no-stream
+          sleep 30
+        done' > resource-${{ matrix.tests.name }}.log 2>&1 &
+
     - name: Run ScalarDL Jepsen test (${{ matrix.tests.nemesis }})
       id: run-test
       timeout-minutes: 180
       run: |
         set +e
         docker exec jepsen-control bash -c "\
+          set -o pipefail; \
           cd /scalar-jepsen/scalardl && \
           lein run test \
             --workload ${{ matrix.tests.workload }} \
             --nemesis ${{ matrix.tests.nemesis }} \
             --concurrency 5 \
             --time-limit ${{ matrix.tests.time_limit }} \
-            --ssh-private-key ~/.ssh/id_rsa"
+            --ssh-private-key ~/.ssh/id_rsa \
+            2>&1 | tail -n 300"
         EXIT_CODE=$?
         echo "done=true" >> $GITHUB_OUTPUT
         exit $EXIT_CODE
@@ -201,6 +213,14 @@ jobs:
           "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           "${{ github.sha }}" \
           "triage-${{ matrix.tests.name }}/triage.md"
+      continue-on-error: true
+
+    - name: Upload resource sampler log
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: resource-${{ matrix.tests.name }}
+        path: resource-${{ matrix.tests.name }}.log
       continue-on-error: true
 
     - name: Upload logs
