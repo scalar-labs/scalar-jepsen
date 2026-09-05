@@ -1,5 +1,6 @@
 (ns scalardb.db.cluster-db.file-options-test
   (:require [clojure.test :refer [deftest is testing]]
+            [jepsen.k8s.chaos-mesh.file-io :as file-io]
             [scalardb.db.cluster-db.alloydb :as alloydb]
             [scalardb.db.cluster-db.cassandra :as cassandra]
             [scalardb.db.cluster-db.cluster-db :as cluster-db]
@@ -91,4 +92,9 @@
              :container-names ["db2"]}]]]
     (testing (name backend-name)
       (is (satisfies? cluster-db/ClusterDbFileOptions backend))
-      (is (= expected (cluster-db/file-io-options backend))))))
+      (is (= expected (cluster-db/file-io-options backend)))
+      ;; The real validator checks path containment, the container names and
+      ;; the pod selector, so a typo fails here instead of after a full
+      ;; cluster provision in a live run.
+      (is (map? (#'file-io/validate-config
+                 (cluster-db/file-io-options backend)))))))

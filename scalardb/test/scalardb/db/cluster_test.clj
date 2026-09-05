@@ -162,9 +162,18 @@
            (collected-logs (Object.)))))
 
   (testing "keeps collecting when one of the requests fails"
-    (with-redefs [store/path! (fn [_ & dirs] (str/join "/" dirs))
-                  k8s/collect-logs! (fn [_ _] (throw (ex-info "boom" {})))]
-      (is (nil? (#'cluster/get-logs {} backend-with-logs))))))
+    (let [requests (atom [])]
+      (with-redefs [store/path! (fn [_ & dirs] (str/join "/" dirs))
+                    k8s/collect-logs!
+                    (fn [_ opts]
+                      (swap! requests conj opts)
+                      (when (= {:app "database"} (:selector opts))
+                        (throw (ex-info "boom" {}))))]
+        (#'cluster/get-logs {} backend-with-logs))
+      (is (= [cluster-logs
+              {:selector {:app "database"} :output-dir "pods"}
+              chaos-mesh-logs]
+             @requests)))))
 
 (deftest nemesis-options-test
   (testing "adds backend-specific options for the file-io nemesis"
