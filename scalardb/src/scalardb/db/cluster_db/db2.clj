@@ -3,7 +3,9 @@
             [jepsen.k8s.core :as k8s]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-k8s-node-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const DB2_NAME "db2-scalardb-cluster")
@@ -56,6 +58,16 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:db2://" ip ":31500/" scalar/KEYSPACE))
         (.setProperty "scalar.db.username" DB2_USER)
-        (.setProperty "scalar.db.password" DB2_PASSWORD)))))
+        (.setProperty "scalar.db.password" DB2_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/database"
+     :file-path "/database/**/*"
+     :pod-selector {:app DB2_NAME}
+     :container-names ["db2"]})
+
+  ClusterDbLogs
+  (log-selector [_] {:app DB2_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbDb2))

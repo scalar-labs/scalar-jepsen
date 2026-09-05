@@ -14,3 +14,13 @@
 
 (defprotocol ClusterDbTableOptions
   (create-table-opts [this test]))
+
+(defprotocol ClusterDbFileOptions
+  (file-io-options [this]
+    "Returns the Chaos Mesh file I/O configuration for this backend."))
+
+(defprotocol ClusterDbLogs
+  (log-selector [this]
+    "Returns a label selector matching this backend's database pods.
+    Backends implement this to have their pod logs collected into the store.
+    Externally-provisioned backends have no pods and don't implement it."))

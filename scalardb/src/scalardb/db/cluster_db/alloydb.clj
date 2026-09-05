@@ -4,7 +4,9 @@
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.io File)
            (java.util Properties)))
 
@@ -94,6 +96,18 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:postgresql://" ip ":5432/postgres"))
         (.setProperty "scalar.db.username" ALLOYDB_USER)
-        (.setProperty "scalar.db.password" ALLOYDB_PASSWORD)))))
+        (.setProperty "scalar.db.password" ALLOYDB_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/mnt/disks/pgsql"
+     :file-path "/mnt/disks/pgsql/data/**/*"
+     :pod-selector {"alloydbomni.internal.dbadmin.goog/dbcluster" ALLOYDB_NAME
+                    "alloydbomni.internal.dbadmin.goog/task-type" "database"}
+     :container-names ["database"]})
+
+  ClusterDbLogs
+  (log-selector [_]
+    {"alloydbomni.internal.dbadmin.goog/dbcluster" ALLOYDB_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbAlloyDb))

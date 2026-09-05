@@ -3,7 +3,9 @@
             [jepsen.k8s.core :as k8s]
             [jepsen.k8s.helm :as helm]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const POSTGRESQL_NAME "postgresql-scalardb-cluster")
@@ -34,6 +36,10 @@
                          :version "16.7.0"
                          :set {:auth.postgresPassword POSTGRESQL_PASSWORD
                                :primary.persistence.enabled true
+                               ;; toda, which Chaos Mesh injects IOChaos with,
+                               ;; sets up its mount inside the container and
+                               ;; can't start on a read-only root filesystem.
+                               :primary.containerSecurityContext.readOnlyRootFilesystem false
                                :service.type "LoadBalancer"
                                :primary.service.type "LoadBalancer"
                                :image.repository "bitnamilegacy/postgresql"
@@ -59,6 +65,17 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:postgresql://" ip ":5432/postgres"))
         (.setProperty "scalar.db.username" POSTGRESQL_USER)
-        (.setProperty "scalar.db.password" POSTGRESQL_PASSWORD)))))
+        (.setProperty "scalar.db.password" POSTGRESQL_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/bitnami/postgresql"
+     :file-path "/bitnami/postgresql/data/**/*"
+     :pod-selector {"app.kubernetes.io/instance" POSTGRESQL_NAME
+                    "app.kubernetes.io/component" "primary"}
+     :container-names ["postgresql"]})
+
+  ClusterDbLogs
+  (log-selector [_] {"app.kubernetes.io/instance" POSTGRESQL_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbPostgres))

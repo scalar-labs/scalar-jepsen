@@ -185,11 +185,27 @@
        (filter #(= "Running" (get-in % [:status :phase])))
        (map #(get-in % [:metadata :name]))))
 
+(defn- collect-logs!
+  [test opts]
+  (try
+    (k8s/collect-logs! test opts)
+    (catch Exception e
+      (warn e "Failed to collect pod logs:" opts))))
+
 (defn- get-logs
-  "Collect ScalarDB Cluster pod logs into the test's store directory directly."
-  [test]
-  (k8s/collect-logs! test {:selector NODE_SELECTOR
-                           :output-dir (store/path! test "pods")}))
+  "Collect ScalarDB Cluster, backend DB and Chaos Mesh pod logs into the test's
+  store directory directly."
+  [test backend-db]
+  (let [output-dir (store/path! test "pods")]
+    (collect-logs! test {:selector NODE_SELECTOR :output-dir output-dir})
+    (when (satisfies? cluster-db/ClusterDbLogs backend-db)
+      (collect-logs! test {:selector (cluster-db/log-selector backend-db)
+                           :output-dir output-dir}))
+    ;; Chaos Mesh's own logs tell whether a fault was really injected: the
+    ;; controller manager reconciles the experiment and the chaos daemons
+    ;; apply it on each node.
+    (collect-logs! test {:namespace cm/default-namespace
+                         :output-dir (store/path! test "pods" "chaos-mesh")})))
 
 (defn- find-load-balancer-ip
   [test prefix]
@@ -299,7 +315,7 @@
     (log-files [_ test _]
       ;; Collect pod logs into store/ ourselves and return [] so jepsen's
       ;; snarf-logs! doesn't try to fetch them over the dummy SSH connection.
-      (get-logs test)
+      (get-logs test backend-db)
       [])))
 
 (defrecord ExtCluster [backend-db]
@@ -354,11 +370,25 @@
       (if (managed-db-types db-type) (f opts) (f)))
     (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
 
+(defn- nemesis-options
+  "Note: the file-io nemesis needs amd64 nodes. Chaos Mesh injects IOChaos with
+  toda, and the binary shipped even in the arm64 chaos-daemon image is x86-64,
+  so it dies under emulation and no fault is ever applied (the chaos controller
+  manager logs it). Run this fault on an amd64 cluster."
+  [backend-db db-type faults]
+  (if (contains? (set faults) :file-io)
+    (if (satisfies? cluster-db/ClusterDbFileOptions backend-db)
+      {:file-io (cluster-db/file-io-options backend-db)}
+      (throw (ex-info "Backend does not support the file-io nemesis"
+                      {:db db-type})))
+    {}))
+
 (defn gen-db
   [faults admin db-type & [opts]]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
   (let [backend-db (cluster-backend-db db-type opts)
         db (ext/extend-db (db backend-db) (->ExtCluster backend-db))
-        nemesis (cm/nemesis-package db 60 faults)]
+        nemesis (cm/nemesis-package db 60 faults
+                                    (nemesis-options backend-db db-type faults))]
     [db nemesis 1]))
