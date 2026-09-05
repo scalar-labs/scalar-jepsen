@@ -118,20 +118,27 @@ jobs:
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
 
-    - name: Start resource sampler
-      run: |
-        nohup bash -c 'while true; do
-          echo "===== $(date -u +%H:%M:%S)"
-          free -m | head -2
-          df -m / | tail -1
-          docker stats --no-stream
-          sleep 30
-        done' > resource-${{ matrix.tests.name }}.log 2>&1 &
-
     - name: Run ScalarDL Jepsen test (${{ matrix.tests.nemesis }})
       id: run-test
       timeout-minutes: 180
       run: |
+        # Stream resource samples to this step's stdout: lines already sent to
+        # Actions survive a runner death, unlike a file on the discarded VM.
+        # tee keeps a copy for the artifact.
+        (
+          while true; do
+            {
+              echo "===== $(date -u +%H:%M:%S)"
+              free -m | head -2
+              df -m / | tail -1
+              cat /proc/loadavg
+              docker stats --no-stream
+            } | tee -a resource-${{ matrix.tests.name }}.log
+            sleep 30
+          done
+        ) &
+        SAMPLER_PID=$!
+
         set +e
         docker exec jepsen-control bash -c "\
           set -o pipefail; \
@@ -144,6 +151,9 @@ jobs:
             --ssh-private-key ~/.ssh/id_rsa \
             2>&1 | tail -n 300"
         EXIT_CODE=$?
+
+        kill "${SAMPLER_PID}" 2>/dev/null || true
+
         echo "done=true" >> $GITHUB_OUTPUT
         exit $EXIT_CODE
 
