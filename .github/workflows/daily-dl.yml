@@ -122,16 +122,38 @@ jobs:
       id: run-test
       timeout-minutes: 180
       run: |
+        # Stream resource samples to this step's stdout: lines already sent to
+        # Actions survive a runner death, unlike a file on the discarded VM.
+        # tee keeps a copy for the artifact.
+        (
+          while true; do
+            {
+              echo "===== $(date -u +%H:%M:%S)"
+              free -m | head -2
+              df -m / | tail -1
+              cat /proc/loadavg
+              docker stats --no-stream
+            } | tee -a resource-${{ matrix.tests.name }}.log
+            sleep 30
+          done
+        ) &
+        SAMPLER_PID=$!
+
         set +e
         docker exec jepsen-control bash -c "\
+          set -o pipefail; \
           cd /scalar-jepsen/scalardl && \
           lein run test \
             --workload ${{ matrix.tests.workload }} \
             --nemesis ${{ matrix.tests.nemesis }} \
             --concurrency 5 \
             --time-limit ${{ matrix.tests.time_limit }} \
-            --ssh-private-key ~/.ssh/id_rsa"
+            --ssh-private-key ~/.ssh/id_rsa \
+            2>&1 | tail -n 300"
         EXIT_CODE=$?
+
+        kill "${SAMPLER_PID}" 2>/dev/null || true
+
         echo "done=true" >> $GITHUB_OUTPUT
         exit $EXIT_CODE
 
@@ -201,6 +223,14 @@ jobs:
           "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           "${{ github.sha }}" \
           "triage-${{ matrix.tests.name }}/triage.md"
+      continue-on-error: true
+
+    - name: Upload resource sampler log
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: resource-${{ matrix.tests.name }}
+        path: resource-${{ matrix.tests.name }}.log
       continue-on-error: true
 
     - name: Upload logs
