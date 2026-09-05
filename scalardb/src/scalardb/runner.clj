@@ -13,11 +13,7 @@
              [transfer]
              [transfer-append]
              [elle-append]
-             [elle-write-read]
-             [transfer-2pc]
-             [transfer-append-2pc]
-             [elle-append-2pc]
-             [elle-write-read-2pc]]
+             [elle-write-read]]
             [clojure.core :as c]))
 
 (def supported-dbs
@@ -39,22 +35,14 @@
   {"transfer"            :transfer
    "transfer-append"     :transfer-append
    "elle-append"         :elle-append
-   "elle-write-read"     :elle-write-read
-   "transfer-2pc"        :transfer-2pc
-   "transfer-append-2pc" :transfer-append-2pc
-   "elle-append-2pc"     :elle-append-2pc
-   "elle-write-read-2pc" :elle-write-read-2pc})
+   "elle-write-read"     :elle-write-read})
 
 (def workloads
   "A map of workload to test constructors."
   {:transfer            scalardb.transfer/workload
    :transfer-append     scalardb.transfer-append/workload
    :elle-append         scalardb.elle-append/workload
-   :elle-write-read     scalardb.elle-write-read/workload
-   :transfer-2pc        scalardb.transfer-2pc/workload
-   :transfer-append-2pc scalardb.transfer-append-2pc/workload
-   :elle-append-2pc     scalardb.elle-append-2pc/workload
-   :elle-write-read-2pc scalardb.elle-write-read-2pc/workload})
+   :elle-write-read     scalardb.elle-write-read/workload})
 
 (def nemeses
   "A map of nemeses."
@@ -156,7 +144,6 @@
 (def ^:private scalardb-opts
   {:storage (atom nil)
    :transaction (atom nil)
-   :2pc (atom nil)
    :table-id (atom INITIAL_TABLE_ID)
    :unknown-tx (atom #{})
    :failures (atom 0)
