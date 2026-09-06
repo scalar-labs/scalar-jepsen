@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-09-06T13:07:37Z",
+  "last_updated": "2026-09-06T15:48:39Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
@@ -1685,7 +1685,7 @@
           {
             "date": "2026-09-06",
             "status": "success",
-            "run_id": 33974002824
+            "run_id": 34041491027
           },
           {
             "date": "2026-09-04",
@@ -1837,7 +1837,7 @@
           {
             "date": "2026-09-06",
             "status": "success",
-            "run_id": 33974002824
+            "run_id": 34041491027
           },
           {
             "date": "2026-09-04",
@@ -1989,7 +1989,7 @@
           {
             "date": "2026-09-06",
             "status": "success",
-            "run_id": 33974002824
+            "run_id": 34041491027
           },
           {
             "date": "2026-09-04",
