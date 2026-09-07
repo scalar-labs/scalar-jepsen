@@ -132,6 +132,7 @@ jobs:
               free -m | head -2
               df -m / | tail -1
               cat /proc/loadavg
+              grep -E '^ *(eth|ens|enp)' /proc/net/dev
               docker stats --no-stream
             } | tee -a resource-${{ matrix.tests.name }}.log
             sleep 30
