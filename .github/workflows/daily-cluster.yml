@@ -29,31 +29,9 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "snapshot-isolation"
             time_limit: 600
-          - name: "Transfers_2PC_SI"
-            backend_db: "postgres"
-            workload: "transfer-2pc transfer-append-2pc"
-            nemesis: "none partition packet clock crash"
-            enable_one_phase_commit: false
-            enable_group_commit: false
-            enable_client_side_optimizations: false
-            isolation_level: "snapshot"
-            jdbc_isolation_level: "read-committed"
-            consistency_model: "snapshot-isolation"
-            time_limit: 600
           - name: "ReadCommitted"
             backend_db: "postgres"
             workload: "elle-append elle-write-read"
-            nemesis: "none partition packet clock crash"
-            enable_one_phase_commit: false
-            enable_group_commit: false
-            enable_client_side_optimizations: false
-            isolation_level: "read-committed"
-            jdbc_isolation_level: "read-committed"
-            consistency_model: "cursor-stability"
-            time_limit: 600
-          - name: "ReadCommitted_2PC"
-            backend_db: "postgres"
-            workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false
@@ -73,31 +51,9 @@ jobs:
             jdbc_isolation_level: "read-committed"
             consistency_model: "cursor-stability"
             time_limit: 600
-          - name: "RCSI_2PC"
-            backend_db: "postgres"
-            workload: "elle-append-2pc elle-write-read-2pc"
-            nemesis: "none partition packet clock crash"
-            enable_one_phase_commit: false
-            enable_group_commit: false
-            enable_client_side_optimizations: false
-            isolation_level: "snapshot"
-            jdbc_isolation_level: "read-committed"
-            consistency_model: "cursor-stability"
-            time_limit: 600
           - name: "Serializable"
             backend_db: "postgres"
             workload: "elle-append elle-write-read"
-            nemesis: "none partition packet clock crash"
-            enable_one_phase_commit: false
-            enable_group_commit: false
-            enable_client_side_optimizations: false
-            isolation_level: "serializable"
-            jdbc_isolation_level: "read-committed"
-            consistency_model: "strict-serializable"
-            time_limit: 600
-          - name: "Serializable_2PC"
-            backend_db: "postgres"
-            workload: "elle-append-2pc elle-write-read-2pc"
             nemesis: "none partition packet clock crash"
             enable_one_phase_commit: false
             enable_group_commit: false

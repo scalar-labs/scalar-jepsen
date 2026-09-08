@@ -7,8 +7,6 @@
   (:import (com.scalar.db.api DistributedStorage
                               DistributedTransaction
                               DistributedTransactionManager
-                              TwoPhaseCommitTransaction
-                              TwoPhaseCommitTransactionManager
                               Get
                               Result)
            (java.util Optional)))
@@ -71,27 +69,12 @@
     (start [_] mock-transaction)
     (close [_])))
 
-(def mock-2pc
-  (reify
-    TwoPhaseCommitTransaction
-    (prepare [_])
-    (commit [_])))
-
-(def mock-2pc-manager
-  (reify
-    TwoPhaseCommitTransactionManager
-    (start [_] mock-2pc)
-    (join [_ _] mock-2pc)
-    (close [_])))
-
 (deftest close-all-test
   (let [test {:storage (atom mock-storage)
-              :transaction (atom mock-tx-manager)
-              :2pc (atom [mock-2pc-manager mock-2pc-manager])}]
+              :transaction (atom mock-tx-manager)}]
     (scalar/close-all! test)
     (is (nil? @(:storage test)))
-    (is (nil? @(:transaction test)))
-    (is (nil? @(:2pc test)))))
+    (is (nil? @(:transaction test)))))
 
 (deftest prepare-storage-service-test
   (with-redefs [scalar/create-service-instance (spy/stub mock-storage)]

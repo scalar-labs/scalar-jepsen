@@ -30,8 +30,7 @@
 
 (defn setup-transaction-tables
   [test schemata]
-  (let [props (ext/create-properties (:db test) test)
-        properties (if (vector? props) (first props) props)
+  (let [properties (ext/create-properties (:db test) test)
         options (ext/create-table-opts (:db test) test)]
     (doseq [schema (map cheshire/generate-string schemata)]
       (loop [retries RETRIES]
@@ -70,19 +69,10 @@
         (reset! transaction nil)
         (info "The current transaction service closed")))))
 
-(defn- close-2pc!
-  [test]
-  (let [tms (:2pc test)]
-    (locking tms
-      (mapv #(.close %) @tms)
-      (reset! tms nil)
-      (info "The current 2pc service closed"))))
-
 (defn close-all!
   [test]
   (close-storage! test)
-  (close-transaction! test)
-  (close-2pc! test))
+  (close-transaction! test))
 
 (defn- create-service-instance
   [test mode]
@@ -96,15 +86,9 @@
             .getStorage)
 
         :transaction
-        (-> (if (vector? props) (first props) props)
+        (-> props
             TransactionFactory/create
             .getTransactionManager)
-
-        :2pc
-        (->> (if (vector? props) props [props props])
-             (mapv #(-> %
-                        TransactionFactory/create
-                        .getTwoPhaseCommitTransactionManager)))
 
         (throw (ex-info (str "Unknown mode: " mode) {:mode mode})))
       (catch Exception e
@@ -122,8 +106,7 @@
         (do
           (condp = mode
             :storage (close-storage! test)
-            :transaction (close-transaction! test)
-            :2pc (close-2pc! test))
+            :transaction (close-transaction! test))
           (reset! (mode test) instance)
           (info "reconnected to the cluster"))
         (when-not @(mode test)
@@ -136,10 +119,6 @@
 (defn prepare-transaction-service!
   [test]
   (prepare-service! test :transaction))
-
-(defn prepare-2pc-service!
-  [test]
-  (prepare-service! test :2pc))
 
 (defn check-transaction-connection!
   [test]
@@ -155,40 +134,6 @@
 (defn start-transaction
   [test]
   (some-> test :transaction deref .start))
-
-(defn start-2pc
-  [test]
-  ; use the first transaction manager to start a transaction
-  (some-> test :2pc deref first .start))
-
-(defn join-2pc
-  [test tx-id]
-  ; use the second transaction manager to join a transaction
-  (some-> test :2pc deref second (.join tx-id)))
-
-(defn prepare-validate-commit-txs
-  "Given transactions as a vector are prepared, validated, then committed for 2pc.
-   The overall commit is considered successful if at least one commit succeeds."
-  [txs]
-  ;; Prepare/validate (fail fast on any error)
-  (doseq [f [#(.prepare %) #(.validate %)]
-          tx txs]
-    (f tx))
-
-  ;; Commit (successful if any commit succeeds)
-  (let [results (mapv (fn [tx]
-                        (try
-                          (.commit tx)
-                          :committed
-                          (catch Exception e
-                            e)))
-                      txs)]
-    (when-not (some #{:committed} results)
-      ;; All commit attempts failed: log all exceptions, then throw the first one.
-      (doseq [r results
-              :when (instance? Exception r)]
-        (warn r "Commit attempts failed in 2PC commit"))
-      (throw (first results)))))
 
 (defn rollback-txs
   "Given transactions as a vector are rollbacked."
