@@ -164,10 +164,20 @@
                (ext/set-common-properties test)))))
   (create-storage-properties [this test] (ext/create-properties this test)))
 
+(def ^:private SUPPORTED_FAULTS
+  "Faults `jn/nemesis-package` builds a generator for with the options below.
+  Anything else (e.g. `:file-io`, which needs Chaos Mesh) would leave the test
+  with no fault injection at all instead of failing."
+  #{:partition :packet :clock :kill :pause})
+
 (defn gen-db
   [faults admin & _]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
+  (when-not (every? SUPPORTED_FAULTS faults)
+    (throw
+     (ex-info
+      (str "Invalid nemesis for PostgreSQL: " faults) {})))
   [(ext/extend-db (db) (->ExtPostgres))
    (jn/nemesis-package
     {:db db

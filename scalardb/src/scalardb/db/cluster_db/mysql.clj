@@ -4,7 +4,9 @@
             [jepsen.k8s.helm :as helm]
             [scalardb.core :as scalar]
             [scalardb.db.cluster :refer [get-load-balancer-ip WIPE_TIMEOUT]]
-            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb]])
+            [scalardb.db.cluster-db.cluster-db :refer [ClusterDb
+                                                       ClusterDbFileOptions
+                                                       ClusterDbLogs]])
   (:import (java.util Properties)))
 
 (def ^:private ^:const MYSQL_NAME "mysql-scalardb-cluster")
@@ -37,6 +39,8 @@
                          :set {:auth.rootPassword MYSQL_PASSWORD
                                :auth.database scalar/KEYSPACE
                                :primary.persistence.enabled true
+                               ;; See the comment in the PostgreSQL backend.
+                               :primary.containerSecurityContext.readOnlyRootFilesystem false
                                :primary.service.type "LoadBalancer"
                                :image.repository "bitnamilegacy/mysql"
                                :volumePermissions.image.repository "bitnamilegacy/os-shell"
@@ -59,6 +63,17 @@
         (.setProperty "scalar.db.contact_points"
                       (str "jdbc:mysql://" ip ":3306/" scalar/KEYSPACE))
         (.setProperty "scalar.db.username" MYSQL_USER)
-        (.setProperty "scalar.db.password" MYSQL_PASSWORD)))))
+        (.setProperty "scalar.db.password" MYSQL_PASSWORD))))
+
+  ClusterDbFileOptions
+  (file-io-options [_]
+    {:volume-path "/bitnami/mysql"
+     :file-path "/bitnami/mysql/data/**/*"
+     :pod-selector {"app.kubernetes.io/instance" MYSQL_NAME
+                    "app.kubernetes.io/component" "primary"}
+     :container-names ["mysql"]})
+
+  ClusterDbLogs
+  (log-selector [_] {"app.kubernetes.io/instance" MYSQL_NAME}))
 
 (defn gen-cluster-db [] (->ClusterDbMySql))

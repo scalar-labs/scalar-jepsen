@@ -54,6 +54,7 @@ on:
           - partition
           - packet
           - clock
+          - file-io
       enable_one_phase_commit:
         description: 'Enable one phase commit'
         default: false
