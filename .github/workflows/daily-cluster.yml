@@ -2,7 +2,7 @@ name: Daily ScalarDB Cluster test
 
 on:
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "0 10 * * 0-5"
 
 jobs:
   daily-cluster:
