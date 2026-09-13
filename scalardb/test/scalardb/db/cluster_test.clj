@@ -1,6 +1,7 @@
 (ns scalardb.db.cluster-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
+            [jepsen.k8s.chaos-mesh.stress :as stress]
             [jepsen.k8s.core :as k8s]
             [jepsen.store :as store]
             [scalardb.db.cluster :as cluster]
@@ -124,6 +125,12 @@
    :pod-selector {:app "database"}
    :container-names ["database"]})
 
+(def stress-options
+  {:pod-selector "app.kubernetes.io/app=scalardb-cluster"
+   :targets [:one]
+   :cpu {:workers 2 :load 80}
+   :memory {:workers 1 :size "256MB"}})
+
 (def backend-with-file-options
   (reify
     cluster-db/ClusterDbFileOptions
@@ -181,6 +188,18 @@
            (#'cluster/nemesis-options backend-with-file-options
                                       :postgres
                                       [:file-io]))))
+
+  (testing "targets one ScalarDB Cluster node with CPU and memory stress"
+    (is (= {:stress stress-options}
+           (#'cluster/nemesis-options (Object.) :managed [:stress])))
+    (is (map? (#'stress/validate-config stress-options))))
+
+  (testing "combines stress with backend-specific file I/O options"
+    (is (= {:stress stress-options
+            :file-io file-io-options}
+           (#'cluster/nemesis-options backend-with-file-options
+                                      :postgres
+                                      [:stress :file-io]))))
 
   (testing "does not require file options for other nemeses"
     (is (= {}

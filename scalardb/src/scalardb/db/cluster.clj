@@ -24,6 +24,11 @@
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
+(def ^:private STRESS_OPTIONS
+  {:pod-selector NODE_SELECTOR
+   :targets [:one]
+   :cpu {:workers 2 :load 80}
+   :memory {:workers 1 :size "50%"}})
 
 (def ^:private ^:const LB_SCHEME_ANNOTATION
   "service.beta.kubernetes.io/aws-load-balancer-scheme")
@@ -374,14 +379,21 @@
   "Note: the file-io nemesis needs amd64 nodes. Chaos Mesh injects IOChaos with
   toda, and the binary shipped even in the arm64 chaos-daemon image is x86-64,
   so it dies under emulation and no fault is ever applied (the chaos controller
-  manager logs it). Run this fault on an amd64 cluster."
+  manager logs it). Run this fault on an amd64 cluster.
+
+  Stress targets ScalarDB Cluster node pods, not the backend database or Envoy,
+  and applies both CPU and memory load to one selected node at a time."
   [backend-db db-type faults]
-  (if (contains? (set faults) :file-io)
-    (if (satisfies? cluster-db/ClusterDbFileOptions backend-db)
-      {:file-io (cluster-db/file-io-options backend-db)}
-      (throw (ex-info "Backend does not support the file-io nemesis"
-                      {:db db-type})))
-    {}))
+  (let [faults (set faults)
+        opts (cond-> {}
+               (contains? faults :stress)
+               (assoc :stress STRESS_OPTIONS))]
+    (if (contains? faults :file-io)
+      (if (satisfies? cluster-db/ClusterDbFileOptions backend-db)
+        (assoc opts :file-io (cluster-db/file-io-options backend-db))
+        (throw (ex-info "Backend does not support the file-io nemesis"
+                        {:db db-type})))
+      opts)))
 
 (defn gen-db
   [faults admin db-type & [opts]]

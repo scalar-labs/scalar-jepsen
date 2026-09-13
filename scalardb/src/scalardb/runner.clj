@@ -64,7 +64,8 @@
    "clock"     [:clock]
    "crash"     [:kill]
    "pause"     [:pause]
-   "file-io"   [:file-io]})
+   "file-io"   [:file-io]
+   "stress"    [:stress]})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"

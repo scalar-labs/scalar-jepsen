@@ -55,6 +55,7 @@ on:
           - packet
           - clock
           - file-io
+          - stress
       enable_one_phase_commit:
         description: 'Enable one phase commit'
         default: false
