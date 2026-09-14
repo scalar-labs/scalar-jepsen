@@ -2,7 +2,7 @@ name: Daily ScalarDL test
 
 on:
   schedule:
-    - cron: "0 15 * * *"
+    - cron: "0 14 * * 0-5"
 
 jobs:
   daily-dl:
