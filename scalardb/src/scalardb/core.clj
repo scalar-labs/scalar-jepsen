@@ -11,6 +11,7 @@
            (com.scalar.db.transaction.consensuscommit CoordinatorStateAccessor)))
 
 (def ^:const RETRIES 20)
+(def ^:const RETRIES_FOR_ADDING_TABLES 5)
 (def ^:const RETRIES_FOR_RECONNECTION 3)
 (def ^:private ^:const NUM_FAILURES_FOR_RECONNECTION 1000)
 (def ^:private ^:const MAX_WAIT_MILLIS 32000)
@@ -29,27 +30,31 @@
   (Thread/sleep (compute-exponential-backoff r)))
 
 (defn setup-transaction-tables
-  [test schemata]
-  (let [properties (ext/create-properties (:db test) test)
-        options (ext/create-table-opts (:db test) test)]
-    (doseq [schema (map cheshire/generate-string schemata)]
-      (loop [retries RETRIES]
-        (when (zero? retries)
-          (throw (ex-info "Failed to set up tables" {:schema schema})))
-        (when (< retries RETRIES)
-          (exponential-backoff (- RETRIES retries))
-          (try
-            (SchemaLoader/repairAll properties schema options true)
-            (catch Exception e (warn e "Repairing the schema failed")))
-          (exponential-backoff (- RETRIES retries)))
-        (let [result (try
-                       (SchemaLoader/load properties schema options true)
-                       :success
-                       (catch Exception e
-                         (warn e "Loading the schema failed")
-                         :fail))]
-          (when (= result :fail)
-            (recur (dec retries))))))))
+  "Creates the given tables. The default budget is about 17 minutes per table;
+  callers running during the test should pass RETRIES_FOR_ADDING_TABLES."
+  ([test schemata] (setup-transaction-tables test schemata RETRIES))
+  ([test schemata retries]
+   (let [properties (ext/create-properties (:db test) test)
+         options (ext/create-table-opts (:db test) test)]
+     (doseq [schema (map cheshire/generate-string schemata)]
+       (loop [remaining retries]
+         (when (zero? remaining)
+           (throw (ex-info "Failed to set up tables" {:schema schema})))
+         (let [attempt (- retries remaining)]
+           (when (pos? attempt)
+             (exponential-backoff attempt)
+             (try
+               (SchemaLoader/repairAll properties schema options true)
+               (catch Exception e (warn e "Repairing the schema failed")))
+             (exponential-backoff attempt)))
+         (let [result (try
+                        (SchemaLoader/load properties schema options true)
+                        :success
+                        (catch Exception e
+                          (warn e "Loading the schema failed")
+                          :fail))]
+           (when (= result :fail)
+             (recur (dec remaining)))))))))
 
 (defn- close-storage!
   [test]
