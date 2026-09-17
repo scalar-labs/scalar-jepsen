@@ -143,9 +143,6 @@
     @specs))
 
 (defn- scalardb-opts
-  "Fresh state for one run. Each run wipes the backend DB, so these atoms must
-  not be shared: a carried-over :table-id makes the next run use tables that no
-  longer exist."
   []
   {:storage (atom nil)
    :transaction (atom nil)
