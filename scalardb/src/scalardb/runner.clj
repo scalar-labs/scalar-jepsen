@@ -142,7 +142,11 @@
       (swap! specs into @(resolve 'cassandra.runner/admin-opt-spec)))
     @specs))
 
-(def ^:private scalardb-opts
+(defn- scalardb-opts
+  "Fresh state for one run. Each run wipes the backend DB, so these atoms must
+  not be shared: a carried-over :table-id makes the next run use tables that no
+  longer exist."
+  []
   {:storage (atom nil)
    :transaction (atom nil)
    :table-id (atom INITIAL_TABLE_ID)
@@ -156,7 +160,7 @@
         ssh (if (= (env :cluster?) "true") {:dummy? true} (:ssh base-opts))
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
-                             scalardb-opts
+                             (scalardb-opts)
                              {:nodes (vec (take max-nodes (:nodes base-opts)))
                               :consistency-model consistency-model
                               ;; jepsen-k8s reads [:k8s :kubeconfig] to pass
