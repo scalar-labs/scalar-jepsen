@@ -129,7 +129,7 @@
   {:pod-selector "app.kubernetes.io/app=scalardb-cluster"
    :targets [:one]
    :cpu {:workers 2 :load 80}
-   :memory {:workers 1 :size "256MB"}})
+   :memory {:workers 1 :size "50%"}})
 
 (def backend-with-file-options
   (reify

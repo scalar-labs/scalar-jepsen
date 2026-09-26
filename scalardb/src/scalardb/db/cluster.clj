@@ -23,7 +23,7 @@
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
-(def ^:private STRESS_OPTIONS
+(def ^:private ^:const STRESS_OPTIONS
   {:pod-selector NODE_SELECTOR
    :targets [:one]
    :cpu {:workers 2 :load 80}
