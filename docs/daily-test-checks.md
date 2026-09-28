@@ -20,13 +20,15 @@ Kelpie verification and benchmarks are documented in [kelpie-test](https://githu
   * Check GitHub Actions: https://github.com/scalar-labs/scalar-jepsen/actions
   * Check the status page: https://scalar-labs.github.io/scalar-jepsen/ (gh-pages, 30-day history) after the **Update status page** workflow finishes.
 
-* Confirm the expected scheduled runs completed (UTC):
+* Confirm the expected scheduled runs completed (UTC, Sunday–Friday):
 
   | Workflow | Cron | Approx IST |
   |----------|------|------------|
-  | Daily ScalarDB Cluster test | `0 10 * * *` | 15:30 |
-  | Daily ScalarDL test | `0 15 * * *` | 20:30 |
-  | Daily ScalarDB test | `0 20 * * *` | 01:30 next day |
+  | Daily ScalarDB Cluster test | `0 10 * * 0-5` | 15:30 |
+  | Daily ScalarDL test | `0 14 * * 0-5` | 19:30 |
+  | Daily ScalarDB test | `0 15 * * 0-5` | 20:30 |
+
+  Scheduled runs do not fire on Saturdays.
 
 Environments are ephemeral GitHub-hosted runners. There is no Azure VM to retain or destroy.
 

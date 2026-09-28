@@ -10,9 +10,9 @@ Local how-to for Docker, bare metal, and Cluster (including EKS) remains in the 
 
 | Workflow | File | Schedule (UTC) | Environment |
 |----------|------|----------------|-------------|
-| Daily ScalarDB Cluster test | [`.github/workflows/daily-cluster.yml`](../.github/workflows/daily-cluster.yml) | `0 10 * * *` | Kind + MetalLB on the runner |
-| Daily ScalarDL test | [`.github/workflows/daily-dl.yml`](../.github/workflows/daily-dl.yml) | `0 15 * * *` | Docker Compose (`docker/`) |
-| Daily ScalarDB test | [`.github/workflows/daily-db.yml`](../.github/workflows/daily-db.yml) | `0 20 * * *` | Docker Compose (`docker/`) |
+| Daily ScalarDB Cluster test | [`.github/workflows/daily-cluster.yml`](../.github/workflows/daily-cluster.yml) | `0 10 * * 0-5` (Sun–Fri) | Kind + MetalLB on the runner |
+| Daily ScalarDL test | [`.github/workflows/daily-dl.yml`](../.github/workflows/daily-dl.yml) | `0 14 * * 0-5` (Sun–Fri) | Docker Compose (`docker/`) |
+| Daily ScalarDB test | [`.github/workflows/daily-db.yml`](../.github/workflows/daily-db.yml) | `0 15 * * 0-5` (Sun–Fri) | Docker Compose (`docker/`) |
 
 Related:
 
@@ -20,7 +20,7 @@ Related:
 * **ScalarDB Cluster Test (dispatch)** ([`cluster-test.yml`](../.github/workflows/cluster-test.yml)) is a manual Kind run with extra inputs (ref, version, backend, workload, nemesis).
 * PR/push: `build-test.yml`, `fmt-lint.yml`, and a shorter smoke run in `test.yml` (not the daily matrix).
 
-The three daily workflows are schedule-only (no `workflow_dispatch`).
+The three daily workflows are schedule-only (no `workflow_dispatch`). There is no Saturday cron.
 
 ---
 
@@ -40,7 +40,7 @@ Daily DB/DL jobs:
 5. `docker exec jepsen-control … lein … run test` with matrix options (`--concurrency 5`, `--time-limit 600`, `--ssh-private-key ~/.ssh/id_rsa`).
 6. Copy `store` out of the control container; on failure run triage, Jira, then upload artifacts.
 
-**ScalarDB daily matrix (11 jobs):** Transfers_SI, Transfers_2PC_SI, ReadCommitted, ReadCommitted_2PC, RCSI, RCSI_2PC, Serializable, Serializable_2PC, OnePhaseCommit_SI, OnePhaseCommit_Serializable, GroupCommit. Typical nemeses: `none`, `partition`, `crash`. Isolation/consistency flags are set per cell in `daily-db.yml`.
+**ScalarDB daily matrix (7 jobs):** Transfers_SI, ReadCommitted, RCSI, Serializable, OnePhaseCommit_SI, OnePhaseCommit_Serializable, GroupCommit. Typical nemeses: `none`, `partition`, `crash`. Isolation/consistency flags are set per cell in `daily-db.yml`. (2PC matrix cells were removed.)
 
 **ScalarDL daily matrix (3 jobs):** `nemesis-none`, `nemesis-crash`, `nemesis-partition`. The workflow currently passes `--workload all`.
 
@@ -55,7 +55,7 @@ Daily Cluster jobs run on the runner itself (not inside `jepsen-control`):
 3. Kind cluster `test-cluster` + MetalLB (L2 pool on the Kind Docker network).
 4. `lein with-profile cluster run test --db <backend> …` with matrix workloads and nemeses (`none partition packet clock crash`), time-limit 600.
 
-**Matrix (high level):** postgres feature cells matching the DB suite plus `ClientSideOptimizations`; Transfers and Elle pairs for alloydb, yugabytedb, mysql, mariadb, tidb, sqlserver, oracle, db2.
+**Matrix (high level):** postgres feature cells matching the DB suite plus `ClientSideOptimizations`; Transfers and Elle pairs for alloydb, yugabytedb, mysql, mariadb, tidb, sqlserver, oracle, db2, cassandra.
 
 Daily Cluster is Kind-only. EKS StorageClass and LoadBalancer notes in the root README apply to manual/EKS runs, not to the scheduled daily.
 
