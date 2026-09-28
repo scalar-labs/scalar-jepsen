@@ -22,7 +22,6 @@
 (def ^:private ^:const INTERVAL_SEC 10)
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
-(def ^:private ^:const CLUSTER2_NAME (str CLUSTER_NAME "-2"))
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
 
 (def ^:private ^:const LB_SCHEME_ANNOTATION
@@ -88,21 +87,13 @@
                               "scalar.db.consensus_commit.coordinator.group_commit.metrics_monitor_log_enabled=true"]))))]
     (assoc-in values path new-db-props)))
 
-(defn- need-two-clusters?
-  [test]
-  (str/includes? (:name test) "2pc"))
-
 (defn- expose-loadbalancers!
   "When --lb-internet-facing is set, annotate the test's own LoadBalancer
   services so the cloud provisions them internet-facing."
   [test backend-db]
   (when (:lb-internet-facing test)
-    (let [envoy-names (map #(str % "-envoy")
-                           (if (need-two-clusters? test)
-                             [CLUSTER_NAME CLUSTER2_NAME]
-                             [CLUSTER_NAME]))
-          names (remove nil? (conj envoy-names
-                                   (cluster-db/get-lb-service-name backend-db)))]
+    (let [names (remove nil? [(str CLUSTER_NAME "-envoy")
+                              (cluster-db/get-lb-service-name backend-db)])]
       (doseq [name (->> (k8s/services test {})
                         :items
                         (filter #(= "LoadBalancer" (get-in % [:spec :type])))
@@ -144,14 +135,11 @@
          (update-cluster-values test backend-db)
          yaml/generate-string
          (spit CLUSTER_VALUES_YAML))
-    (doseq [name (if (need-two-clusters? test)
-                   [CLUSTER_NAME CLUSTER2_NAME]
-                   [CLUSTER_NAME])]
-      (helm/install! test {:release name
-                           :chart "scalar-labs/scalardb-cluster"
-                           :values [CLUSTER_VALUES_YAML]
-                           :version chart-version
-                           :namespace "default"}))
+    (helm/install! test {:release CLUSTER_NAME
+                         :chart "scalar-labs/scalardb-cluster"
+                         :values [CLUSTER_VALUES_YAML]
+                         :version chart-version
+                         :namespace "default"})
     (.delete (File. CLUSTER_VALUES_YAML)))
 
   (cm/setup! test {})
@@ -169,27 +157,42 @@
       (.delete f)))
   (info "wiping the pods...")
   (cluster-db/wipe! backend-db test)
-  (doseq [release [CLUSTER_NAME CLUSTER2_NAME]]
-    (try (helm/uninstall! test {:release release
-                                :timeout WIPE_TIMEOUT
-                                :ignore-not-found? true})
-         (catch Exception e (warn e "Failed to uninstall:" release))))
+  (try (helm/uninstall! test {:release CLUSTER_NAME
+                              :timeout WIPE_TIMEOUT
+                              :ignore-not-found? true})
+       (catch Exception e (warn e "Failed to uninstall:" CLUSTER_NAME)))
   (try (cm/wipe! test {})
        (catch Exception e (warn e "Failed to wipe Chaos Mesh"))))
 
 (defn- get-pod-list
-  "Get names of running ScalarDB Cluster node pods across all releases."
+  "Get names of running ScalarDB Cluster node pods."
   [test]
   (->> (k8s/pods test {:selector NODE_SELECTOR})
        :items
        (filter #(= "Running" (get-in % [:status :phase])))
        (map #(get-in % [:metadata :name]))))
 
+(defn- collect-logs!
+  [test opts]
+  (try
+    (k8s/collect-logs! test opts)
+    (catch Exception e
+      (warn e "Failed to collect pod logs:" opts))))
+
 (defn- get-logs
-  "Collect ScalarDB Cluster pod logs into the test's store directory directly."
-  [test]
-  (k8s/collect-logs! test {:selector NODE_SELECTOR
-                           :output-dir (store/path! test "pods")}))
+  "Collect ScalarDB Cluster, backend DB and Chaos Mesh pod logs into the test's
+  store directory directly."
+  [test backend-db]
+  (let [output-dir (store/path! test "pods")]
+    (collect-logs! test {:selector NODE_SELECTOR :output-dir output-dir})
+    (when (satisfies? cluster-db/ClusterDbLogs backend-db)
+      (collect-logs! test {:selector (cluster-db/log-selector backend-db)
+                           :output-dir output-dir}))
+    ;; Chaos Mesh's own logs tell whether a fault was really injected: the
+    ;; controller manager reconciles the experiment and the chaos daemons
+    ;; apply it on each node.
+    (collect-logs! test {:namespace cm/default-namespace
+                         :output-dir (store/path! test "pods" "chaos-mesh")})))
 
 (defn- find-load-balancer-ip
   [test prefix]
@@ -238,8 +241,7 @@
 (defn- running-pods?
   "Check a live node."
   [test]
-  (= (count (get-pod-list test))
-     (if (need-two-clusters? test) 6 3)))
+  (= (count (get-pod-list test)) 3))
 
 (defn- cluster-nodes-ready?
   [test]
@@ -299,34 +301,36 @@
     (log-files [_ test _]
       ;; Collect pod logs into store/ ourselves and return [] so jepsen's
       ;; snarf-logs! doesn't try to fetch them over the dummy SSH connection.
-      (get-logs test)
+      (get-logs test backend-db)
       [])))
 
 (defrecord ExtCluster [backend-db]
   ext/DbExtension
   (live-nodes [_ test] (running-pods? test))
   (wait-for-recovery [_ test] (wait-for-recovery test))
-  (create-table-opts [_ _] {})
+  (create-table-opts [_ test]
+    (if (satisfies? cluster-db/ClusterDbTableOptions backend-db)
+      (cluster-db/create-table-opts backend-db test)
+      {}))
   (create-properties
     [_ test]
     (or (ext/load-config test)
-        (let [create-fn
-              (fn [ip]
-                (let [client-side-optimizations-enabled (str (:enable-cluster-client-side-optimizations test))]
-                  (doto (Properties.)
-                    (.setProperty "scalar.db.transaction_manager" "cluster")
-                    (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
-                    (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled" client-side-optimizations-enabled)
-                    (.setProperty "scalar.db.cluster.client.write_buffering.enabled" client-side-optimizations-enabled))))]
-          (if (need-two-clusters? test)
-            (mapv (comp create-fn #(get-load-balancer-ip test (str % "-envoy")))
-                  [CLUSTER_NAME CLUSTER2_NAME])
-            (create-fn (get-load-balancer-ip test (str CLUSTER_NAME "-envoy")))))))
+        (let [ip (get-load-balancer-ip test (str CLUSTER_NAME "-envoy"))
+              client-side-optimizations-enabled
+              (str (:enable-cluster-client-side-optimizations test))]
+          (doto (Properties.)
+            (.setProperty "scalar.db.transaction_manager" "cluster")
+            (.setProperty "scalar.db.contact_points" (str "indirect:" ip))
+            (.setProperty "scalar.db.cluster.client.piggyback_begin.enabled"
+                          client-side-optimizations-enabled)
+            (.setProperty "scalar.db.cluster.client.write_buffering.enabled"
+                          client-side-optimizations-enabled)))))
   (create-storage-properties [_ test]
     (cluster-db/create-storage-properties backend-db test)))
 
 (def ^:private dbtype->gen-var
-  {:postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
+  {:cassandra 'scalardb.db.cluster-db.cassandra/gen-cluster-db
+   :postgres  'scalardb.db.cluster-db.postgres/gen-cluster-db
    :alloydb   'scalardb.db.cluster-db.alloydb/gen-cluster-db
    :yugabytedb  'scalardb.db.cluster-db.yugabytedb/gen-cluster-db
    :mysql     'scalardb.db.cluster-db.mysql/gen-cluster-db
@@ -350,11 +354,25 @@
       (if (managed-db-types db-type) (f opts) (f)))
     (throw (ex-info "Unsupported DB for ScalarDB Cluster test" {:db db-type}))))
 
+(defn- nemesis-options
+  "Note: the file-io nemesis needs amd64 nodes. Chaos Mesh injects IOChaos with
+  toda, and the binary shipped even in the arm64 chaos-daemon image is x86-64,
+  so it dies under emulation and no fault is ever applied (the chaos controller
+  manager logs it). Run this fault on an amd64 cluster."
+  [backend-db db-type faults]
+  (if (contains? (set faults) :file-io)
+    (if (satisfies? cluster-db/ClusterDbFileOptions backend-db)
+      {:file-io (cluster-db/file-io-options backend-db)}
+      (throw (ex-info "Backend does not support the file-io nemesis"
+                      {:db db-type})))
+    {}))
+
 (defn gen-db
   [faults admin db-type & [opts]]
   (when (seq admin)
     (warn "The admin operations are ignored: " admin))
   (let [backend-db (cluster-backend-db db-type opts)
         db (ext/extend-db (db backend-db) (->ExtCluster backend-db))
-        nemesis (cm/nemesis-package db 60 faults)]
+        nemesis (cm/nemesis-package db 60 faults
+                                    (nemesis-options backend-db db-type faults))]
     [db nemesis 1]))

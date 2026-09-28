@@ -13,11 +13,7 @@
              [transfer]
              [transfer-append]
              [elle-append]
-             [elle-write-read]
-             [transfer-2pc]
-             [transfer-append-2pc]
-             [elle-append-2pc]
-             [elle-write-read-2pc]]
+             [elle-write-read]]
             [clojure.core :as c]))
 
 (def supported-dbs
@@ -39,22 +35,14 @@
   {"transfer"            :transfer
    "transfer-append"     :transfer-append
    "elle-append"         :elle-append
-   "elle-write-read"     :elle-write-read
-   "transfer-2pc"        :transfer-2pc
-   "transfer-append-2pc" :transfer-append-2pc
-   "elle-append-2pc"     :elle-append-2pc
-   "elle-write-read-2pc" :elle-write-read-2pc})
+   "elle-write-read"     :elle-write-read})
 
 (def workloads
   "A map of workload to test constructors."
   {:transfer            scalardb.transfer/workload
    :transfer-append     scalardb.transfer-append/workload
    :elle-append         scalardb.elle-append/workload
-   :elle-write-read     scalardb.elle-write-read/workload
-   :transfer-2pc        scalardb.transfer-2pc/workload
-   :transfer-append-2pc scalardb.transfer-append-2pc/workload
-   :elle-append-2pc     scalardb.elle-append-2pc/workload
-   :elle-write-read-2pc scalardb.elle-write-read-2pc/workload})
+   :elle-write-read     scalardb.elle-write-read/workload})
 
 (def nemeses
   "A map of nemeses."
@@ -63,7 +51,8 @@
    "packet"    [:packet]
    "clock"     [:clock]
    "crash"     [:kill]
-   "pause"     [:pause]})
+   "pause"     [:pause]
+   "file-io"   [:file-io]})
 
 (def test-opt-spec
   [(cli/repeated-opt nil "--db NAME" "DB(s) on which the test is run"
@@ -153,10 +142,10 @@
       (swap! specs into @(resolve 'cassandra.runner/admin-opt-spec)))
     @specs))
 
-(def ^:private scalardb-opts
+(defn- scalardb-opts
+  []
   {:storage (atom nil)
    :transaction (atom nil)
-   :2pc (atom nil)
    :table-id (atom INITIAL_TABLE_ID)
    :unknown-tx (atom #{})
    :failures (atom 0)
@@ -168,7 +157,7 @@
         ssh (if (= (env :cluster?) "true") {:dummy? true} (:ssh base-opts))
         consistency-model (->> base-opts :consistency-model (mapv keyword))
         workload-opts (merge base-opts
-                             scalardb-opts
+                             (scalardb-opts)
                              {:nodes (vec (take max-nodes (:nodes base-opts)))
                               :consistency-model consistency-model
                               ;; jepsen-k8s reads [:k8s :kubeconfig] to pass

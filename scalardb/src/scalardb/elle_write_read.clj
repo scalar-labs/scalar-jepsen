@@ -6,7 +6,8 @@
             [jepsen.tests.cycle.wr :as wr]
             [scalardb.core :as scalar :refer [KEYSPACE
                                               INITIAL_TABLE_ID
-                                              DEFAULT_TABLE_COUNT]])
+                                              DEFAULT_TABLE_COUNT
+                                              RETRIES_FOR_ADDING_TABLES]])
   (:import (com.scalar.db.api Get
                               Put)
            (com.scalar.db.io IntValue
@@ -70,16 +71,18 @@
 
 (defn add-tables
   [test next-id]
-  (let [table-id (:table-id test)
-        current-id @table-id]
-    (when (< current-id next-id)
+  (let [table-id (:table-id test)]
+    (when (< @table-id next-id)
       (locking table-id
-        (when (compare-and-set! table-id current-id next-id)
+        (when (< @table-id next-id)
           (info (str "Creating new tables for " next-id))
           (doseq [i (range DEFAULT_TABLE_COUNT)]
             (scalar/setup-transaction-tables
              test
-             [{(keyword (str KEYSPACE \. TABLE next-id \_ i)) SCHEMA}])))))))
+             [{(keyword (str KEYSPACE \. TABLE next-id \_ i)) SCHEMA}]
+             RETRIES_FOR_ADDING_TABLES))
+          ;; publish the new ID only once every table exists
+          (reset! table-id next-id))))))
 
 (defrecord WriteReadClient [initialized?]
   client/Client
