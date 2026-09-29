@@ -1,6 +1,11 @@
 ![Build and Test](https://github.com/scalar-labs/scalar-jepsen/actions/workflows/build-test.yml/badge.svg)
 ![Test with Docker](https://github.com/scalar-labs/scalar-jepsen/actions/workflows/test.yml/badge.svg)
 
+Daily GitHub Actions (ScalarDB, ScalarDL, Cluster), failure handling, and Docker/Kind environment details:
+
+* [Daily test monitoring and failure handling](docs/daily-test-checks.md)
+* [Test environment and setup](docs/test-environment-and-setup.md)
+
 # Run tests with Jepsen Docker
 1. Move to the docker directory
 ```sh
