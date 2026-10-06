@@ -21,3 +21,6 @@
       (is (not (identical? (k opts) (k other)))))
     (swap! (:table-id opts) inc)
     (is (= INITIAL_TABLE_ID @(:table-id other)))))
+
+(deftest stress-nemesis-option-test
+  (is (= [:stress] (get runner/nemeses "stress"))))
