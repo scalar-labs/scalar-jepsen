@@ -10,3 +10,4 @@ docker/keys/
 */.lein-*
 */.lsp
 managed.yaml
+cassandra-tarball/

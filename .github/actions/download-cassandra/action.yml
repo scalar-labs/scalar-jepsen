@@ -1,0 +1,37 @@
+name: Download Cassandra
+description: Download the Cassandra tarball once so that nodes don't fetch it from the internet
+
+outputs:
+  tarball:
+    description: Tarball URL for --tarball, as seen from jepsen-control
+    value: ${{ steps.download.outputs.tarball }}
+
+runs:
+  using: composite
+  steps:
+  - name: Get Cassandra version
+    id: version
+    shell: bash
+    run: |
+      # Single source of truth: link-to-tarball in the Cassandra runner
+      url=$(grep -oE 'https://[^"]+apache-cassandra-[^"]+-bin\.tar\.gz' cassandra/src/cassandra/runner.clj)
+      echo "url=${url}" >> $GITHUB_OUTPUT
+      echo "file=$(basename "${url}")" >> $GITHUB_OUTPUT
+
+  - name: Cache Cassandra tarball
+    uses: actions/cache@v5
+    with:
+      path: cassandra-tarball
+      key: ${{ steps.version.outputs.file }}
+
+  - name: Download Cassandra tarball
+    id: download
+    shell: bash
+    run: |
+      mkdir -p cassandra-tarball
+      f="cassandra-tarball/${{ steps.version.outputs.file }}"
+      if [ ! -s "${f}" ]; then
+        curl -fL --retry 5 --retry-all-errors -o "${f}" "${{ steps.version.outputs.url }}"
+      fi
+      # The workspace is mounted at /scalar-jepsen in jepsen-control
+      echo "tarball=file:///scalar-jepsen/${f}" >> $GITHUB_OUTPUT

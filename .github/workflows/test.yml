@@ -23,9 +23,13 @@ jobs:
         cd docker
         docker compose up -d
 
+    - name: Download Cassandra
+      id: cassandra
+      uses: ./.github/actions/download-cassandra
+
     - name: Cassandra test
       run: |
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein run test --workload lwt --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa --tarball ${{ steps.cassandra.outputs.tarball }}"
 
   scalardb:
     runs-on: ubuntu-latest
@@ -43,10 +47,14 @@ jobs:
         cd docker
         docker compose up -d
 
+    - name: Download Cassandra
+      id: cassandra
+      uses: ./.github/actions/download-cassandra
+
     - name: ScalarDB test
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein with-profile cassandra run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardb && lein with-profile cassandra run test --workload transfer --nodes n1,n2,n3 --ssh-private-key ~/.ssh/id_rsa --tarball ${{ steps.cassandra.outputs.tarball }}"
 
   scalardl:
     runs-on: ubuntu-latest
@@ -94,10 +102,14 @@ jobs:
         cd docker
         docker compose up -d
 
+    - name: Download Cassandra
+      id: cassandra
+      uses: ./.github/actions/download-cassandra
+
     - name: ScalarDL test
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
-        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardl && lein run test --workload transfer --ssh-private-key ~/.ssh/id_rsa"
+        docker exec jepsen-control bash -c "cd /scalar-jepsen/scalardl && lein run test --workload transfer --ssh-private-key ~/.ssh/id_rsa --tarball ${{ steps.cassandra.outputs.tarball }}"
 
   cluster:
     runs-on: ubuntu-latest

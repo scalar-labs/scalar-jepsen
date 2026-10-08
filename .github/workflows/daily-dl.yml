@@ -114,6 +114,10 @@ jobs:
           docker cp m2-cache/. jepsen-control:/root/.m2/
         fi
 
+    - name: Download Cassandra
+      id: cassandra
+      uses: ./.github/actions/download-cassandra
+
     - name: Install Cassandra test tool
       run: |
         docker exec jepsen-control bash -c "cd /scalar-jepsen/cassandra && lein install"
@@ -150,6 +154,7 @@ jobs:
             --concurrency 5 \
             --time-limit ${{ matrix.tests.time_limit }} \
             --ssh-private-key ~/.ssh/id_rsa \
+            --tarball ${{ steps.cassandra.outputs.tarball }} \
             2>&1 | tail -n 300"
         EXIT_CODE=$?
 
