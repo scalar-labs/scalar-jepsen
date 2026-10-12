@@ -1,112 +1,90 @@
 # Daily Test Monitoring & Failure Handling SOP
 
-This document is a quick daily procedure for monitoring Scalar Jepsen tests and handling failures.
+Quick daily checklist for Jepsen tests in this repository.
 
-Kelpie verification and benchmarks are documented in [kelpie-test](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md). Test environment details for this repo are in [test-environment-and-setup.md](./test-environment-and-setup.md).
+| Related docs | |
+|--------------|---|
+| Environments / how tests run | [test-environment-and-setup.md](./test-environment-and-setup.md) |
+| Kelpie verification & benchmarks | [kelpie-test daily SOP](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md) |
 
-**This repo owns:** Jepsen ScalarDB, ScalarDL, and ScalarDB Cluster dailies. **kelpie-test** owns Kelpie verification and benchmarks.
+**What this repo covers:** daily Jepsen for ScalarDB, ScalarDL, and ScalarDB Cluster.  
+**What kelpie-test covers:** Kelpie verification and benchmarks.
 
 ---
 
 ## 1. Daily Monitoring
 
-* Check Slack (`eng-verification`) for daily Jepsen results (webhook; channel is configured on the webhook secret).
+1. Check Slack channel **`eng-verification`** for the three daily summaries (Cluster, ScalarDL, ScalarDB).
+2. If Slack is quiet (no success and no failure), or something looks incomplete:
+   * Open [GitHub Actions](https://github.com/scalar-labs/scalar-jepsen/actions)
+   * Open the [status page](https://scalar-labs.github.io/scalar-jepsen/) (updated after each daily finishes; ~30-day history)
 
-  * Daily ScalarDB Cluster, ScalarDL, and ScalarDB test summaries are posted after each scheduled run.
-  * Failed or timed-out tests include a first-pass triage label in the Slack line when triage succeeded (for example `TEMPORARY_ISSUE`).
+**When do the dailies run?** Sunday–Friday only (no Saturday). Times below are cron UTC and approx IST:
 
-* If there is no failure message, or no success message:
+| Workflow | Cron (UTC) | Approx IST |
+|----------|------------|------------|
+| Daily ScalarDB Cluster test | `0 10 * * 0-5` | 15:30 |
+| Daily ScalarDL test | `0 14 * * 0-5` | 19:30 |
+| Daily ScalarDB test | `0 15 * * 0-5` | 20:30 |
 
-  * Check GitHub Actions: https://github.com/scalar-labs/scalar-jepsen/actions
-  * Check the status page: https://scalar-labs.github.io/scalar-jepsen/ (gh-pages, 30-day history) after the **Update status page** workflow finishes.
+Each run uses a temporary GitHub-hosted runner. There is nothing to SSH into or destroy in Azure after the job ends.
 
-* Confirm the expected scheduled runs completed (UTC, Sunday–Friday):
-
-  | Workflow | Cron | Approx IST |
-  |----------|------|------------|
-  | Daily ScalarDB Cluster test | `0 10 * * 0-5` | 15:30 |
-  | Daily ScalarDL test | `0 14 * * 0-5` | 19:30 |
-  | Daily ScalarDB test | `0 15 * * 0-5` | 20:30 |
-
-  Scheduled runs do not fire on Saturdays.
-
-Environments are ephemeral GitHub-hosted runners. There is no Azure VM to retain or destroy.
+> **Note:** AI triage labels in Slack/Jira are currently unreliable or missing. Always use Actions artifacts (`logs-*`) — see [§4 AI triage](#4-ai-triage-currently-not-working).
 
 ---
 
 ## 2. Failure Handling (Slack Alert Present)
 
-If a failure alert is present in Slack:
+1. Open the **Jira** ticket (project **`DLT`**). It should contain the Actions run URL and commit. Artifact names are usually `logs-<test>` and (if present) `triage-<test>`.
+2. Open the Actions run and download **`logs-<test>`**. Inside the Jepsen store, start with `current/jepsen.log`. Also check `result-<test>` (`success` / `failure` / `timeout`).
+3. Update the ticket:
+   * **Known / temporary** (infra, timeout, missing log, known flake) → write the reason → close the ticket.
+   * **New / real inconsistency** → add findings from the log → notify the right engineer(s) → suggest a fix if you have one → wait for confirmation before acting on a proposed fix.
+4. Follow up on the ticket until resolved.
 
-* Open the Jira ticket (project `DLT`). The ticket description includes the workflow run URL, commit, and the triage summary when available. The environment field points at artifacts `logs-<test>` and `triage-<test>`.
-
-* Review the first-pass triage (ticket, Slack suffix, job step summary, or the `triage-<test>` artifact). Treat it as a hint only — see [AI triage](#ai-triage).
-
-* If more information is needed:
-
-  * Open the Actions run from Slack or Jira.
-  * Download `logs-<test>` (Jepsen `store`, including `current/jepsen.log`) and `triage-<test>` if present.
-  * Confirm the result in `result-<test>` (`success` / `failure` / `timeout`).
-
-* Update the Jira ticket:
-
-  * **Known / temporary issue** (infrastructure, timeout, missing log, known flaky env)
-
-    * Record the reason.
-    * Close the ticket. The test environment is already gone (`docker compose` / Kind on the runner).
-
-  * **New issue / real inconsistency**
-
-    * Add findings from `jepsen.log` and related store files.
-    * Notify the relevant engineer(s).
-    * Include a potential solution if available, and request confirmation before acting on it.
-
-* Wait for a response and follow up on the ticket.
+Do not rely on an AI triage label to decide known vs new. Confirm from `jepsen.log`.
 
 ---
 
 ## 3. Failure Handling (No Slack Alert / No Ticket)
 
-If a failure occurred and:
+Use this path when Actions shows a failure but Slack/Jira did not fire (or the job died before the test step):
 
-* No Slack alert is present
-* No Jira ticket was created
-* OR no success message exists (for example the job failed before the test step)
+1. Open the Actions run and find the failing job (often compose/Kind/build before the test).
+2. Create a Jira ticket in **`DLT`** with the run URL and what you found.
+3. Download artifacts if they exist; otherwise use the job log.
+4. Notify the relevant engineer(s) and follow up.
 
-Then:
-
-* Check the Actions run (job logs for compose/Kind/build failures).
-* Create a Jira ticket in `DLT` with the run URL and findings.
-* Download artifacts if they exist; otherwise investigate the failed setup step.
-* Notify the relevant engineer(s) and wait for a response.
-
-Jira and Slack helpers use `continue-on-error`, so a green notify job does not prove the test passed. Always confirm the matrix jobs and `result-*` artifacts.
+Slack/Jira steps are marked `continue-on-error` in the workflow, so a green “Notify Slack” job does **not** mean all tests passed. Always check the matrix jobs and `result-*` artifacts.
 
 ---
 
-## 4. AI triage
+## 4. AI triage (currently not working)
 
-Daily workflows run [`.github/scripts/triage.py`](../.github/scripts/triage.py) on failure. It reads the tail of `jepsen.log` and classifies the failure.
+Daily workflows still call [`.github/scripts/triage.py`](../.github/scripts/triage.py) on failure. That script was meant to read the end of `jepsen.log` and attach a first-pass label.
 
-**Labels**
+### Current status
+
+**AI triage is currently not working.** It uses GitHub Models with model id `openai/gpt-4o-mini`, which is no longer available. In practice you will often see:
+
+* No `triage-<test>` artifact
+* A failed “First-pass triage with GitHub Models” step (the workflow continues anyway)
+* No triage label in Slack / incomplete triage text in Jira
+
+**What to do today:** ignore missing or wrong triage. Investigate with `logs-<test>` / `jepsen.log` as usual. Do not wait for triage to succeed.
+
+**Follow-up (maintainers):** replace the model (or the triage approach) in `triage.py` and update this section when it works again.
+
+### Labels (when triage worked)
 
 | Label | Meaning |
 |-------|---------|
-| `TEMPORARY_ISSUE` | Likely transient, environmental, or infrastructure-related |
-| `INCONSISTENCY_REQUIRES_INVESTIGATION` | Credible evidence of a consistency/correctness violation |
-| `UNKNOWN_REQUIRES_HUMAN` | Insufficient or conflicting evidence |
-| `NO_JEPSEN_LOG` | No `jepsen.log` (failure before Jepsen wrote a log) |
+| `TEMPORARY_ISSUE` | Likely transient / infrastructure |
+| `INCONSISTENCY_REQUIRES_INVESTIGATION` | Credible consistency/correctness signal |
+| `UNKNOWN_REQUIRES_HUMAN` | Needs a human look |
+| `NO_JEPSEN_LOG` | No `jepsen.log` yet (failed before Jepsen wrote a log) |
 
-The script also tags the final log line as `ANALYSIS_INVALID`, `ANALYSIS_ERRORS_NO_ANOMALIES`, or `OTHER_FAILURE` before calling the model. `"Analysis invalid!"` alone is not treated as a real consistency bug.
-
-**Operator rules**
-
-* Always confirm the label against `jepsen.log` and the store. Do not close a ticket as temporary, or escalate as an inconsistency, based only on the model.
-* If triage is missing, empty, or failed (`continue-on-error: true` on the triage step), investigate the logs as usual.
-
-**Future update required**
-
-Triage currently calls GitHub Models (`https://models.github.ai/inference/chat/completions`) with `openai/gpt-4o-mini`. That model is no longer available and will need to be replaced. Until then, missing or wrong triage is expected; investigation must not wait on a successful AI pass.
+Even when triage works again, treat labels as hints only. `"Analysis invalid!"` alone is not proof of a real consistency bug.
 
 ---
 
@@ -115,39 +93,30 @@ Triage currently calls GitHub Models (`https://models.github.ai/inference/chat/c
 ```mermaid
 flowchart TD
 
-A[Check Slack eng-verification] --> B{Failure Alert in Slack?}
+A[Check Slack eng-verification] --> B{Failure alert?}
 
-B -- Yes --> C[Check Jira Ticket]
-C --> D[Review triage and logs in ticket]
-D --> E{Need More Info?}
-E -- Yes --> F[Download logs and triage artifacts from Actions]
-F --> G[Inspect jepsen.log and store]
-G --> H[Update Jira Ticket]
-E -- No --> H
+B -- Yes --> C[Open Jira ticket]
+C --> D[Download logs from Actions]
+D --> E[Inspect jepsen.log]
+E --> F{Known or temporary?}
+F -- Yes --> G[Update reason and close]
+F -- No --> H[Add findings and notify engineer]
+H --> I[Follow up on ticket]
+G --> END
+I --> END
 
-H --> I{Known or temporary?}
-I -- Yes --> J[Update Reason and Close Ticket]
-I -- No --> K[Add Findings Notify Engineer Suggest Solution]
-
-J --> END
-K --> L[Handle Queries if Any]
-L --> M[Act Based on Response]
-M --> END
-
-B -- No --> O{Success Message Present?}
-O -- Yes --> END1[No Action Required]
-O -- No --> P[Check GitHub Actions and status page]
-P --> Q{Failure Found?}
-Q -- Yes --> R[Create Jira Ticket if Missing]
-R --> S[Investigate artifacts or setup logs]
-S --> V[Add Findings and Notify Engineer]
-V --> W[Wait for Response]
-Q -- No --> END2[Monitor Further]
+B -- No --> J{Success message present?}
+J -- Yes --> END1[No action]
+J -- No --> K[Check Actions and status page]
+K --> L{Failure found?}
+L -- Yes --> M[Create Jira if missing]
+M --> N[Investigate and notify]
+L -- No --> END2[Keep monitoring]
 ```
 
 ---
 
-## 6. Additional details
+## 6. More detail
 
-* How environments are created and how to reproduce a failed cell: [test-environment-and-setup.md](./test-environment-and-setup.md)
-* Kelpie daily verification and benchmarks: [kelpie-test daily SOP](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md)
+* Environments, schedules, matrices, local reproduce: [test-environment-and-setup.md](./test-environment-and-setup.md)
+* Kelpie dailies: [kelpie-test daily SOP](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md)

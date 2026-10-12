@@ -1,8 +1,11 @@
 # Test Environment and Setup
 
-Daily Jepsen tests run on GitHub-hosted `ubuntu-latest` runners. Environments are created in the workflow and torn down when the job ends. There is no Terraform or Azure VM retain step.
+How daily Jepsen CI builds its environment, what it runs, and how to reproduce a failure locally.
 
-Local how-to for Docker, bare metal, and Cluster (including EKS) remains in the [root README](../README.md).
+Daily jobs use GitHub-hosted `ubuntu-latest` runners. The environment is created in the workflow and removed when the job ends (no Azure VM / Terraform retain).
+
+For the operator checklist (Slack / Jira / failures), see [daily-test-checks.md](./daily-test-checks.md).  
+For local Docker, bare metal, and EKS Cluster setup, see the [root README](../README.md).
 
 ---
 
@@ -38,7 +41,7 @@ Daily DB/DL jobs:
 3. Copy m2 into the control container; `lein install` in `cassandra/`.
 4. ScalarDL only: checkout `scalar-labs/scalardl`, `./gradlew distTar`, copy `ledger.tar` into `scalardl/resources/`.
 5. `docker exec jepsen-control … lein … run test` with matrix options (`--concurrency 5`, `--time-limit 600`, `--ssh-private-key ~/.ssh/id_rsa`).
-6. Copy `store` out of the control container; on failure run triage, Jira, then upload artifacts.
+6. Copy `store` out of the control container; on failure attempt triage (currently not working — see [daily SOP §4](./daily-test-checks.md#4-ai-triage-currently-not-working)), create Jira, then upload artifacts.
 
 **ScalarDB daily matrix (7 jobs):** Transfers_SI, ReadCommitted, RCSI, Serializable, OnePhaseCommit_SI, OnePhaseCommit_Serializable, GroupCommit. Typical nemeses: `none`, `partition`, `crash`. Isolation/consistency flags are set per cell in `daily-db.yml`. (2PC matrix cells were removed.)
 
@@ -69,13 +72,13 @@ On every daily matrix job (`if: always()` unless noted):
 |----------|----------|
 | `result-<name>` | One line: `<name>:success`, `failure`, or `timeout` |
 | `logs-<name>` | Jepsen `store` copied from the control container (or Cluster working dir) |
-| `triage-<name>` | `triage.md` (failure only; may be missing if triage failed) |
+| `triage-<name>` | `triage.md` on failure only — **usually missing today** because AI triage is broken |
 
 Scripts under [`.github/scripts/`](../.github/scripts/):
 
-* `triage.py` — first-pass classification of `jepsen.log` (see [daily-test-checks.md](./daily-test-checks.md#ai-triage))
+* `triage.py` — intended first-pass classification of `jepsen.log` (**currently not working**; see [daily SOP §4](./daily-test-checks.md#4-ai-triage-currently-not-working))
 * `create_jira_ticket.sh` — Bug in Jira project `DLT`; embeds triage when present
-* `notify_slack.sh` — run summary with triage labels on failed/timed-out tests
+* `notify_slack.sh` — run summary (may include triage labels when triage succeeded)
 
 ---
 
