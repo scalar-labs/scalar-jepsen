@@ -118,5 +118,5 @@ L -- No --> END2[Keep monitoring]
 
 ## 6. More detail
 
-* Environments, schedules, matrices, local reproduce: [test-environment-and-setup.md](./test-environment-and-setup.md)
+* Environments, schedules, and matrices: [test-environment-and-setup.md](./test-environment-and-setup.md)
 * Kelpie dailies: [kelpie-test daily SOP](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md)

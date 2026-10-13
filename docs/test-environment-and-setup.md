@@ -1,6 +1,6 @@
 # Test Environment and Setup
 
-How daily Jepsen CI builds its environment, what it runs, and how to reproduce a failure locally.
+How daily Jepsen CI builds its environment and what it runs.
 
 Daily jobs use GitHub-hosted `ubuntu-latest` runners. The environment is created in the workflow and removed when the job ends (no Azure VM / Terraform retain).
 
@@ -79,36 +79,6 @@ Scripts under [`.github/scripts/`](../.github/scripts/):
 * `triage.py` — intended first-pass classification of `jepsen.log` (**currently not working**; see [daily SOP §4](./daily-test-checks.md#4-ai-triage-currently-not-working))
 * `create_jira_ticket.sh` — Bug in Jira project `DLT`; embeds triage when present
 * `notify_slack.sh` — run summary (may include triage labels when triage succeeded)
-
----
-
-## Reproduce a failed cell locally
-
-Match the failed job’s workload, nemesis, isolation, and backend from the Actions log or `daily-*.yml`.
-
-**Docker (DB / DL)** — same as the root README:
-
-```sh
-cd docker
-docker compose up -d
-docker exec -it jepsen-control bash
-# ScalarDB example
-cd /scalar-jepsen/cassandra && lein install
-cd /scalar-jepsen/scalardb
-lein with-profile cassandra run test --workload transfer --nemesis none \
-  --concurrency 5 --time-limit 600 --ssh-private-key ~/.ssh/id_rsa
-```
-
-**Cluster (Kind)** — install Kind, Helm, kubectl; SSH to localhost as in CI; then from `scalardb/`:
-
-```sh
-DOCKER_USERNAME=${GITHUB_USER} \
-DOCKER_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
-lein with-profile cluster run test --workload transfer --db postgres \
-  --nodes ${KUBERNETES_CLUSTER_HOST} --username ${USER}
-```
-
-Download `logs-<name>` from the failed run and compare `store/current/jepsen.log` with the local store.
 
 ---
 
