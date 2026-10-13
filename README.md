@@ -5,6 +5,7 @@ Daily GitHub Actions (ScalarDB, ScalarDL, Cluster), failure handling, and Docker
 
 * [Daily test monitoring and failure handling](docs/daily-test-checks.md)
 * [Test environment and setup](docs/test-environment-and-setup.md)
+* [Daily test types (what each matrix job checks)](docs/test-types.md)
 
 # Run tests with Jepsen Docker
 1. Move to the docker directory

@@ -5,6 +5,7 @@ Quick daily checklist for Jepsen tests in this repository.
 | Related docs | |
 |--------------|---|
 | Environments / how tests run | [test-environment-and-setup.md](./test-environment-and-setup.md) |
+| What each matrix job checks | [test-types.md](./test-types.md) |
 | Kelpie verification & benchmarks | [kelpie-test daily SOP](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md) |
 
 **What this repo covers:** daily Jepsen for ScalarDB, ScalarDL, and ScalarDB Cluster.  
@@ -119,4 +120,5 @@ L -- No --> END2[Keep monitoring]
 ## 6. More detail
 
 * Environments, schedules, and matrices: [test-environment-and-setup.md](./test-environment-and-setup.md)
+* What each matrix job checks: [test-types.md](./test-types.md)
 * Kelpie dailies: [kelpie-test daily SOP](https://github.com/scalar-labs/kelpie-test/blob/master/docs/daily-test-checks.md)

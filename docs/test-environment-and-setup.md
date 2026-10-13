@@ -5,6 +5,7 @@ How daily Jepsen CI builds its environment and what it runs.
 Daily jobs use GitHub-hosted `ubuntu-latest` runners. The environment is created in the workflow and removed when the job ends (no Azure VM / Terraform retain).
 
 For the operator checklist (Slack / Jira / failures), see [daily-test-checks.md](./daily-test-checks.md).  
+For what each matrix job checks, see [test-types.md](./test-types.md).  
 For local Docker, bare metal, and EKS Cluster setup, see the [root README](../README.md).
 
 ---
