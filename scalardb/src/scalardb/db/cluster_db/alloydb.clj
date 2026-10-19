@@ -20,6 +20,7 @@
 (def ^:private ^:const ALLOYDB_NAME "alloydb-scalardb-cluster")
 (def ^:private ^:const ALLOYDB_USER "postgres")
 (def ^:private ^:const ALLOYDB_PASSWORD "postgres")
+(def ^:private ^:const APPLY_RETRIES 10)
 
 (defn- operator-tgz []
   (str "alloydbomni-operator-" ALLOYDB_OPERATOR_VERSION ".tgz"))
@@ -64,7 +65,15 @@
                   (str "--from-literal=" ALLOYDB_NAME \= ALLOYDB_PASSWORD)))
 
   (start! [_ test]
-    (k8s/kubectl! test :apply :-f ALLOYDB_MANIFEST_YAML)
+    ;; The operator webhook can refuse connections right after install
+    (loop [tries APPLY_RETRIES]
+      (when-let [e (try (k8s/kubectl! test :apply :-f ALLOYDB_MANIFEST_YAML)
+                        nil
+                        (catch Exception e
+                          (if (> tries 1) e (throw e))))]
+        (warn e "Failed to apply the AlloyDB manifest. Retrying...")
+        (Thread/sleep 10000)
+        (recur (dec tries))))
     (k8s/wait! test {:resource (str "dbcluster/" ALLOYDB_NAME)
                      :for "condition=Provisioned"}))
 
