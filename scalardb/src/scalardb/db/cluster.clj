@@ -23,6 +23,8 @@
 
 (def ^:private ^:const CLUSTER_NAME "scalardb-cluster")
 (def ^:private ^:const NODE_SELECTOR "app.kubernetes.io/app=scalardb-cluster")
+(def ^:private ^:const CHAOS_MESH_SELECTOR
+  (str "app.kubernetes.io/instance=" cm/default-release))
 (def ^:private ^:const STRESS_OPTIONS
   {:pod-selector NODE_SELECTOR
    :targets [:one]
@@ -153,6 +155,16 @@
   ;; when requested (e.g. a Jepsen control running outside the VPC on EKS).
   (expose-loadbalancers! test backend-db))
 
+(defn- wait-for-pods-deleted!
+  "helm uninstall doesn't wait for the pods to terminate."
+  [test opts]
+  (try (when (seq (:items (k8s/pods test opts)))
+         (k8s/wait! test (assoc opts
+                                :resource "pod"
+                                :for "delete"
+                                :timeout WIPE_TIMEOUT)))
+       (catch Exception e (warn e "Failed to wait for pod deletion:" opts))))
+
 (defn- wipe!
   [test backend-db]
   (info "wiping old logs...")
@@ -166,8 +178,11 @@
                               :timeout WIPE_TIMEOUT
                               :ignore-not-found? true})
        (catch Exception e (warn e "Failed to uninstall:" CLUSTER_NAME)))
+  (wait-for-pods-deleted! test {:selector NODE_SELECTOR})
   (try (cm/wipe! test {})
-       (catch Exception e (warn e "Failed to wipe Chaos Mesh"))))
+       (catch Exception e (warn e "Failed to wipe Chaos Mesh")))
+  (wait-for-pods-deleted! test {:namespace cm/default-namespace
+                                :selector CHAOS_MESH_SELECTOR}))
 
 (defn- get-pod-list
   "Get names of running ScalarDB Cluster node pods."
@@ -175,6 +190,7 @@
   (->> (k8s/pods test {:selector NODE_SELECTOR})
        :items
        (filter #(= "Running" (get-in % [:status :phase])))
+       (remove #(get-in % [:metadata :deletionTimestamp]))
        (map #(get-in % [:metadata :name]))))
 
 (defn- collect-logs!
