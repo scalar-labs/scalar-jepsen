@@ -37,9 +37,8 @@
 
   (start! [_ test]
     (k8s/kubectl! test :apply :-f ORACLE_MANIFEST_YAML)
-    (k8s/wait! test {:resource "pod"
-                     :selector {"app" ORACLE_NAME}
-                     :for "condition=Ready"}))
+    (k8s/kubectl! test :rollout :status (str "statefulset/" ORACLE_NAME)
+                  :--timeout "300s"))
 
   (wipe! [_ test]
     (doseq [cmd [#(k8s/kubectl! test :delete :-f ORACLE_MANIFEST_YAML
