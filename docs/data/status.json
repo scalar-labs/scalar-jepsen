@@ -1,11 +1,16 @@
 {
-  "last_updated": "2026-10-30T14:45:31Z",
+  "last_updated": "2026-10-30T17:01:22Z",
   "suites": {
     "scalardb": {
       "workflow": "Daily ScalarDB test",
       "tests": {
         "GroupCommit": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -149,15 +154,15 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "timeout",
-            "run_id": 36017659891
           }
         ],
         "OnePhaseCommit_SI": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -301,15 +306,15 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "success",
-            "run_id": 36017659891
           }
         ],
         "OnePhaseCommit_Serializable": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -453,15 +458,15 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "success",
-            "run_id": 36017659891
           }
         ],
         "RCSI": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -605,15 +610,15 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "timeout",
-            "run_id": 36017659891
           }
         ],
         "ReadCommitted": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -757,15 +762,15 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "success",
-            "run_id": 36017659891
           }
         ],
         "Serializable": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -909,15 +914,15 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "success",
-            "run_id": 36017659891
           }
         ],
         "Transfers_SI": [
           {
+            "date": "2026-10-30",
+            "status": "success",
+            "run_id": 41077347738
+          },
+          {
             "date": "2026-10-29",
             "status": "success",
             "run_id": 40897948974
@@ -1061,11 +1066,6 @@
             "date": "2026-09-25",
             "status": "success",
             "run_id": 36151941896
-          },
-          {
-            "date": "2026-09-24",
-            "status": "success",
-            "run_id": 36017659891
           }
         ]
       }
