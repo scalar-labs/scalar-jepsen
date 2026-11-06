@@ -39,10 +39,8 @@
 
   (start! [_ test]
     (k8s/kubectl! test :apply :-f DB2_MANIFEST_YAML)
-    (k8s/wait! test {:resource "pod"
-                     :selector {"app" DB2_NAME}
-                     :for "condition=Ready"
-                     :timeout "600s"}))
+    (k8s/kubectl! test :rollout :status (str "statefulset/" DB2_NAME)
+                  :--timeout "600s"))
 
   (wipe! [_ test]
     (doseq [cmd [#(k8s/kubectl! test :delete :-f DB2_MANIFEST_YAML
