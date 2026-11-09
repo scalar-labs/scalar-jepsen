@@ -15,7 +15,7 @@
              [generator :as gen]
              [tests :as tests]]))
 
-(def link-to-tarball "https://archive.apache.org/dist/cassandra/5.0.8/apache-cassandra-5.0.8-bin.tar.gz")
+(def link-to-tarball "https://archive.apache.org/dist/cassandra/5.0.9/apache-cassandra-5.0.9-bin.tar.gz")
 
 (def workload-keys
   "A map of workload keys"
