@@ -20,7 +20,7 @@ Quick daily checklist for Jepsen tests in this repository.
    * Open [GitHub Actions](https://github.com/scalar-labs/scalar-jepsen/actions)
    * Open the [status page](https://scalar-labs.github.io/scalar-jepsen/) (updated after each daily finishes; ~30-day history)
 
-**When do the dailies run?** Sunday–Friday only (no Saturday). Times below are cron UTC and approx IST:
+**When do the dailies run?** Sunday–Friday only (no Saturday). Times below are cron UTC and approx JST (UTC+9):
 
 | Workflow | Cron (UTC) | Approx JST |
 |----------|------------|------------|
