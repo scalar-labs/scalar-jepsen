@@ -22,11 +22,11 @@ Quick daily checklist for Jepsen tests in this repository.
 
 **When do the dailies run?** Sunday–Friday only (no Saturday). Times below are cron UTC and approx IST:
 
-| Workflow | Cron (UTC) | Approx IST |
+| Workflow | Cron (UTC) | Approx JST |
 |----------|------------|------------|
-| Daily ScalarDB Cluster test | `0 10 * * 0-5` | 15:30 |
-| Daily ScalarDL test | `0 14 * * 0-5` | 19:30 |
-| Daily ScalarDB test | `0 15 * * 0-5` | 20:30 |
+| Daily ScalarDB Cluster test | `0 10 * * 0-5` | 19:00 |
+| Daily ScalarDL test | `0 14 * * 0-5` | 23:00 |
+| Daily ScalarDB test | `0 15 * * 0-5` | 00:00 next day |
 
 Each run uses a temporary GitHub-hosted runner. There is nothing to SSH into or destroy in Azure after the job ends.
 
