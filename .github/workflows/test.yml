@@ -72,7 +72,10 @@ jobs:
     - name: Setup Java
       uses: actions/setup-java@v5
       with:
-        java-version: '21'
+        # JDK 8 is for the Gradle toolchain of ScalarDL. The last one (21) becomes the default JAVA_HOME.
+        java-version: |
+          8
+          21
         distribution: 'temurin'
 
     - name: Cache Gradle packages
