@@ -23,8 +23,8 @@ ANALYSIS_ERRORS_NO_ANOMALIES_PAT = re.compile(
     r"errors occurred during analysis.*no anomalies found", re.IGNORECASE
 )
 
-MODELS_API_URL = "https://models.github.ai/inference/chat/completions"
-MODEL_ID = "openai/gpt-4o-mini" # https://docs.github.com/en/billing/reference/costs-for-github-modelso
+MODELS_API_URL = "https://bedrock-mantle.us-east-1.api.aws/v1"
+MODEL_ID = "openai.gpt-6-luna"
 
 
 def shorten(line: str, max_len: int = MAX_LINE_LEN) -> str:
@@ -65,13 +65,13 @@ def parse_json_content(content: str) -> dict:
     return json.loads(text)
 
 
-def call_github_models(
+def call_model(
     final_line: str,
     category: str,
     tail_lines: list[str],
     error_lines: list[str],
 ) -> dict:
-    token = os.environ["GITHUB_TOKEN"]
+    api_key = os.environ["BEDROCK_API_KEY"]
 
     user_prompt = f"""
 You are analyzing a failed Jepsen test.
@@ -157,12 +157,11 @@ ERROR_SNIPPETS:
     }
 
     req = Request(
-        MODELS_API_URL,
+        f"{MODELS_API_URL}/chat/completions",
         data=json.dumps(body).encode("utf-8"),
         headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         method="POST",
@@ -173,7 +172,7 @@ ERROR_SNIPPETS:
             payload = json.loads(resp.read().decode("utf-8"))
     except HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"GitHub Models API error: {e.code} {detail}") from e
+        raise RuntimeError(f"Bedrock API error: {e.code} {detail}") from e
 
     content = payload["choices"][0]["message"]["content"]
     return parse_json_content(content)
@@ -211,7 +210,7 @@ def main():
 
     tail, errors, final_line = scan_log(log_path)
     category = categorize_final_line(final_line)
-    result = call_github_models(final_line, category, tail, errors)
+    result = call_model(final_line, category, tail, errors)
 
     md = []
     md.append("## Jepsen triage")
