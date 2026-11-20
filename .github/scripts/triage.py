@@ -23,7 +23,7 @@ ANALYSIS_ERRORS_NO_ANOMALIES_PAT = re.compile(
     r"errors occurred during analysis.*no anomalies found", re.IGNORECASE
 )
 
-MODELS_API_URL = "https://bedrock-mantle.us-east-1.api.aws/v1"
+MODELS_API_URL = "https://bedrock-mantle.us-east-1.api.aws/openai/v1"
 MODEL_ID = "openai.gpt-6-luna"
 
 
@@ -152,7 +152,6 @@ ERROR_SNIPPETS:
                 "content": user_prompt
             }
         ],
-        "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }
 
