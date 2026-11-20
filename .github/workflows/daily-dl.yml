@@ -12,7 +12,6 @@ jobs:
 
     permissions:
       contents: read
-      models: read
 
     strategy:
       fail-fast: false
@@ -195,10 +194,10 @@ jobs:
       run: |
         docker cp jepsen-control:/scalar-jepsen/scalardl/store store-${{ matrix.tests.name }} || true
 
-    - name: First-pass triage with GitHub Models
+    - name: First-pass triage with Bedrock
       if: failure()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BEDROCK_API_KEY: ${{ secrets.BEDROCK_API_KEY }}
       run: |
         python3 .github/scripts/triage.py \
           --log store-${{ matrix.tests.name }}/current/jepsen.log \
