@@ -12,7 +12,6 @@ jobs:
 
     permissions:
       contents: read
-      models: read
 
     strategy:
       fail-fast: false
@@ -438,10 +437,10 @@ jobs:
         name: result-${{ matrix.tests.name }}
         path: result-${{ matrix.tests.name }}.txt
 
-    - name: First-pass triage with GitHub Models
+    - name: First-pass triage with Bedrock
       if: failure()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BEDROCK_API_KEY: ${{ secrets.BEDROCK_API_KEY }}
       run: |
         python3 .github/scripts/triage.py \
           --log scalardb/store/current/jepsen.log \
