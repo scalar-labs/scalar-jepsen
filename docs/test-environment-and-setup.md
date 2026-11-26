@@ -1,0 +1,98 @@
+# Test Environment and Setup
+
+How daily Jepsen CI builds its environment and what it runs.
+
+Daily jobs use GitHub-hosted `ubuntu-latest` runners. The environment is created in the workflow and removed when the job ends (no Azure VM / Terraform retain).
+
+For the operator checklist (Slack / Jira / failures), see [daily-test-checks.md](./daily-test-checks.md).  
+For what each matrix job checks, see [test-types.md](./test-types.md).  
+For local Docker, bare metal, and EKS Cluster setup, see the [root README](../README.md).
+
+---
+
+## Daily workflows
+
+| Workflow | File | Schedule (UTC) | Environment |
+|----------|------|----------------|-------------|
+| Daily ScalarDB Cluster test | [`.github/workflows/daily-cluster.yml`](../.github/workflows/daily-cluster.yml) | `0 10 * * 0-5` (Sun–Fri) | Kind + MetalLB on the runner |
+| Daily ScalarDL test | [`.github/workflows/daily-dl.yml`](../.github/workflows/daily-dl.yml) | `0 14 * * 0-5` (Sun–Fri) | Docker Compose (`docker/`) |
+| Daily ScalarDB test | [`.github/workflows/daily-db.yml`](../.github/workflows/daily-db.yml) | `0 15 * * 0-5` (Sun–Fri) | Docker Compose (`docker/`) |
+
+Related:
+
+* **Update status page** ([`update-status.yml`](../.github/workflows/update-status.yml)) runs when a daily workflow completes and merges `result-*` into gh-pages `docs/data/status.json` (30-day history). Published at https://scalar-labs.github.io/scalar-jepsen/
+* **ScalarDB Cluster Test (dispatch)** ([`cluster-test.yml`](../.github/workflows/cluster-test.yml)) is a manual Kind run with extra inputs (ref, version, backend, workload, nemesis).
+* PR/push: `build-test.yml`, `fmt-lint.yml`, and a shorter smoke run in `test.yml` (not the daily matrix).
+
+The three daily workflows are schedule-only (no `workflow_dispatch`). There is no Saturday cron.
+
+---
+
+## Docker environment (ScalarDB and ScalarDL)
+
+Topology is defined in [`docker/docker-compose.yaml`](../docker/docker-compose.yaml):
+
+* `jepsen-control` — JDK, Leiningen, graphviz; repo mounted at `/scalar-jepsen`
+* `jepsen-n1` … `jepsen-n5` — privileged nodes with SSH
+
+Daily DB/DL jobs:
+
+1. Restore cached Docker images and Maven (`~/.m2`) when present.
+2. `docker compose up -d` and wait until all six containers are running.
+3. Copy m2 into the control container; `lein install` in `cassandra/`.
+4. ScalarDL only: checkout `scalar-labs/scalardl`, `./gradlew distTar`, copy `ledger.tar` into `scalardl/resources/`.
+5. `docker exec jepsen-control … lein … run test` with matrix options (`--concurrency 5`, `--time-limit 600`, `--ssh-private-key ~/.ssh/id_rsa`).
+6. Copy `store` out of the control container; on failure attempt triage (currently not working — see [daily SOP §4](./daily-test-checks.md#4-ai-triage-currently-not-working)), create Jira, then upload artifacts.
+
+**ScalarDB daily matrix (7 jobs):** Transfers_SI, ReadCommitted, RCSI, Serializable, OnePhaseCommit_SI, OnePhaseCommit_Serializable, GroupCommit. Typical nemeses: `none`, `partition`, `crash`. Isolation/consistency flags are set per cell in `daily-db.yml`. (2PC matrix cells were removed.)
+
+**ScalarDL daily matrix (3 jobs):** `nemesis-none`, `nemesis-crash`, `nemesis-partition`. The workflow currently passes `--workload all`.
+
+---
+
+## Kind environment (ScalarDB Cluster)
+
+Daily Cluster jobs run on the runner itself (not inside `jepsen-control`):
+
+1. Enable SSH to localhost for the runner user.
+2. Java 21 + Leiningen.
+3. Kind cluster `test-cluster` + MetalLB (L2 pool on the Kind Docker network).
+4. `lein with-profile cluster run test --db <backend> …` with matrix workloads and nemeses (`none partition packet clock crash`), time-limit 600.
+
+**Matrix (high level):** postgres feature cells matching the DB suite plus `ClientSideOptimizations`; Transfers and Elle pairs for alloydb, yugabytedb, mysql, mariadb, tidb, sqlserver, oracle, db2, cassandra.
+
+Daily Cluster is Kind-only. EKS StorageClass and LoadBalancer notes in the root README apply to manual/EKS runs, not to the scheduled daily.
+
+---
+
+## Artifacts and helper scripts
+
+On every daily matrix job (`if: always()` unless noted):
+
+| Artifact | Contents |
+|----------|----------|
+| `result-<name>` | One line: `<name>:success`, `failure`, or `timeout` |
+| `logs-<name>` | Jepsen `store` copied from the control container (or Cluster working dir) |
+| `triage-<name>` | `triage.md` on failure only — **usually missing today** because AI triage is broken |
+
+Scripts under [`.github/scripts/`](../.github/scripts/):
+
+* `triage.py` — intended first-pass classification of `jepsen.log` (**currently not working**; see [daily SOP §4](./daily-test-checks.md#4-ai-triage-currently-not-working))
+* `create_jira_ticket.sh` — Bug in Jira project `DLT`; embeds triage when present
+* `notify_slack.sh` — run summary (may include triage labels when triage succeeded)
+
+---
+
+## Secrets (names only)
+
+| Secret / permission | Used for |
+|---------------------|----------|
+| `GITHUB_TOKEN` | Triage (GitHub Models); `models: read` on daily jobs |
+| `GH_PAT` | Slack notify job and status-page artifact download |
+| `SLACK_WEBHOOK_URL` | Daily Slack summary |
+| `JIRA_AUTH`, `JIRA_ASSIGNEE_ID` | Failure tickets (`DLT`) |
+| `CR_PAT` | GHCR / Cluster image pull |
+
+Do not put secret values in tickets or this document.
+
+Kelpie verification and benchmarks: [kelpie-test test environment and setup](https://github.com/scalar-labs/kelpie-test/blob/master/docs/test-environment-and-setup.md).
