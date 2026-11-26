@@ -408,13 +408,15 @@ jobs:
           OPTS+=" --enable-cluster-client-side-optimizations"
         fi
         set +e
+        set -o pipefail
         DOCKER_USERNAME=${{ github.repository_owner }} \
         DOCKER_ACCESS_TOKEN=${{ secrets.CR_PAT }} \
         lein with-profile cluster run test \
           --time-limit ${{ matrix.tests.time_limit }} \
           --db ${{ matrix.tests.backend_db }} \
           --concurrency 5 \
-          ${OPTS} > /dev/null 2>&1
+          ${OPTS} \
+          2>&1 | tail -n 300
         EXIT_CODE=$?
         echo "done=true" >> $GITHUB_OUTPUT
         exit $EXIT_CODE
